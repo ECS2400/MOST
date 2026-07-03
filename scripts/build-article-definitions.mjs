@@ -1,0 +1,434 @@
+import { writeFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const out = join(dirname(fileURLToPath(import.meta.url)), '../data/knowledgeCenter/articleDefinitions.ts');
+
+// Articles 1-5: hand-authored unique content (already validated)
+const part1 = `export interface KnowledgeArticleDefinition {
+  topic: string;
+  title: string;
+  contentOn: string;
+  contentOna: string;
+}
+
+export const KNOWLEDGE_ARTICLE_DEFINITIONS: KnowledgeArticleDefinition[] = [
+  {
+    topic: 'Konflikty i kłótnie',
+    title: 'Kłótnie są normalne — nie oznaczają końca miłości',
+    contentOn:
+      'Wielu mężczyzn traktuje każdą kłótnię jak alarm: „coś jest nie tak z nami". Tymczasem badania par pokazują, że pary, które potrafią się sprzeciwić, często są silniejsze niż te, które milczą z obawy przed konfliktem.\\n\\nKłótnia nie oznacza braku miłości — oznacza, że oboje macie coś ważnego do powiedzenia. Kluczowe jest, by nie szukać zwycięstwa, lecz zrozumienia. Zanim odpowiesz, zatrzymaj się na oddech i zapytaj siebie: czy chcę wygrać, czy naprawdę usłyszeć partnerkę?\\n\\nPraktyczny krok: po eskalacji wróć do rozmowy w ciągu 24 godzin. Krótkie zdanie „przepraszam, że podniosłem głos" otwiera drzwi do naprawy. Małe gesty naprawcze mają większą moc niż wielkie deklaracje.\\n\\nPamiętaj — spór o naczynia czy pieniądze rzadko dotyczy tylko tego tematu. Szukaj warstwy głębszej: potrzeby bycia docenionym, bezpieczeństwa lub bliskości.',
+    contentOna:
+      'Kobiety często po kłótni czują, że relacja się rozpada — a przecież to właśnie unikanie trudnych rozmów prowadzi do dystansu. Kłótnie są naturalną częścią życia we dwoje, o ile nie zamieniają się w codzienny atak personalny.\\n\\nTwoje emocje podczas sporu są ważnym sygnałem, nie przeszkodą. Zamiast tłumić złość czy smutek, spróbuj nazwać je wprost: „czuję się niewidzialna, gdy…". To zmienia dynamikę z walki na rozmowę.\\n\\nPo burzy zrób pierwszy krok, jeśli czujesz, że to bezpieczne — nawet proste „wróćmy do tego spokojniej" buduje most. Nie musisz mieć racji, by odzyskać bliskość.\\n\\nObserwuj wzorce: czy kłócicie się o te same rzeczy? To znak, że pod powierzchnią leży nierozwiązana potrzeba. Wspólna rozmowa o tym, czego każde z Was naprawdę potrzebuje, może przerwać cykl powtarzających się awantur.',
+  },
+  {
+    topic: 'Konflikty i kłótnie',
+    title: 'Jak kłócić się konstruktywnie zamiast niszczyć',
+    contentOn:
+      'Konstruktywna kłótnia to nie taka bez krzyku — to taka, po której relacja jest silniejsza. Jako mężczyzna często reagujesz „naprawianiem": od razu proponujesz rozwiązanie, zanim partnerka skończy mówić. To gasi rozmowę szybciej niż podniesiony głos.\\n\\nZasada trzech zdań: jedno o faktach („wczoraj wróciłem po 22"), jedno o uczuciu („czuję się zmęczony tym tematem") i jedno o potrzebie („potrzebuję, żebyśmy ustalili to razem"). Unikaj słów „zawsze" i „nigdy" — to amunicja, nie argument.\\n\\nGdy czujesz, że temperatura rośnie, nazwij to: „czuję, że zaraz powiem coś, czego pożałuję". To nie ucieczka — to odpowiedzialność. Ustalcie z góry sygnał przerwy, np. uniesienie dłoni.\\n\\nPo sporze podsumujcie, co ustaliliście — nawet jeśli to tylko „wrócimy do tego w sobotę". Konkretne zobowiązanie zamyka kłótnię i daje obojgu poczucie, że coś się zmieniło.',
+    contentOna:
+      'Konstruktywna kłótnia wymaga odwagi — zwłaszcza gdy przyzwyczaiłaś się do ustępowania, by zachować spokój. Ale milczenie kosztuje więcej niż jeden trudny wieczór z trudną rozmową.\\n\\nZamiast atakować charakter („jesteś egoistą"), mów o konkretnym zachowaniu i jego wpływie na Ciebie. Partner nie jest wróżką — nie zawsze wie, co Cię boli, dopóki nie powiesz jasno.\\n\\nPodczas sporu trzymaj kontakt wzrokowy, gdy to możliwe — fizyczna obecność przypomina, że jesteście po tej samej stronie. Jeśli głos rośnie, obniż swój. To nie poddanie się, lecz świadoma regulacja.\\n\\nNa koniec każdej kłótni zapytaj: „co możemy zrobić inaczej następnym razem?" Jedno małe ustalenie — np. kto wychodzi na chwilę, gdy emocje buzują — może odmienić kolejne miesiące.',
+  },
+  {
+    topic: 'Konflikty i kłótnie',
+    title: 'Kiedy przerwa w rozmowie ratuje relację',
+    contentOn:
+      'Mózg w stresie nie słucha — reaguje. Gdy tętno przyspiesza i czujesz gorąco w twarzy, Twoja zdolność do empatii spada niemal do zera. W takim momencie kontynuowanie kłótni to jak jazda po ciemku bez świateł.\\n\\nPrzerwa to nie ucieczka od partnerki i nie oznaka, że „nie zależy Ci". To narzędzie. Powiedz wprost: „potrzebuję 20 minut, wrócę i dokończymy". Kluczowe słowo to „wrócę" — bez tego przerwa staje się milczeniem-zemstą.\\n\\nPodczas przerwy nie analizuj, kto miał rację. Oddychaj, przejdź się, napij wody. Nie wysyłaj eskalujących wiadomości. Celem jest uspokojenie układu nerwowego, nie zbieranie argumentów.\\n\\nWracając, zacznij od czegoś łagodnego: „dzięki, że dałaś mi czas. Chcę Cię wysłuchać". Przerwa działa tylko wtedy, gdy obie strony wiedzą, że rozmowa zostanie dokończona — inaczej niewypowiedziane słowa fermentują w ciszy.',
+    contentOna:
+      'Kiedy emocje buzują, każde kolejne zdanie może ranić głębiej. Przerwa w rozmowie to nie porażka — to mądra decyzja, która chroni Was przed słowami, których nie da się łatwo cofnąć.\\n\\nJeśli partner proponuje przerwę, spróbuj nie interpretować tego jako odrzucenia. Zapytaj: „kiedy wracamy do rozmowy?" Ustalony termin daje poczucie bezpieczeństwa — wiesz, że temat nie zostanie zignorowany.\\n\\nW czasie przerwy unikaj rozpisywania w głowie całej historii swoich krzywd. Zamiast tego zadaj sobie pytanie: czego naprawdę potrzebuję od tej rozmowy? Zrozumienia? Przeprosin? Wspólnego planu?\\n\\nGdy wracacie do stołu — dosłownie lub metaforycznie — zacznij od tego, co Was łączy. „Zależy mi na nas" to najkrótsza droga z pola bitwy z powrotem do relacji. Przerwa bez powrotu to milczenie; przerwa z intencją to inwestycja.',
+  },
+  {
+    topic: 'Konflikty i kłótnie',
+    title: 'Dlaczego te same tematy wracają',
+    contentOn:
+      'Powracające kłótnie to jak niewyleczone rany — za każdym razem boli w tym samym miejscu, choć powód na powierzchni wygląda inaczej. Spór o wakacje może naprawdę dotyczyć poczucia, że Twoje potrzeby są ignorowane.\\n\\nZapisz trzy ostatnie kłótnie i znajdź wspólny mianownik. Czy chodzi o szacunek? O czas razem? O poczucie sprawiedliwości? Dopiero gdy nazwiesz rdzeń, możesz przestać walczyć o objawy.\\n\\nPorozmawiaj z partnerką poza momentem konfliktu: „zauważyłem, że wracamy do tematu X. Co dla Ciebie leży pod spodem?" Spokojna rozmowa o wzorcu jest skuteczniejsza niż kolejna awantura o szczegóły.\\n\\nUstal jeden konkretny krok na najbliższy miesiąc — nie pięć obietnic naraz. Mała zmiana, np. cotygodniowa rozmowa przy kawie, może przerwać cykl, który trwał latami. Powtarzalność tematów to sygnał, nie wyrok.',
+    contentOna:
+      'Frustrujące jest kłócić się o to samo po raz dziesiąty — czujesz, że nic się nie zmienia. Ale powracające tematy zwykle nie dotyczą naczyń ani pieniędzy. Dotyczą głębszych potrzeb: bycia ważną, słyszaną, bezpieczną.\\n\\nZatrzymaj się po kolejnej kłótni i zapytaj siebie: o co naprawdę walczę? Często odkryjesz, że to nie konkretne zachowanie partnera, lecz emocja, którą ono w Tobie budzi — samotność, lęk, zazdrość.\\n\\nPodziel się tym odkryciem z partnerem w spokojnym momencie. „Kiedy nie odbierasz telefonu, nie chodzi mi o telefon — boję się, że nie jestem priorytetem". Takie zdania zmieniają grę.\\n\\nPoproś o wspólne szukanie rozwiązania, nie o jednostronne ustępstwo. Cykl się łamie, gdy oboje bierzecie odpowiedzialność za wzorzec — nie tylko za ostatnią kłótnię.',
+  },
+  {
+    topic: 'Konflikty i kłótnie',
+    title: 'Po kłótni: jak wrócić do rozmowy bez urazy',
+    contentOn:
+      'Po kłótni wiele mężczyzn wybiera strategię „czas leczy rany" — milczą, licząc, że problem sam zniknie. Czas nie leczy nierozwiązanych konfliktów — je tylko zakrywa kurzem codzienności, aż wybuchną znowu.\\n\\nPierwszy krok po burzy: przeproś za swoją część — konkretnie. Nie „przepraszam, że się pokłóciliśmy", lecz „przepraszam, że powiedziałem, że Ci na mnie nie zależy. To nieprawda". Szczerość bez wymówek otwiera drzwi.\\n\\nNie naciskaj na natychmiastową rozmowę, jeśli partnerka potrzebuje przestrzeni. Ale zasygnalizuj gotowość: „chcę wrócić do tego, kiedy będziesz gotowa. Daj znać". To balans między inicjatywą a szacunkiem.\\n\\nGdy wracacie do tematu, zacznij od tego, co zrozumiałeś z jej perspektywy. „Rozumiem, że poczułaś się odtrącona" — nawet jeśli nie zgadzasz się w 100%, to pokazuje, że słuchałeś. Naprawa po kłótni to umiejętność, którą można ćwiczyć jak mięsień.',
+    contentOna:
+      'Po ostrym sporze serce wciąż bije szybciej, a zdanie „przepraszam" od partnera może brzmieć niewystarczająco — albo zbyt późno. To normalne. Wracanie do rozmowy wymaga czasu i odwagi z obu stron.\\n\\nTy też weź odpowiedzialność za swoją część. Nawet jeśli partner zaczął, Twoje słowa też mają wagę. „Przepraszam, że powiedziałam, że jesteś bezduszny — wiem, że się starasz" buduje most szybciej niż czekanie na idealne przeprosiny.\\n\\nNie testuj partnera milczeniem przez dni. Jeśli potrzebujesz czasu, powiedz to wprost i zaproponuj termin powrotu do rozmowy. Gra w ignorowanie niszczy więcej niż sama kłótnia.\\n\\nGdy wracacie do tematu, szukajcie wspólnego gruntu, nie winnego. „Co możemy zrobić inaczej?" to pytanie, które przenosi Was z przeszłości w przyszłość. Uraza nie znika w jednej rozmowie — ale każda szczera próba naprawy ją zmniejsza.',
+  },`;
+
+const part2 = `
+  {
+    topic: 'Komunikacja',
+    title: 'Aktywne słuchanie — co to znaczy w praktyce',
+    contentOn:
+      'Aktywne słuchanie to nie czekanie na swoją kolej do mówienia. To pełna uwaga na to, co partnerka mówi — bez planowania odpowiedzi w głowie, bez sięgania po telefon, bez przerywania „rozwiązaniem".\\n\\nW praktyce: patrzysz na nią, kiwasz głową, powtarzasz kluczowe słowa: „czyli czujesz, że jesteś sama z tym problemem?" To sprawdzenie, czy dobrze zrozumiałeś — nie pytanie retoryczne.\\n\\nMężczyźni często słyszą pierwsze zdanie i od razu „naprawiają". Zadaj jedno pytanie więcej: „co byłoby dla Ciebie najlepszym rozwiązaniem?" Często partnerka już je zna — potrzebuje przestrzeni, by o tym powiedzieć.\\n\\nĆwicz 10 minut dziennie: jedna rozmowa, w której Twoim jedynym zadaniem jest słuchanie. Bez rad, bez ocen. Z czasem partnerka sama prosi o Twoją opinię — bo czuje się naprawdę wysłuchana.',
+    contentOna:
+      'Aktywne słuchanie to dar, który dajesz partnerowi — i sobie. W świecie ciągłych powiadomień pełna uwaga na jedną osobę staje się rzadkością, a jednocześnie tym, czego najbardziej pragniesz.\\n\\nGdy partner mówi, nie przerywaj nawet wtedy, gdy znasz odpowiedź. Pozwól mu dokończyć myśl. Potem podsumuj: „słyszę, że martwisz się o nasze finanse i czujesz presję".\\n\\nPowiedz wprost, gdy potrzebujesz być wysłuchana: „teraz potrzebuję, żebyś tylko słuchał, bez rad". Jasna prośba eliminuje frustrację, gdy partner wchodzi w tryb „naprawiacza".\\n\\nSłuchanie to aktywna praca: pytania, parafraza, obecność. Gdy oboje ćwiczycie tę umiejętność, rozmowy stają się krótsze, a zrozumienie — głębsze.',
+  },
+  {
+    topic: 'Komunikacja',
+    title: 'Mówienie „ja czuję" zamiast „ty zawsze"',
+    contentOn:
+      'Zdanie „ty zawsze zostawiasz bałagan" to oskarżenie, nie komunikat. Partnerka słyszy atak i broni się, zamiast usłyszeć Twoją potrzebę. Mózg w trybie obrony nie słucha — reaguje.\\n\\nZamień „ty zawsze" na „ja czuję": „gdy widzę nieposprzątaną kuchnię, czuję się przytłoczony". Mówisz o swoim doświadczeniu, nie o jej charakterze.\\n\\nĆwicz formułę: „kiedy [fakt], czuję [emocja], potrzebuję [prośba]". Np. „kiedy wracasz późno bez wiadomości, czuję się zaniepokojony, potrzebuję krótkiego SMS-a". Konkret, bez generalizacji.\\n\\nPoczątkowo może się to wydawać sztuczne — to normalne. Z czasem staje się naturalne. Partnerka nie czuje się atakowana, więc łatwiej odpowiada współpracą zamiast kontratakiem.',
+    contentOna:
+      '„Ty nigdy mnie nie słuchasz" — za każdym razem partner słyszy: jestem do niczego. Tymczasem chodziło Ci o samotność w relacji, o tęsknotę za rozmową.\\n\\nKomunikat „ja czuję" pozwala powiedzieć o bólu bez raniących słów. „Czuję się samotna, kiedy wieczorami jesteś w telefonie" to inna rozmowa niż „jesteś uzależniony od ekranu".\\n\\nMów o jednym momencie, jednej emocji, jednej prośbie. Im prostszy komunikat, tym trudniej go zignorować. Unikaj katalogowania win z przeszłości.\\n\\nGdy partner mówi „ja czuję", przyjmij to bez obrony. „Rozumiem, że tak się czujesz" to najpotężniejsze zdanie w relacji. Nie musisz się zgadzać — wystarczy, że bierzesz jego uczucia na poważnie.',
+  },
+  {
+    topic: 'Komunikacja',
+    title: 'Jak rozmawiać, gdy emocje są wysokie',
+    contentOn:
+      'Rozmowa przy wysokich emocjach to jak jazda we mgle — widzisz tylko to, co tuż przed maską. Umysł skraca zdania do haseł, a cierpliwość znika.\\n\\nZwolnij tempo. Mów wolniej, rób pauzy. Głęboki oddech przed każdą odpowiedzią to prosta technika, która naprawdę działa — dla Ciebie i dla partnerki.\\n\\nUnikaj trzech pułapek: ucieczki (wychodzenie bez słowa), ataku (podnoszenie głosu) i zamrożenia (milczenie godzinami). Lepiej: „jestem zbyt podenerwowany, wrócę za chwilę".\\n\\nGdy emocje opadną, wróć do rozmowy. Niewyjaśnione sprawy fermentują. Nawet „przepraszam za ton, chcę to dokończyć spokojnie" pokazuje dojrzałość i troskę o relację.',
+    contentOna:
+      'Kiedy łzy napływają albo głos drży, rozmowa logiczna staje się niemożliwa — i to nie Twoja wina. Emocje sygnalizują, że temat jest ważny.\\n\\nDaj sobie prawo do zatrzymania: „nie mogę teraz rozmawiać spokojnie, potrzebuję chwili". To dbanie o jakość rozmowy, nie dramatyzowanie. Lepiej odłożyć niż powiedzieć coś, czego pożałujesz.\\n\\nGdy partner jest podenerwowany, nie odpowiadaj tym samym tonem. Obniż głos, zwolnij tempo. Jedna spokojna osoba często wyciąga drugą z spirali.\\n\\nPo burzy oceń, czy dotarliście do sedna. Czasem wystarczy: „przepraszam, że płakałam — chodziło mi o to, że się boję". Nazwanie emocji po fakcie też jest komunikacją.',
+  },
+  {
+    topic: 'Komunikacja',
+    title: 'Niewerbalna komunikacja — co przekazujesz milczeniem',
+    contentOn:
+      'Słowa to tylko część komunikatu. Partnerka czyta Twój wzrok, postawę ciała i to, czy w ogóle na nią patrzysz. Milczenie też mówi — często głośniej niż krzyk.\\n\\nSkrzyżowane ręce, odwrócona głowa, wzrok w telefonie — to sygnały „nie jestem dostępny", nawet jeśli mówisz „słucham". Otwórz postawę: stopy na ziemi, ramiona rozluźnione, kontakt wzrokowy.\\n\\nMilczenie po kłótni bywa karą lub obojętnością. Jeśli potrzebujesz czasu, powiedz jednym zdaniem: „potrzebuję godziny, potem porozmawiamy". Samo milczenie zostawia partnerkę w niepewności.\\n\\nDotyk buduje mosty, gdy słowa zawodzą: ręka na ramieniu, krótkie przytulenie przy wyjściu. Niewerbalna bliskość często otwiera drogę do werbalnej rozmowy.',
+    contentOna:
+      'Ciało mówi prawdę, której usta czasem się wstydzą. Partner może powiedzieć „wszystko w porządku", ale napięte szczęki mówią co innego. Ucz się czytać te sygnały — i własne też.\\n\\nTwoje milczenie ma wagę. Gdy wycofujesz się bez słowa, partner czuje się opuszczony. Nawet „potrzebuję chwili dla siebie" daje informację zamiast lęku.\\n\\nSygnalizuj otwartość: skieruj ciało w stronę partnera, utrzymuj kontakt wzrokowy, kiwnij głową. Te gesty mówią: jesteś ważny, jestem tu.\\n\\nDotyk nie wymaga słów. Przytulenie po ciężkim dniu, dłoń w dłoni podczas spaceru — budują poczucie bezpieczeństwa. Czasem jeden gest mówi więcej niż godzina rozmowy.',
+  },
+  {
+    topic: 'Komunikacja',
+    title: 'Pytania, które otwierają rozmowę zamiast ją zamykać',
+    contentOn:
+      'Zamknięte pytania — „czy zrobiłaś to?" — prowadzą do „tak" lub „nie" i koniec. Otwarte zapraszają: „jak się z tym czujesz?", „co byłoby idealnym rozwiązaniem?", „czego potrzebujesz ode mnie?".\\n\\nUnikaj pytań-zasadzek: „dlaczego zawsze…?" Partnerka słyszy oskarżenie. Zamień na: „pomóż mi zrozumieć, co się wydarzyło". Ton ma znaczenie tak samo jak treść.\\n\\nJedno dobre pytanie zmienia kierunek rozmowy. Zamiast „czy jesteś zła?" spróbuj „co Cię dziś najbardziej zmartwiło?". Drugie otwiera przestrzeń, pierwsze zamyka.\\n\\nĆwicz codziennie jedno pytanie bez ukrytej agendy — czysta ciekawość o jej dzień i uczucia. Z czasem partnerka chętniej dzieli się tym, co leży jej na sercu.',
+    contentOna:
+      'Pytania kształtują jakość rozmowy. „Czy znowu o tym?" zamyka drzwi. „Co sprawia, że ten temat jest dla Ciebie ważny?" je otwiera.\\n\\nDobre pytanie to ciekawość bez osądu. Partner nie jest na przesłuchaniu — jest w bezpiecznej przestrzeni. Twoje zadanie to słuchać, nie oceniać.\\n\\nUnikaj pytań retorycznych w kłótni: „czy Ty w ogóle mnie kochasz?" To ból przebrany za pytanie. Lepiej: „czuję się niepewnie — co dla Ciebie znaczy ta relacja?".\\n\\nZadawaj pytania sobie: czego naprawdę chcę się dowiedzieć? Często chodzi nie o fakty, lecz o uczucia. „Jak się z tym czujesz?" to najprostsze i najpotężniejsze pytanie w relacji.',
+  },`;
+
+writeFileSync(out, part1 + part2);
+console.log('Parts 1-2 written (10 articles)');
+
+const part3 = `
+  {
+    topic: 'Emocje i uczucia',
+    title: 'Nazywanie emocji — pierwszy krok do bliskości',
+    contentOn:
+      'Wielu mężczyzn uczy się tłumić emocje — „nie płacz", „bądź twardy". W związku to kosztuje bliskość. Partnerka nie może dotrzeć do Ciebie, jeśli nie wie, co czujesz.\\n\\nNazywanie emocji to nie słabość — to precyzja. Zamiast „jestem zły" spróbuj „czuję się nie doceniony" lub „jestem rozczarowany". Im dokładniej nazwiesz uczucie, tym łatwiej partnerka zrozumie, czego potrzebujesz.\\n\\nZacznij od małych kroków: jedno zdanie dziennie o tym, co czujesz. „Dziś był ciężki dzień, czuję się wyczerpany". Nie musisz od razu otwierać całego wnętrza — buduj nawyk stopniowo.\\n\\nGdy nauczysz się nazywać własne emocje, łatwiej rozpoznasz je u partnerki. To fundament empatii i głębszej rozmowy — nie tylko o faktach, ale o tym, co naprawdę się dzieje pod powierzchnią.',
+    contentOna:
+      'Emocjonalna świadomość to siła w budowaniu trwałej relacji. Kobiety często naturalnie nazywają uczucia — ale czasem też je tłumią, by „nie psuć atmosfery".\\n\\nNazywanie emocji partnerowi daje mu mapę Twojego wnętrza. Zamiast milczeć i liczyć, że zgadnie, powiedz: „czuję się przytłoczona obowiązkami" lub „jestem wdzięczna za Twój wysiłek".\\n\\nĆwicz rozpoznawanie emocji u siebie przed rozmową. Zatrzymaj się i zapytaj: co teraz czuję? Złość? Smutek? Lęk? Często pod złością kryje się smutek lub strach.\\n\\nGdy oboje nazywacie emocje, kłótnie stają się mniej destrukcyjne. Zamiast walczyć o rację, rozmawiacie o tym, co każde z Was czuje — i to jest droga do prawdziwej bliskości.',
+  },
+  {
+    topic: 'Emocje i uczucia',
+    title: 'Lęk przed odrzuceniem w związku',
+    contentOn:
+      'Lęk przed odrzuceniem może sprawiać, że wycofujesz się, zanim partnerka Cię „zostawi". Albo że kłócisz się, by „sprawdzić", czy zależy jej na Tobie. Obie strategie niszczą bliskość.\\n\\nRozpoznaj swoje wzorce: czy unikasz trudnych rozmów z obawy przed konfliktem? Czy testujesz partnerkę milczeniem? Te zachowania często wynikają z lęku, nie z obojętności.\\n\\nPowiedz o lęku wprost, gdy czujesz się bezpiecznie: „boję się, że mnie nie potrzebujesz". Brzmi wrażliwie — ale właśnie takie rozmowy budują zaufanie. Partnerka nie jest wróżką.\\n\\nPracuj nad poczuciem własnej wartości niezależnie od relacji. Terapia, dziennik, rozmowy z przyjaciółmi — lęk przed odrzuceniem często ma korzenie głębsze niż obecny związek. Im silniejszy jesteś w sobie, tym mniej boisz się utraty.',
+    contentOna:
+      'Lęk przed odrzuceniem w związku to jeden z najczęstszych, najmniej mówionych tematów. Może sprawiać, że godzisz się na za mało, milczysz, gdy boli, albo wchodzisz w kłótnie, by „odzyskać" uwagę.\\n\\nZauważ, kiedy lęk przejmuje kontrolę. Czy rezygnujesz z własnych potrzeb, by partner nie odszedł? Czy interpretujesz każde milczenie jako znak końca? Te reakcje są zrozumiałe — ale można je zmieniać.\\n\\nPodziel się lękiem w spokojnym momencie: „czasem boję się, że nie jestem wystarczająca". To nie słabość — to zaproszenie do bliskości. Partner, który słucha bez oceny, może stać się Twoim bezpiecznym miejscem.\\n\\nBuduj poczucie wartości poza związkiem: pasje, przyjaźnie, rozwój. Im pełniejsza jesteś w sobie, tym mniej lęk decyduje o Twoich reakcjach w relacji.',
+  },
+  {
+    topic: 'Emocje i uczucia',
+    title: 'Jak mówić o zranieniu bez oskarżeń',
+    contentOn:
+      'Zranienie w związku jest nieuniknione — nawet bez złych intencji. Partnerka może Cię zranić słowem, milczeniem, zapomnieniem. Kluczowe jest, jak o tym mówisz.\\n\\nZamiast „zraniłaś mnie" spróbuj: „kiedy powiedziałaś X, poczułem się jakbyś mnie nie szanowała. Czy możemy o tym porozmawiać?" Mów o swoim doświadczeniu, nie o jej intencjach.\\n\\nWybieraj moment — nie w środku kłótni o coś innego. Spokojna rozmowa o zranieniu ma większą szansę na zrozumienie niż wyrzut w ferworze walki.\\n\\nBądź gotowy usłyszeć jej perspektywę. Czasem zranienie było niezamierzone. To nie umniejsza Twojego bólu — ale otwiera drogę do naprawy zamiast wojny o winę.',
+    contentOna:
+      'Mówić o zranieniu wymaga odwagi — zwłaszcza gdy przyzwyczaiłaś się do „przełykania" bólu, by nie być „trudną". Ale niewypowiedziane zranienie zamienia się w żal, a żal — w dystans.\\n\\nUżyj formuły: „kiedy [sytuacja], poczułam się [emocja], bo [potrzeba]". Np. „kiedy zapomniałeś o naszej rocznicy, poczułam się nieważna, bo potrzebuję, byśmy celebrowali nas".\\n\\nNie atakuj charakteru — mów o konkretnym zachowaniu i jego wpływie na Ciebie. Partner może się bronić, jeśli słyszy „jesteś bezduszny", zamiast „poczułam się samotna".\\n\\nPo wypowiedzeniu zranienia daj przestrzeń na reakcję. Słuchaj, co partner ma do powiedzenia. Naprawa to dialog, nie monolog. Nawet jeśli boli — szczera rozmowa jest lepsza niż ciche obojętność.',
+  },
+  {
+    topic: 'Emocje i uczucia',
+    title: 'Zazdrość — kiedy sygnalizuje potrzebę, a kiedy problem',
+    contentOn:
+      'Zazdrość to nie zawsze „zła" emocja. Czasem sygnalizuje, że coś w relacji wymaga uwagi — np. brak czasu razem lub poczucie zagrożenia.\\n\\nJako mężczyzna możesz też odczuwać zazdrość — i warto o tym mówić, zamiast udawać, że Cię to nie dotyczy. „Czuję się niepewnie, gdy rozmawiasz z tym kolegą" to uczciwy komunikat, nie kontrola.\\n\\nOdróżnij zazdrość od zaufania: czy masz realne powody do niepokoju, czy projektujesz lęki z przeszłości? Szczerość z samym sobą jest pierwszym krokiem.\\n\\nJeśli zazdrość jest chroniczna i prowadzi do kontroli, śledzenia, kłótni — to sygnał do pracy nad sobą lub rozmowy z terapeutą. Zdrowa zazdrość mówi o potrzebie; toksyczna niszczy relację.',
+    contentOna:
+      'Zazdrość bywa źródłem wstydu — zwłaszcza gdy słyszysz, że „nie powinnaś" jej czuć. Ale emocja sama w sobie nie jest zła. Ważne jest, co z nią robisz.\\n\\nZazdrość często maskuje lęk przed utratą lub poczucie, że nie jesteś wystarczająca. Zanim oskarżysz partnera, zapytaj siebie: czego naprawdę się boję? Co bym potrzebowała, by czuć się bezpieczniej?\\n\\nMów o zazdrości w spokojnym momencie, nie w akcie wścibstwa. „Czuję się niepewnie, gdy widzę, że często piszesz do niej" otwiera rozmowę. Kontrolowanie telefonu zamyka ją.\\n\\nJeśli zazdrość wraca regularnie i nie daje się uspokoić rozmową — rozważ wsparcie terapeutyczne. Czasem korzenie leżą głębiej niż obecny związek, a praca nad nimi wzmacnia całą relację.',
+  },
+  {
+    topic: 'Emocje i uczucia',
+    title: 'Radość w relacji — jak ją pielęgnować',
+    contentOn:
+      'W relacji łatwo skupić się na problemach i zapomnieć o radości. A to właśnie wspólne śmiech, lekkość i celebracja budują odporność na trudne czasy.\\n\\nPlanuj momenty radości świadomie — nie tylko „jak będzie czas". Wspólny film, spacer, gotowanie razem, żart w trudny dzień. Małe rzeczy, regularnie.\\n\\nMów partnerce, co Cię w niej cieszy — konkretnie. „Podoba mi się, jak się śmiejesz" lub „cieszę się, że jesteś" to inwestycja w atmosferę relacji.\\n\\nRadość nie wymaga idealnych warunków. Nawet w trudnym okresie jeden wspólny żart czy przytulenie może przypomnieć, dlaczego jesteście razem. Kłótnie są normalne — ale radość jest paliwem.',
+  },
+  {
+    topic: 'Zaufanie',
+    title: 'Zaufanie buduje się w małych momentach',
+    contentOn:
+      'Zaufanie to nie jednorazowa deklaracja — to tysiące małych momentów, w których partnerka widzi, że może na Ciebie liczyć. Dotrzymane słowo, punktualność, szczerość w drobiazgach.\\n\\nJako mężczyzna często skupiasz się na wielkich gestach — a zaufanie rośnie w codzienności. Czy dzwonisz, gdy się spóźniasz? Czy mówisz prawdę, nawet gdy jest niewygodna?\\n\\nBądź konsekwentny. Obietnica bez pokrycia niszczy zaufanie szybciej niż jeden błąd. Lepiej mniej obiecać i dotrzymać, niż obiecać wszystko i zapomnieć.\\n\\nGdy zawiedziesz — przyznaj się i napraw. „Przepraszam, zapomniałem — to moja wina" buduje więcej zaufania niż wymówki. Małe momenty szczerości sumują się w fundament relacji.',
+    contentOna:
+      'Zaufanie nie przychodzi z dnia na dzień — rośnie w codziennych detalach. Czy partner dotrzymuje słowa? Czy jest obecny, gdy mówisz o czymś ważnym? Czy szanuje to, co mu powierzasz?\\n\\nTy też budujesz zaufanie swoimi gestami. Szczerość, punktualność, otwartość — to dwustronna ulica. Zaufanie to nie brak wątpliwości, lecz wybór bycia w relacji mimo niepewności.\\n\\nZwracaj uwagę na małe rzeczy: czy partner pamięta o tym, co mówiłaś? Czy reaguje, gdy prosisz o pomoc? Te momenty mówią więcej niż wielkie deklaracje miłości.\\n\\nGdy zaufanie zostanie naruszone, odbudowuje się powoli — małymi, konsekwentnymi krokami. Jedna szczera rozmowa, jedno dotrzymane słowo, jeden gest troski na raz.',
+  },
+  {
+    topic: 'Zaufanie',
+    title: 'Jak naprawić zaufanie po zawiedzeniu',
+    contentOn:
+      'Zawiedzenie zaufania — kłamstwo, zdrada, złamana obietnica — nie musi oznaczać końca. Ale wymaga pracy, czasu i szczerości z obu stron.\\n\\nJeśli to Ty zawiodłeś: przyznaj się w pełni, bez wymówek. Odpowiedz na pytania partnerki, nawet trudne. Bądź cierpliwy — odbudowa zaufania trwa miesiącami, nie dniami.\\n\\nZmień zachowanie, nie tylko słowa. Partnerka musi widzieć konsekwencję w czasie. Transparentność, dotrzymywanie ustaleń, gotowość do rozmowy — to buduje nowy fundament.\\n\\nRozważ terapię par lub indywidualną. Czasem zawiedzenie zaufania ma głębsze korzenie. Profesjonalne wsparcie pomaga przejść przez proces bez niszczenia relacji.',
+    contentOna:
+      'Naprawa zaufania po zawiedzeniu to jedna z najtrudniejszych dróg w relacji — ale możliwa. Wymaga czasu, cierpliwości i gotowości obu stron do pracy.\\n\\nJeśli to Ty zostałaś zraniona: masz prawo do złości, smutku i czasu na przetworzenie. Nie musisz „przebaczać" od razu. Ale warto zdecydować, czy chcesz próbować naprawy — czy to dla Ciebie możliwe.\\n\\nOd partnera potrzebujesz szczerości, odpowiedzialności i zmiany w czasie — nie tylko przeprosin. Obserwuj zachowanie, nie tylko słowa. Zaufanie wraca, gdy widzisz konsekwencję.\\n\\nDbaj o siebie w tym procesie. Rozmowy z przyjaciółką, terapia, granice — naprawa zaufania nie powinna kosztować Cię poczucia godności. Ty też masz prawo do bezpieczeństwa emocjonalnego.',
+  },
+  {
+    topic: 'Zaufanie',
+    title: 'Transparentność bez kontroli',
+    contentOn:
+      'Transparentność to otwartość — mówienie, co robisz, z kim się spotykasz, jak się czujesz. Kontrola to wymaganie raportów i sprawdzanie. Różnica jest fundamentalna.\\n\\nBądź transparentny z własnej inicjatywy: „dziś mam spotkanie z zespołem, wrócę około 20". Partnerka nie musi pytać — dajesz informację, bo budujesz zaufanie.\\n\\nTransparentność nie oznacza braku prywatności. Masz prawo do własnych myśli, przyjaciół, przestrzeni. Chodzi o to, by w ważnych sprawach nie było niespodzianek, które ranią.\\n\\nJeśli partnerka prosi o „kontrolę" — rozmawiajcie o lęku, który za tym stoi. Często to nie brak zaufania do Ciebie, lecz jej własny niepokój. Wspólne ustalenia działają lepiej niż inwigilacja.',
+    contentOna:
+      'Transparentność w związku to wiedza, na czym stoicie — bez niespodzianek, które bolą. To nie to samo co kontrola, choć granica bywa cienka.\\n\\nMożesz prosić o otwartość: „chcę wiedzieć, co u Ciebie, żeby czuć się bezpiecznie". To uzasadniona potrzeba. Ale sprawdzanie telefonu, wymaganie raportów z każdej godziny — to już kontrola, która niszczy zaufanie.\\n\\nTy też bądź transparentna: mów o swoich planach, uczuciach, wątpliwościach. Relacja to dwie strony. Otwartość z Twojej strony zachęca partnera do tego samego.\\n\\nGdy czujesz potrzebę kontroli — zatrzymaj się i zapytaj: czego się boję? Co bym potrzebowała, by czuć się bezpiecznie bez inwigilacji? Często odpowiedź prowadzi do rozmowy, nie do sprawdzania.',
+  },
+  {
+    topic: 'Zaufanie',
+    title: 'Obietnice — dlaczego dotrzymywanie ich ma znaczenie',
+    contentOn:
+      'Obietnica w związku to nie formalność — to fundament zaufania. „Zrobię to" i zrobienie. „Będę" i bycie. Partnerka uczy się na podstawie Twoich działań, nie deklaracji.\\n\\nNie obiecuj za dużo. Lepiej powiedzieć „spróbuję" lub „zrobię to w sobotę" i dotrzymać, niż obiecać rewolucję i zapomnieć. Małe, dotrzymane obietnice budują więcej niż wielkie, złamane.\\n\\nGdy nie możesz dotrzymać — powiedz wcześniej. „Przepraszam, nie dam rady dziś — zrobię to w czwartek" to szacunek. Milczenie i niedotrzymanie to zawiedzenie.\\n\\nPrzypomnij sobie ostatnie obietnice. Czy je dotrzymałeś? Jeśli nie — przyznaj się i napraw. To prosty sposób na wzmacnianie zaufania w codzienności.',
+    contentOna:
+      'Obietnice w relacji to nie słowa do przodu — to zobowiązania, które partner ma w pamięci. „Zadzwonię", „pomogę", „będziemy razem" — każda z nich ma wagę.\\n\\nGdy partner nie dotrzymuje obietnic, uczysz się, że jego słowa nie znaczą tyle, co czyny. Z czasem przestajesz wierzyć w deklaracje — i to niszczy bliskość.\\n\\nTy też dotrzymuj obietnic — lub nie składaj ich, jeśli nie jesteś pewna. Szczerość „nie dam rady" jest lepsza niż obietnica bez pokrycia.\\n\\nRozmawiajcie o tym, gdy obietnice są łamane. „Zauważyłam, że często obiecujesz X i nie robisz — co się dzieje?" To nie atak, to szansa na zrozumienie i zmianę.',
+  },
+  {
+    topic: 'Zaufanie',
+    title: 'Zaufanie do siebie w relacji',
+    contentOn:
+      'Zaufanie do partnerki zaczyna się od zaufania do siebie. Jeśli nie wiesz, czego potrzebujesz, trudno o to poprosić. Jeśli nie ufasz swoim emocjom, łatwo je tłumisz lub wybuchasz.\\n\\nPoznaj swoje granice i potrzeby. Co jest dla Ciebie OK, a co nie? Co Cię wzmacnia, a co wyczerpuje? Im lepiej to wiesz, tym pewniej stoisz w relacji.\\n\\nNie rezygnuj z siebie dla „harmonii". Związek, w którym tracisz siebie, nie jest zdrowy. Zaufanie do siebie to mówienie „nie", gdy trzeba, i „tak" własnym potrzebom.\\n\\nPracuj nad poczuciem własnej wartości niezależnie od relacji. Terapia, hobby, przyjaciele — im silniejszy jesteś w sobie, tym mniej boisz się konfliktów i tym pewniej budujesz zaufanie z partnerką.',
+    contentOna:
+      'Zaufanie do siebie to fundament — bez niego trudno ufać partnerowi lub prosić o to, czego potrzebujesz. Czy znasz swoje granice? Czy szanujesz własne emocje?\\n\\nW relacji łatwo się zatracić — dostosować, ustąpić, zapomnieć o sobie. Ale kobieta, która nie ufa sobie, często milczy, gdy boli, lub godzi się na za mało.\\n\\nĆwicz mówienie o potrzebach bez wstydu. „Potrzebuję czasu dla siebie" lub „to dla mnie ważne" to nie egoizm — to zdrowa granica.\\n\\nBuduj życie poza związkiem: pasje, przyjaźnie, rozwój. Im pełniejsza jesteś w sobie, tym mniej szukasz w partnerze potwierdzenia własnej wartości — i tym zdrowsza jest relacja.',
+  },`;
+
+writeFileSync(out, part1 + part2 + part3);
+console.log('Parts 1-3 written (20 articles)');
+
+const part4 = `
+  {
+    topic: 'Intymność',
+    title: 'Intymność emocjonalna przed fizyczną',
+    contentOn:
+      'Intymność emocjonalna to fundament — wspólne rozmowy, zaufanie, wrażliwość. Bez niej fizyczna bliskość może być płytka lub mechaniczna.\\n\\nZainwestuj w rozmowy, które nie dotyczą logistyki. Co partnerka czuje? Czego się boi? O czym marzy? Te rozmowy budują więź głębszą niż dotyk.\\n\\nBądź wrażliwy na jej emocje. Gdy jest smutna lub zestresowana, czasem potrzebuje rozmowy, nie seksu. Słuchanie to też forma intymności.\\n\\nIntymność emocjonalna wymaga czasu i obecności. Wyłącz telefon, usiądź naprzeciwko, pytaj i słuchaj. To inwestycja, która procentuje w sypialni i poza nią.',
+    contentOna:
+      'Intymność emocjonalna to poczucie, że partner widzi Cię naprawdę — Twoje myśli, lęki, marzenia. Bez tego fizyczna bliskość może zostawiać pustkę.\\n\\nSzukaj rozmów, które idą głębiej niż „co na obiad". Dziel się tym, co Cię zajmuje, co Cię martwi, co Cię cieszy. Zapraszaj partnera do swojego wewnętrznego świata.\\n\\nGdy potrzebujesz emocjonalnej bliskości, powiedz o tym. „Chcę dziś po prostu porozmawiać i być blisko" — partner nie zawsze zgaduje.\\n\\nIntymność emocjonalna rośnie w małych momentach: wspólna cisza, szczera rozmowa, wzajemne wsparcie. To ona daje relacji głębię i odporność na kryzysy.',
+  },
+  {
+    topic: 'Intymność',
+    title: 'Jak rozmawiać o potrzebach w sypialni',
+    contentOn:
+      'Rozmowa o potrzebach intymnych bywa trudna — wstyd, obawa przed odrzuceniem, brak słów. Ale milczenie prowadzi do frustracji z obu stron.\\n\\nZacznij poza sypialnią, w spokojnym momencie. „Chciałbym porozmawiać o tym, co nas łączy w łóżku — kiedy masz czas?" To zaproszenie, nie wymóg.\\n\\nMów o sobie, nie o ocenach. „Lubię, gdy…" zamiast „nigdy nie…". Partnerka łatwiej słucha, gdy nie czuje się atakowana.\\n\\nSłuchaj jej potrzeb bez obrony. Może chce więcej czasu na foreplay, więcej rozmowy, innego tempa. Intymność to dialog — oboje macie prawo do satysfakcji i szacunku.',
+    contentOna:
+      'Mówić o potrzebach w sypialni wymaga odwagi — zwłaszcza gdy przyzwyczaiłaś się do milczenia lub udawania. Ale niewypowiedziane potrzeby zamieniają się w frustrację i dystans.\\n\\nWybierz spokojny moment, nie w trakcie. „Chciałabym porozmawiać o naszej bliskości — co dla Ciebie jest ważne?" Otwiera drzwi bez presji.\\n\\nMów konkretnie o sobie: „Lubię, gdy…", „Potrzebuję…", „Czuję się dobrze, gdy…". Unikaj „nigdy" i „zawsze" — to zamyka rozmowę.\\n\\nSłuchaj partnera bez osądu. Jego potrzeby mogą być inne niż Twoje — i to OK. Intymność to wspólne szukanie, nie jednostronne oczekiwanie. Kompromis i szacunek są możliwe.',
+  },
+  {
+    topic: 'Intymność',
+    title: 'Bliskość po trudnym okresie',
+    contentOn:
+      'Po kryzysie, chorobie, stracie lub długiej kłótni bliskość często się oddala. To naturalne — ciało i emocje potrzebują czasu na regenerację.\\n\\nNie naciskaj na „powrót do normy" zbyt szybko. Zapytaj partnerkę: „jak się czujesz? czego potrzebujesz?" Czasem potrzeba rozmowy, czasem ciszy, czasem delikatnego dotyku.\\n\\nBuduj mosty małymi krokami. Wspólny posiłek, krótki spacer, przytulenie bez oczekiwań. Bliskość wraca stopniowo — nie na komendę.\\n\\nBądź cierpliwy i obecny. Trudny okres może wzmocnić relację, jeśli przejdziecie go razem — z szacunkiem do tempa każdego z Was.',
+    contentOna:
+      'Po trudnym okresie bliskość bywa ostatnią rzeczą, o której myślisz — zmęczenie, smutek, uraza mogą blokować ciało i serce. To zrozumiałe.\\n\\nDaj sobie czas. Nie musisz „być gotowa" na komendę. Powiedz partnerowi, czego potrzebujesz: rozmowy, przestrzeni, delikatności.\\n\\nMałe gesty budują most: wspólna herbata, dłoń w dłoni, krótkie „jestem tu". Bliskość emocjonalna często poprzedza fizyczną — i to OK.\\n\\nGdy czujesz, że jesteś gotowa — powiedz. Partner nie zawsze zgaduje. Wspólna cierpliwość po kryzysie może uczynić relację głębszą niż przed nim.',
+  },
+  {
+    topic: 'Intymność',
+    title: 'Czas tylko dla Was — dlaczego jest ważny',
+    contentOn:
+      'W natłoku obowiązków czas tylko dla Was często znika pierwszy. A to właśnie te chwile budują więź — bez dzieci, pracy, ekranów.\\n\\nPlanuj go świadomie. Raz w tygodniu wieczór we dwoje — nawet godzina. Restauracja, spacer, film, rozmowa. Nie „jak będzie czas" — w kalendarzu.\\n\\nPodczas tego czasu bądź naprawdę obecny. Telefon w innej pokoju. Pytaj, słuchaj, żartuj. To inwestycja w „my", nie luksus.\\n\\nCzas we dwoje to nie egoizm — to konieczność. Relacja bez takich momentów staje się współlokatorska. Małe, regularne chwile sumują się w silną więź.',
+    contentOna:
+      'Czas tylko dla Was to nie fanaberia — to tlen relacji. Bez niego zostajecie współlokatorami, którzy dzielą logistykę, ale nie serca.\\n\\nWalcz o ten czas. Ustal z partnerem stały termin — raz w tygodniu, raz na dwa tygodnie. Nawet godzina. Bez dzieci, bez pracy, bez ekranów.\\n\\nPodczas tych chwil bądź obecna. Nie planuj w głowie listy zakupów. Patrz na partnera, rozmawiaj, śmiej się. To momenty, które pamiętasz latami.\\n\\nGdy brakuje czasu — skróć, ale nie rezygnuj. 20 minut przy kawie razem to lepsze niż zero. Relacja potrzebuje regularnej uwagi, nie tylko wielkich gestów.',
+  },
+  {
+    topic: 'Intymność',
+    title: 'Dotyk bez oczekiwań — budowanie więzi',
+    contentOn:
+      'Dotyk nie zawsze musi prowadzić do seksu. Przytulenie, głaskanie po plecach, dłoń w dłoni — to buduje więź i poczucie bezpieczeństwa.\\n\\nPartnerka często potrzebuje dotyku bez presji. Gdy każdy kontakt fizyczny kończy się oczekiwaniem seksu, bliskość się kurczy. Oferuj dotyk bez agendy.\\n\\nŚwiadomie dotykaj w codzienności: przy wyjściu, przy powrocie, podczas filmu. Małe gesty — ręka na ramieniu, krótkie przytulenie — mówią „jestem tu".\\n\\nDotyk bez oczekiwań to inwestycja w intymność. Im więcej bezpiecznego, ciepłego kontaktu, tym silniejsza więź — w łóżku i poza nim.',
+    contentOna:
+      'Dotyk to język bliskości — ale czasem niesie presję. Gdy każdy kontakt fizyczny kończy się oczekiwaniem seksu, ciało się wycofuje.\\n\\nPotrzebujesz dotyku bez agendy: przytulenia, głaskania, dłoni w dłoni — bez „dalszych" oczekiwań. Powiedz o tym partnerowi, jeśli czujesz presję.\\n\\nTy też oferuj dotyk bez oczekiwań. Przytulenie przy powrocie, ręka na ramieniu podczas rozmowy — to buduje poczucie bezpieczeństwa.\\n\\nDotyk bez oczekiwań to fundament intymności. Im więcej ciepłego, bezpiecznego kontaktu w codzienności, tym łatwiej o głębszą bliskość, gdy oboje na nią jesteście gotowi.',
+  },
+  {
+    topic: 'Praca nad sobą',
+    title: 'Twoje wzorce z przeszłości wpływają na relację',
+    contentOn:
+      'Wzorce z dzieciństwa i poprzednich związków wpływają na to, jak reagujesz w konflikcie, jak okazujesz miłość, czego się boisz. Nie jesteś tabula rasa.\\n\\nZastanów się: jak wyglądały konflikty w domu? Czy unikasz ich, bo były przerażające? Czy wchodzisz w nie, bo to jedyny sposób na uwagę? Te wzorce powtarzają się w relacji.\\n\\nRozmawiaj z partnerką o tym, co odkrywasz. „Zauważyłem, że wycofuję się, gdy jesteś zła — tak robił mój ojciec". Świadomość to pierwszy krok do zmiany.\\n\\nPraca nad wzorcami to proces. Terapia, dziennik, rozmowy — im lepiej rozumiesz siebie, tym mniej automatycznie reagujesz i tym więcej wybierasz w relacji.',
+    contentOna:
+      'Twoja przeszłość — rodzina, poprzednie związki — kształtuje to, jak kochasz, jak się kłócisz, czego się boisz. Wzorce powtarzają się, dopóki ich nie zobaczysz.\\n\\nZapytaj siebie: jak reaguję w konflikcie? Czy ustępuję, atakuję, wycofuję się? Skąd to się bierze? Często odpowiedź leży w dzieciństwie lub wcześniejszych relacjach.\\n\\nPodziel się odkryciami z partnerem. „Zauważyłam, że boję się mówić o potrzebach — w domu było to zabronione". Świadomość otwiera drogę do zmiany.\\n\\nPraca nad wzorcami to inwestycja w relację. Im lepiej rozumiesz siebie, tym mniej projektujesz przeszłość na partnera — i tym zdrowsza jest więź.',
+  },
+  {
+    topic: 'Praca nad sobą',
+    title: 'Regulacja emocji — umiejętność, którą można ćwiczyć',
+    contentOn:
+      'Regulacja emocji to nie tłumienie — to umiejętność zarządzania tym, co czujesz, by nie ranić siebie ani partnerki. Można jej się nauczyć.\\n\\nGdy emocje buzują: zatrzymaj się, oddychaj, policz do dziesięciu. Proste techniki dają czas na świadomą reakcję zamiast automatycznej.\\n\\nRozpoznaj swoje „wyzwalacze". Co Cię najczęściej doprowadza do wybuchu? Zmęczenie? Poczucie niesprawiedliwości? Przygotuj strategie na te momenty.\\n\\nĆwicz regularnie — nie tylko w kryzysie. Medytacja, sport, dziennik emocji. Im silniejsza jest Twoja regulacja, tym mniej kłótni eskaluje i tym więcej energii zostaje na budowanie relacji.',
+    contentOna:
+      'Regulacja emocji to umiejętność, nie cecha wrodzona. Możesz nauczyć się zarządzać złością, smutkiem, lękiem — by nie ranić siebie ani partnera.\\n\\nGdy emocje przejmują kontrolę: zatrzymaj się, oddychaj głęboko, wyjdź na chwilę. Te sekundy dają przestrzeń na świadomą reakcję.\\n\\nPoznaj swoje wyzwalacze. Co najczęściej wyprowadza Cię z równowagi? Zmęczenie? Poczucie niesłuchania? Przygotuj plan na te momenty.\\n\\nĆwicz codziennie: dziennik emocji, medytacja, ruch. Im lepiej regulujesz siebie, tym mniej kłótni wymyka się spod kontroli — a spory są normalne, ale nie muszą niszczyć.',
+  },
+  {
+    topic: 'Praca nad sobą',
+    title: 'Kiedy warto pójść do terapeuty — sam/sama lub w parze',
+    contentOn:
+      'Terapia to nie porażka — to inwestycja. Sam, w parze lub oboje — gdy kłótnie się powtarzają, gdy czujesz się uwięziony, gdy przeszłość blokuje teraźniejszość.\\n\\nTerapia indywidualna pomaga zrozumieć własne wzorce, lęki, reakcje. Im lepiej znasz siebie, tym zdrowsza jest relacja.\\n\\nTerapia par to przestrzeń na trudne rozmowy z neutralnym facylitatorem. Kłótnie są normalne — ale gdy nie da się ich rozwiązać sami, profesjonalna pomoc przyspiesza proces.\\n\\nNie czekaj na kryzys. Wiele par chodzi do terapeuty profilaktycznie — by wzmocnić komunikację, zanim problemy urosną. To mądra decyzja, nie przyznanie się do porażki.',
+    contentOna:
+      'Terapia to nie tabu — to narzędzie. Warto rozważyć ją, gdy kłótnie się powtarzają, gdy czujesz się samotna w związku, gdy przeszłość wraca.\\n\\nTerapia indywidualna pomaga zrozumieć siebie — wzorce, lęki, potrzeby. Im lepiej znasz siebie, tym pewniej stoisz w relacji.\\n\\nTerapia par to bezpieczna przestrzeń na trudne tematy. Terapeuta nie staje po żadnej stronie — pomaga Wam słyszeć siebie nawzajem.\\n\\nNie musisz czekać na „dno". Wiele par idzie do terapeuty, by wzmocnić relację — nie tylko ratować ją. To inwestycja w przyszłość, nie przyznanie do porażki.',
+  },
+  {
+    topic: 'Praca nad sobą',
+    title: 'Granice między „ja" a „my"',
+    contentOn:
+      'Zdrowa relacja to balans między „ja" a „my". Zbyt dużo „my" — tracisz siebie. Zbyt dużo „ja" — partnerka czuje się opuszczona.\\n\\nZachowaj własne pasje, przyjaciół, czas dla siebie. Nie rezygnuj z tego, co Cię definiuje. Partnerka zakochała się w Tobie — nie w wersji, która tylko dostosowuje.\\n\\nKomunikuj granice jasno. „Potrzebuję wieczoru z kumplami raz w miesiącu" to nie odrzucenie — to zdrowa autonomia.\\n\\n„My" też jest ważne — wspólne cele, rytuały, decyzje. Klucz to świadomy wybór: kiedy jesteś „ja", kiedy „my", bez poczucia winy z żadnej strony.',
+    contentOna:
+      'Granica między „ja" a „my" to jeden z najtrudniejszych balansów w związku. Zbyt dużo ustępstw — tracisz siebie. Zbyt dużo „ja" — partner czuje się odtrącony.\\n\\nZachowaj to, co Cię definiuje: pasje, przyjaźnie, czas na regenerację. Relacja nie powinna wymagać rezygnacji z siebie.\\n\\nMów o granicach wprost. „Potrzebuję wieczoru dla siebie" lub „chcę spędzić weekend z przyjaciółką" to nie egoizm — to zdrowa autonomia.\\n\\n„My" też ma znaczenie — wspólne plany, rytuały, decyzje. Szukaj balansu: być razem i być sobą, bez poczucia winy z żadnej strony.',
+  },
+  {
+    topic: 'Praca nad sobą',
+    title: 'Samoopieka — nie egoizm w związku',
+    contentOn:
+      'Samoopieka to nie egoizm — to konieczność. Wyczerpany, zestresowany mężczyzna ma mniej do dania partnerce. Nie możesz lać z pustego naczynia.\\n\\nŚpij, jedz regularnie, ruszaj się, miej czas na regenerację. To nie luksus — to fundament zdrowia psychicznego i relacji.\\n\\nMów o potrzebach bez wstydu. „Potrzebuję godziny dla siebie" to nie odrzucenie partnerki — to dbanie o siebie, by móc być obecnym.\\n\\nSamoopieka wzmacnia relację. Im lepiej dbasz o siebie, tym mniej reagujesz z frustracji i tym więcej masz energii na bliskość, rozmowę i wsparcie.',
+    contentOna:
+      'Samoopieka to nie egoizm — to warunek zdrowej relacji. Wyczerpana kobieta ma mniej do dania partnerowi i sobie. Nie możesz dbać o innych z pustego naczynia.\\n\\nŚpij, jedz, odpoczywaj, rób to, co Cię ładuje. To nie fanaberia — to fundament. Wiele kobiet rezygnuje z siebie „dla relacji" — i to niszczy obie strony.\\n\\nMów o potrzebach bez wstydu. „Potrzebuję wieczoru dla siebie" to nie odrzucenie partnera — to dbanie o siebie, by móc być obecną.\\n\\nSamoopieka procentuje w relacji. Im lepiej dbasz o siebie, tym mniej wybuchasz z frustracji i tym więcej masz energii na bliskość i wsparcie.',
+  },`;
+
+writeFileSync(out, part1 + part2 + part3 + part4);
+console.log('Parts 1-4 written (30 articles)');
+
+const part5 = `
+  {
+    topic: 'Codzienność i rutyna',
+    title: 'Małe gesty — wielkie znaczenie',
+    contentOn:
+      'Wielkie gesty — kwiaty, kolacja — robią wrażenie. Ale to małe, codzienne gesty budują relację: kubek kawy, wiadomość „myślę o Tobie", pomoc bez proszenia.\\n\\nPartnerka zapamiętuje detale. Czy pamiętasz, o co prosiła? Czy zauważasz, kiedy jest zmęczona? Małe gesty mówią „widzę Cię".\\n\\nNie czekaj na okazje. Codziennie jeden drobny gest — bez oczekiwania wdzięczności. Z czasem stają się nawykiem, a relacja — cieplejsza.\\n\\nMałe gesty to inwestycja z niskim kosztem i wysokim zwrotem. Kłótnie są normalne — ale codzienna troska je łagodzi i przypomina, dlaczego jesteście razem.',
+    contentOna:
+      'Małe gesty to język miłości w codzienności. Kubek herbaty, wiadomość w ciągu dnia, pomoc z torbami — to nie „nic nie znaczy", to buduje poczucie bycia ważną.\\n\\nTy też możesz dawać małe gesty. Nie czekaj, aż partner zacznie — inicjatywa z Twojej strony zachęca do wzajemności.\\n\\nZwracaj uwagę na to, co partner robi dla Ciebie. Podziękuj za drobiazgi — często przechodzą niezauważone, a mają ogromną wagę.\\n\\nMałe gesty sumują się w wielką troskę. W rutynie łatwo je zaniedbać — świadomy jeden gest dziennie może odmienić atmosferę relacji.',
+  },
+  {
+    topic: 'Codzienność i rutyna',
+    title: 'Rutyna nie musi zabijać namiętności',
+    contentOn:
+      'Rutyna daje stabilność — ale może też uśpić namiętność. Te same wieczory, te same schematy, brak niespodzianek. To nie wyrok — to sygnał do działania.\\n\\nWprowadzaj drobne zmiany. Inna restauracja, spontaniczny wypad, nowa aktywność razem. Nie musisz rewolucji — wystarczy przełamanie schematu.\\n\\nPlanuj „niespodzianki" świadomie. Raz w miesiącu coś nowego — nawet małe. Partnerka doceni inicjatywę.\\n\\nRutyna i namiętność mogą współistnieć. Stabilność daje bezpieczeństwo — a świadome przełamywanie schematu dodaje iskry. Oboje macie wpływ na to, jak wygląda Wasza codzienność.',
+    contentOna:
+      'Rutyna bywa kojąca — ale też nużąca. Te same wieczory, ten sam schemat, brak iskry. To nie koniec namiętności — to zaproszenie do zmiany.\\n\\nSzukaj drobnych przełamań. Inna kolacja, spontaniczny spacer, nowe miejsce na weekend. Nie musisz wielkich planów — wystarczy świeżość.\\n\\nInicjuj Ty. Nie czekaj, aż partner zaskoczy — zaproponuj coś nowego. Inicjatywa z jednej strony często pociąga drugą.\\n\\nRutyna daje bezpieczeństwo, a świadome zmiany dodają życia. Oboje możecie wpływać na to, czy codzienność Was usypia, czy budzi.',
+  },
+  {
+    topic: 'Codzienność i rutyna',
+    title: 'Podział obowiązków bez rencorów',
+    contentOn:
+      'Nierówny podział obowiązków to jeden z najczęstszych powodów kłótni. Kto robi więcej? Kto „nie widzi"? Kto się wycofuje?\\n\\nUsiądźcie i wypiszcie wszystko: pranie, zakupy, dzieci, rachunki. Porównajcie obciążenie. Często różnica jest większa, niż się wydaje.\\n\\nPodzielcie świadomie — nie „kto ma czas", lecz sprawiedliwie. Uwzględnijcie też obciążenie mentalne: planowanie, przypominanie, organizacja.\\n\\nPrzeglądajcie podział regularnie. Życie się zmienia — praca, dzieci, zdrowie. Elastyczność i otwarta rozmowa zapobiegają rencorom.',
+    contentOna:
+      'Nierówny podział obowiązków wyczerpuje i budzi żal. „Znowu ja", „on nigdy nie zauważa" — znane scenariusze. Ale da się to zmienić rozmową.\\n\\nWypiszcie wszystko, co trzeba robić — włącznie z „niewidzialną" pracą: planowanie, przypominanie, organizacja. Często to pada na jedną osobę.\\n\\nPodzielcie sprawiedliwie — nie tylko fizyczne zadania, lecz też obciążenie mentalne. Kto pamięta o urodzinach, szczepieniach, zakupach?\\n\\nPrzeglądajcie podział co kilka miesięcy. Życie się zmienia — elastyczność i szczera rozmowa zapobiegają narastającym rencorom.',
+  },
+  {
+    topic: 'Codzienność i rutyna',
+    title: 'Wspólne rytuały — śniadanie, wieczór, weekend',
+    contentOn:
+      'Rytuały to kotwice w codzienności — momenty, w których wiesz, że jesteście razem. Śniadanie w niedzielę, wieczorna herbata, spacer w sobotę.\\n\\nNie muszą być wielkie. 15 minut przy kawie bez telefonów. Krótki rytuał po powrocie do domu. Ważna jest regularność, nie skala.\\n\\nChroń rytuały przed logistyką. Gdy coś je psuje — wracajcie do nich. To inwestycja w „my".\\n\\nWspólne rytuały przypominają, że jesteście zespołem. W natłoku obowiązków te chwile budują poczucie „jesteśmy razem" — i to ma ogromną wartość.',
+    contentOna:
+      'Wspólne rytuały to małe święta w tygodniu. Śniadanie w łóżku w niedzielę, wieczorny serial, spacer po pracy — momenty, które budują „my".\\n\\nNie muszą być skomplikowane. 10 minut przy herbacie, krótki rytuał przywitania — ważna jest obecność i regularność.\\n\\nChroń rytuały. Gdy życie je przerywa — wracajcie. To kotwice, które trzymają relację w chaosie codzienności.\\n\\nRytuały przypominają, że jesteście zespołem. W natłoku łatwo o nich zapomnieć — świadome ich pielęgnowanie wzmacnia więź.',
+  },
+  {
+    topic: 'Codzienność i rutyna',
+    title: 'Technologia a relacja — granice ekranu',
+    contentOn:
+      'Telefon przy kolacji, scrollowanie w łóżku, odpowiadanie na wiadomości zamiast rozmowy — technologia wchodzi między Was.\\n\\nUstalcie granice. Np. telefony poza stołem, godzina bez ekranów przed snem, jeden wieczór w tygodniu „offline".\\n\\nBądź przykładem. Gdy partnerka mówi, a Ty patrzysz w ekran — wysyłasz sygnał „to ważniejsze niż Ty". Odłóż telefon.\\n\\nTechnologia to narzędzie — nie wróg. Granice ekranu dają przestrzeń na rozmowę, dotyk, obecność. To inwestycja w relację, nie w powrót do przeszłości.',
+    contentOna:
+      'Ekrany wchodzą między Was — przy kolacji, w łóżku, zamiast rozmowy. Partner obok, a Ty w telefonie — to boli, nawet jeśli nie mówisz.\\n\\nUstalcie wspólne granice. Telefony poza stołem, godzina bez ekranów, jeden wieczór offline. Konkretne ustalenia działają lepiej niż „używaj mniej".\\n\\nTy też odłóż telefon, gdy partner mówi. Obecność to wybór — ekran może poczekać.\\n\\nGranice technologii to nie zakaz — to przestrzeń na Was. Rozmowa, dotyk, wspólna uwaga — to buduje relację, nie scrollowanie obok siebie.',
+  },
+  {
+    topic: 'Wsparcie partnera',
+    title: 'Jak wspierać partnerkę/partnera w stresie',
+    contentOn:
+      'Gdy partnerka jest w stresie, instynkt mówi: napraw, rozwiąż, daj radę. Często potrzebuje czego innego — bycia wysłuchaną i obecności.\\n\\nZapytaj: „Czego potrzebujesz? Słuchania, rady, czy po prostu bycia obok?" To jedno pytanie oszczędza frustrację z obu stron.\\n\\nBądź obecny — fizycznie i emocjonalnie. Przytulenie, „jestem tu", pomoc w drobiazgach. Nie musisz mieć rozwiązania.\\n\\nWsparcie to nie naprawianie — to towarzyszenie. Kłótnie często wynikają z poczucia samotności w stresie. Twoja obecność może to zmienić.',
+    contentOna:
+      'Gdy partner jest w stresie, chcesz pomóc — ale czasem Twoje „naprawianie" go drażni. On może potrzebować słuchania, nie rad.\\n\\nZapytaj: „Czego potrzebujesz ode mnie?" Słuchania, przestrzeni, konkretnej pomocy? Jedno pytanie — mniej nieporozumień.\\n\\nBądź obecna. Czasem wystarczy być obok — bez słów, bez rozwiązań. Przytulenie, herbata, „jestem tu".\\n\\nWsparcie to towarzyszenie w trudnościach. Ty też potrzebujesz wsparcia — mów o tym, gdy jesteś zestresowana. Relacja to wzajemność.',
+  },
+  {
+    topic: 'Wsparcie partnera',
+    title: 'Kiedy dawać radę, a kiedy tylko być obok',
+    contentOn:
+      'Mężczyźni często dają radę, gdy partnerka chce być wysłuchana. Efekt: czuje się niezrozumiana, Ty — odrzucony.\\n\\nZasada: najpierw słuchaj. Parafrazuj, pytaj, potwierdzaj emocje. Dopiero gdy zapyta „co byś zrobił?" — daj radę.\\n\\nCzasem „nie wiem" to najlepsza odpowiedź. Obecność bez rozwiązania też jest wsparciem.\\n\\nNaucz się rozpoznawać sygnały. „Mam dość" często znaczy „potrzebuję wysłuchania", nie „powiedz mi, co robić". Twoja obecność często wystarczy.',
+    contentOna:
+      'Kiedy dawać radę, a kiedy tylko być obok? To jedna z najtrudniejszych umiejętności w relacji.\\n\\nGdy partner się żali, nie zawsze chce rozwiązania. Często chce wysłuchania, potwierdzenia, „rozumiem". Rada w złym momencie drażni.\\n\\nZapytaj: „Chcesz radę, czy po prostu wysłuchania?" Jedno pytanie — mniej frustracji.\\n\\nTy też masz prawo do wsparcia bez rad. „Potrzebuję, żebyś tylko był obok" — powiedz wprost. Partner nie zawsze zgaduje.',
+  },
+  {
+    topic: 'Wsparcie partnera',
+    title: 'Celebracja sukcesów drugiej strony',
+    contentOn:
+      'Celebracja sukcesów partnerki to nie fanaberia — to budowanie zespołu. Gdy wygrywa, Ty też możesz czuć dumę — jeśli to pokazujesz.\\n\\nNie umniejszaj. „Super, ale…" gasi radość. „Świetnie Ci poszło, jestem z Ciebie dumny" — wzmacnia.\\n\\nPamiętaj o sukcesach. Zapytaj po ważnym dniu: „Jak poszło?" Świętuj małe zwycięstwa — nie tylko wielkie.\\n\\nCelebracja to inwestycja w relację. Partnerka, która czuje, że jej sukcesy są ważne, chętniej dzieli się trudnościami — bo wie, że jesteś po jej stronie.',
+    contentOna:
+      'Celebracja sukcesów partnera buduje zespół. Gdy wygrywa, Ty też możesz cieszyć się jego radością — jeśli to pokazujesz.\\n\\nNie umniejszaj. „Fajnie, ale mogło być lepiej" gasi entuzjazm. „Świetnie, jestem z Ciebie dumna" — wzmacnia więź.\\n\\nPamiętaj o jego sukcesach. Zapytaj po ważnym dniu. Świętuj małe zwycięstwa — awans, ukończony projekt, trudna rozmowa.\\n\\nGdy partner celebruje Twoje sukcesy, czujesz się ważna. Daj mu to samo — wzajemna radość z sukcesów drugiej strony to fundament wsparcia.',
+  },
+  {
+    topic: 'Wsparcie partnera',
+    title: 'Wspólne cele — jak je ustalać',
+    contentOn:
+      'Wspólne cele dają kierunek — finanse, dom, rodzina, podróże. Bez nich łatwo dryfować w różne strony.\\n\\nUsiądźcie i porozmawiajajcie. Co chcecie osiągnąć w rok? W pięć lat? Gdzie chcecie mieszkać? Jak wyglądać ma rodzina?\\n\\nSzukajcie wspólnego gruntu. Nie musicie zgadzać się w 100% — wystarczy nakładanie się wizji. Kompromis to nie porażka.\\n\\nPrzeglądajcie cele regularnie. Życie się zmienia — elastyczność i otwarta rozmowa utrzymują Was na jednej drodze.',
+    contentOna:
+      'Wspólne cele to mapa relacji. Bez niej łatwo iść w różne strony — jedno o domu, drugie o karierze, bez synchronizacji.\\n\\nPorozmawiajcie o wizji. Co chcecie za rok, za pięć lat? Gdzie mieszkać? Jak wyglądać ma rodzina, finanse, czas razem?\\n\\nSzukajcie wspólnego gruntu. Nie musicie zgadzać się we wszystkim — wystarczy nakładanie się marzeń. Kompromis buduje, nie niszczy.\\n\\nPrzeglądajcie cele co jakiś czas. Życie się zmienia — otwarta rozmowa utrzymuje Was jako zespół.',
+  },
+  {
+    topic: 'Wsparcie partnera',
+    title: 'Empatia w praktyce — nie tylko słowo',
+    contentOn:
+      'Empatia to nie „rozumiem" wypowiedziane bez słuchania. To włożenie się w buty partnerki — poczuć to, co ona czuje.\\n\\nParafrazuj: „Czyli czujesz się samotna w tym, co robimy?" Sprawdź, czy dobrze zrozumiałeś. Nie zakładaj — pytaj.\\n\\nNie umniejszaj emocji. „Przesadzasz" zamyka rozmowę. „Widzę, że to dla Ciebie ważne" otwiera.\\n\\nEmpatia wymaga praktyki. Im częściej słuchasz bez obrony i ocen, tym naturalniejsza staje się. To umiejętność, która wzmacnia każdą rozmowę — także w kłótni.',
+    contentOna:
+      'Empatia to więcej niż słowo — to praktyka. Włożenie się w buty partnera, poczucie tego, co on czuje, bez oceniania.\\n\\nParafrazuj: „Czyli czujesz się przytłoczony?" Sprawdź, czy dobrze rozumiesz. Nie zakładaj — pytaj.\\n\\nNie umniejszaj. „To nic takiego" rani. „Widzę, że to dla Ciebie trudne" otwiera.\\n\\nEmpatia wymaga ćwiczenia. Im częściej słuchasz bez obrony, tym głębsza relacja. To fundament wsparcia — w radości i w kryzysie.',
+  },
+  {
+    topic: 'Granice',
+    title: 'Granice w związku — co jest OK, a co nie',
+    contentOn:
+      'Granice to mapa tego, co Cię chroni i co pozwala być blisko. Bez nich relacja staje się wyczerpująca lub niesprawiedliwa.\\n\\nZastanów się: co jest dla Ciebie OK? Co nie? Czas dla siebie, szacunek w kłótni, fizyczna przestrzeń — każdy ma swoje.\\n\\nKomunikuj granice jasno. „Nie rozmawiam, gdy krzyczysz" to granica, nie kara. Partnerka może się uczyć, jeśli wie, gdzie stoisz.\\n\\nGranice to nie mur — to ochrona. Zdrowe granice wzmacniają relację, bo dają obojgu poczucie bezpieczeństwa.',
+    contentOna:
+      'Granice w związku to nie egoizm — to ochrona. Bez nich łatwo się zatracić, wyczerpać lub poczuć wykorzystaną.\\n\\nZastanów się: co jest dla Ciebie OK? Co nie? Czas dla siebie, sposób kłótni, fizyczna bliskość — każda ma swoje granice.\\n\\nMów o nich wprost. „Potrzebuję, żebyś nie podnosił głosu" to granica, nie atak. Partner może się uczyć, jeśli wie, czego potrzebujesz.\\n\\nZdrowe granice wzmacniają relację. Dają poczucie bezpieczeństwa — Ty wiesz, gdzie stoisz, partner wie, czego się trzymać.',
+  },
+  {
+    topic: 'Granice',
+    title: 'Mówienie „nie" bez poczucia winy',
+    contentOn:
+      '„Nie" w związku bywa trudne — obawa przed konfliktem, poczucie winy, chęć bycia „dobrym". Ale „nie" bez winy to zdrowa granica.\\n\\n„Nie" nie musi być agresywne. „Nie mogę dziś", „nie jestem gotowy", „to dla mnie za dużo" — szanujące, ale jasne.\\n\\nPartnerka może się rozczarować — to jej prawo. Twoje „nie" to nie odrzucenie jej — to ochrona siebie.\\n\\nĆwicz małe „nie" codziennie. Z czasem staje się łatwiejsze. Relacja, w której oboje możecie mówić „nie", jest zdrowsza niż taka, w której jedno ustępuje w milczeniu.',
+    contentOna:
+      'Mówienie „nie" bez poczucia winy to umiejętność, której wiele kobiet nie uczy się. Ustępowanie „dla harmonii" kosztuje — wyczerpanie, żal, dystans.\\n\\n„Nie" może być łagodne. „Nie dziś", „nie jestem gotowa", „to dla mnie za dużo" — szanujące, ale stanowcze.\\n\\nPartner może się rozczarować — to normalne. Twoje „nie" to nie odrzucenie jego — to dbanie o siebie.\\n\\nĆwicz małe „nie". Z czasem staje się łatwiejsze. Relacja, w której oboje możecie odmawiać bez kary, jest silniejsza.',
+  },
+  {
+    topic: 'Granice',
+    title: 'Przestrzeń osobista w parze',
+    contentOn:
+      'Przestrzeń osobista to nie dystans — to tlen. Każdy potrzebuje czasu na siebie, swoje myśli, regenerację.\\n\\nKomunikuj potrzebę przestrzeni bez odrzucenia. „Potrzebuję godziny dla siebie — wrócę z lepszą energią" to nie „nie chcę Cię".\\n\\nSzanuj też przestrzeń partnerki. Gdy wycofuje się — nie naciskaj. Zapytaj: „Potrzebujesz czasu? Jestem tu, gdy będziesz gotowa".\\n\\nPara to nie jeden organizm. Dwa „ja" z własną przestrzenią tworzą zdrowsze „my" niż dwa zlepione bez oddechu.',
+    contentOna:
+      'Przestrzeń osobista w parze to nie chłód — to konieczność. Każdy potrzebuje czasu na siebie, swoje myśli, odpoczynek.\\n\\nMów o potrzebie przestrzeni wprost. „Potrzebuję wieczoru dla siebie" to nie „nie chcę Cię" — to regeneracja.\\n\\nSzanuj też przestrzeń partnera. Gdy wycofuje się — nie interpretuj jako odrzucenia. Zapytaj, czy potrzebuje czasu.\\n\\nDwa „ja" z własną przestrzenią tworzą zdrowsze „my". Zlepieni bez oddechu często się duszą — przestrzeń daje tlen relacji.',
+  },
+  {
+    topic: 'Granice',
+    title: 'Rodzina a granice w związku',
+    contentOn:
+      'Rodzina — teściowie, święta, wizyty — to częsty pole konfliktów. Granice między „my" a rodziną pochodzenia wymagają jasności.\\n\\nUstalcie z partnerką zasady. Ile wizyt? Jak spędzamy święta? Kto ma pierwszeństwo w decyzjach o Waszym domu?\\n\\nStań po stronie partnerki. Gdy rodzina naciska — Ty i partnerka jesteście zespołem. „My tak zdecydowaliśmy" to granica, nie atak.\\n\\nGranice wobec rodziny to ochrona relacji. Nie chodzi o odcinanie — o świadomy wybór, ile i jak rodzina wchodzi w Wasze życie.',
+    contentOna:
+      'Rodzina a granice — temat, który budzi napięcia. Teściowie, święta, wizyty — gdzie kończy się „my", a zaczyna rodzina?\\n\\nUstalcie z partnerem zasady. Ile wizyt? Jak święta? Kto decyduje o Waszym domu? Wspólna wizja chroni przed presją z zewnątrz.\\n\\nStań po stronie partnera. Gdy rodzina naciska — Wy jesteście zespołem. „My tak zdecydowaliśmy" to granica.\\n\\nGranice wobec rodziny chronią relację. Nie chodzi o odcinanie — o świadomy wybór, ile rodzina wchodzi w Wasze życie.',
+  },
+  {
+    topic: 'Granice',
+    title: 'Respektowanie granic partnera',
+    contentOn:
+      'Granice partnerki to nie wyzwanie — to informacja. Gdy mówi „nie", „stop", „potrzebuję przestrzeni" — szanuj to.\\n\\nNie testuj granic. „Ale przecież…" lub „Tylko raz" podważa jej autonomię. Zaufanie rośnie, gdy granice są respektowane.\\n\\nZapytaj, jeśli nie wiesz. „Co jest dla Ciebie OK w tej sytuacji?" — lepsze niż zgadywanie i przekraczanie.\\n\\nRespektowanie granic to szacunek. Partnerka, która czuje, że jej granice są ważne, chętniej się otwiera — bo wie, że jest bezpieczna.',
+    contentOna:
+      'Respektowanie granic partnera to fundament zaufania. Gdy mówi „nie", „stop", „potrzebuję czasu" — szanuj to.\\n\\nNie testuj granic. „Ale dlaczego?" lub „Tylko raz" podważa jego autonomię. Granice respektowane budują bezpieczeństwo.\\n\\nZapytaj, jeśli nie wiesz. „Co jest dla Ciebie OK?" — lepsze niż zgadywanie i przekraczanie.\\n\\nGdy Twoje granice są respektowane, czujesz się bezpieczna. Daj partnerowi to samo — wzajemny szacunek do granic wzmacnia relację.',
+  },
+  {
+    topic: 'Długoterminowa relacja',
+    title: 'Miłość to też wybór — nie tylko uczucie',
+    contentOn:
+      'Uczucia falują — raz gorąco, raz chłodniej. Miłość długoterminowa to też wybór: być, dbać, wracać po kłótni, inwestować.\\n\\nWybór to codzienne decyzje. Czy dziś zapytać, jak minął jej dzień? Czy przeprosić, gdy zawiodłeś? Czy zrobić coś miłego bez powodu?\\n\\nGdy uczucia słabną — to normalne. Nie oznacza końca. Oznacza, że czas na świadomą inwestycję: rozmowę, czas razem, gesty.\\n\\nMiłość jako wybór daje stabilność. Nie zależy tylko od hormonów — zależy od tego, co robicie razem, dzień po dniu.',
+    contentOna:
+      'Miłość to nie tylko motyle — to też wybór. Codzienne decyzje: być, dbać, wracać po kłótni, inwestować w relację.\\n\\nUczucia falują. Gdy „iskra" słabnie — to nie koniec. To zaproszenie do świadomej pracy: rozmowy, czasu razem, gestów troski.\\n\\nWybór to małe rzeczy. Zapytać o dzień, przeprosić, zrobić coś miłego. Sumują się w „zależy mi na nas".\\n\\nMiłość jako wybór daje głębię. Nie zależy tylko od emocji — zależy od tego, co budujecie razem, rok po roku.',
+  },
+  {
+    topic: 'Długoterminowa relacja',
+    title: 'Jak utrzymać iskrę po latach',
+    contentOn:
+      'Iskra po latach nie utrzymuje się sama — wymaga uwagi. Rutyna, dzieci, praca — łatwo o nią zapomnieć.\\n\\nPlanuj momenty tylko dla Was. Randki, wypady, nowe doświadczenia. Nie „jak będzie czas" — w kalendarzu.\\n\\nZaskakuj. Małe niespodzianki, komplementy, inicjatywa. Partnerka doceni, że wciąż się starasz.\\n\\nIskra to nie tylko namiętność — to ciekawość drugiej osoby. Pytaj, słuchaj, odkrywaj. Ludzie się zmieniają — poznawaj ją na nowo.',
+    contentOna:
+      'Iskra po latach wymaga świadomej troski. Rutyna, obowiązki — łatwo o nią zapomnieć, ale da się ją pielęgnować.\\n\\nPlanuj czas we dwoje. Randki, wypady, nowe doświadczenia. Nawet krótkie — ważna jest regularność.\\n\\nZaskakuj partnera. Małe gesty, komplementy, inicjatywa. Pokazuj, że wciąż Ci zależy.\\n\\nIskra to też ciekawość. Partner się zmienia — pytaj, słuchaj, odkrywaj na nowo. Relacja żyje, gdy oboje inwestujecie.',
+  },
+  {
+    topic: 'Długoterminowa relacja',
+    title: 'Kryzysy — normalna faza, nie porażka',
+    contentOn:
+      'Kryzys w relacji — po narodzinach dziecka, utracie pracy, chorobie — to nie porażka. To faza, przez którą przechodzą pary.\\n\\nNie uciekaj. Kryzys to sygnał, że coś wymaga uwagi — nie że relacja się skończyła. Wiele par wychodzi z kryzysu silniejszych.\\n\\nSzukaj wsparcia. Terapia, rozmowy z przyjaciółmi, czas na regenerację. Nie musicie radzić sobie sami.\\n\\nKłótnie w kryzysie są normalne — presja jest większa. Klucz to nie poddawanie się i wzajemne „jesteśmy w tym razem".',
+    contentOna:
+      'Kryzys w relacji to nie koniec — to faza. Po dziecku, utracie pracy, chorobie — wiele par przechodzi przez trudny okres.\\n\\nNie uciekaj od trudności. Kryzys sygnalizuje, że coś wymaga uwagi — nie że miłość zniknęła. Wiele par wychodzi silniejszych.\\n\\nSzukaj wsparcia. Terapia, rozmowy, czas na siebie. Nie musicie radzić sobie sami.\\n\\nKłótnie w kryzysie są normalne — presja jest większa. „Jesteśmy w tym razem" to najważniejsze zdanie w trudnych czasach.',
+  },
+  {
+    topic: 'Długoterminowa relacja',
+    title: 'Wspólna wizja przyszłości',
+    contentOn:
+      'Wspólna wizja to kompas — dokąd idziecie razem? Bez niej łatwo dryfować w różne strony.\\n\\nPorozmawiajcie o marzeniach. Gdzie chcecie mieszkać? Jak wyglądać ma rodzina? Co chcecie osiągnąć?\\n\\nSzukajcie nakładania się. Nie musicie mieć identycznych celów — wystarczy wspólny kierunek.\\n\\nPrzeglądajcie wizję regularnie. Życie się zmienia — elastyczność i otwarta rozmowa utrzymują Was na jednej drodze.',
+    contentOna:
+      'Wspólna wizja przyszłości to kompas relacji. Dokąd idziecie? Bez odpowiedzi łatwo dryfować osobno.\\n\\nPorozmawiajcie o marzeniach. Dom, rodzina, kariera, podróże — co chcecie budować razem?\\n\\nSzukajcie wspólnego kierunku. Nie musicie zgadzać się we wszystkim — wystarczy nakładanie się wizji.\\n\\nPrzeglądajcie wizję co jakiś czas. Życie się zmienia — otwarta rozmowa utrzymuje Was jako zespół z wspólnym celem.',
+  },
+  {
+    topic: 'Długoterminowa relacja',
+    title: 'Wdzięczność za partnera — codzienna praktyka',
+    contentOn:
+      'Wdzięczność to nie „dziękuję" wypowiedziane automatycznie. To świadome zauważanie tego, co partnerka daje relacji.\\n\\nCodziennie jedna rzecz: za co jesteś wdzięczny? Jej cierpliwość? Gotowanie? Uśmiech? Powiedz to — wprost.\\n\\nWdzięczność zmienia perspektywę. Zamiast skupiać się na tym, czego brakuje, widzisz to, co jest.\\n\\nPraktyka wdzięczności wzmacnia relację. Partnerka, która czuje się doceniana, chętniej daje z siebie — i to buduje cykl pozytywny, który przetrwa trudne chwile.',
+    contentOna:
+      'Wdzięczność za partnera to praktyka, nie jednorazowy gest. Świadome zauważanie tego, co daje relacji — każdego dnia.\\n\\nZa co jesteś wdzięczna? Za jego obecność? Za pomoc? Za uśmiech? Powiedz to — wprost, nie tylko w myślach.\\n\\nWdzięczność zmienia perspektywę. Zamiast „czego mi brakuje" — „co mam". To buduje pozytywną atmosferę.\\n\\nCodzienna wdzięczność wzmacnia więź. Partner, który czuje się doceniony, chętniej daje z siebie — cykl, który przetrwa kłótnie i kryzysy.',
+  },
+];`;
+
+writeFileSync(out, part1 + part2 + part3 + part4 + part5);
+console.log('All 50 articles written');

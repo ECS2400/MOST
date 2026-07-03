@@ -1,0 +1,402 @@
+{
+  "first_dispute": {
+    "title": "first_dispute",
+    "description": "first_dispute"
+  },
+  "disputes_2": {
+    "title": "disputes_2",
+    "description": "disputes_2"
+  },
+  "disputes_3": {
+    "title": "disputes_3",
+    "description": "disputes_3"
+  },
+  "disputes_5": {
+    "title": "disputes_5",
+    "description": "disputes_5"
+  },
+  "disputes_7": {
+    "title": "disputes_7",
+    "description": "disputes_7"
+  },
+  "disputes_10": {
+    "title": "disputes_10",
+    "description": "disputes_10"
+  },
+  "disputes_15": {
+    "title": "disputes_15",
+    "description": "disputes_15"
+  },
+  "disputes_25": {
+    "title": "disputes_25",
+    "description": "disputes_25"
+  },
+  "disputes_50": {
+    "title": "disputes_50",
+    "description": "disputes_50"
+  },
+  "first_resolution": {
+    "title": "first_resolution",
+    "description": "first_resolution"
+  },
+  "resolved_2": {
+    "title": "resolved_2",
+    "description": "resolved_2"
+  },
+  "three_resolutions": {
+    "title": "three_resolutions",
+    "description": "three_resolutions"
+  },
+  "resolved_5": {
+    "title": "resolved_5",
+    "description": "resolved_5"
+  },
+  "resolved_7": {
+    "title": "resolved_7",
+    "description": "resolved_7"
+  },
+  "ten_resolutions": {
+    "title": "ten_resolutions",
+    "description": "ten_resolutions"
+  },
+  "resolved_15": {
+    "title": "resolved_15",
+    "description": "resolved_15"
+  },
+  "resolved_20": {
+    "title": "resolved_20",
+    "description": "resolved_20"
+  },
+  "resolved_30": {
+    "title": "resolved_30",
+    "description": "resolved_30"
+  },
+  "resolved_50": {
+    "title": "resolved_50",
+    "description": "resolved_50"
+  },
+  "resolved_75": {
+    "title": "resolved_75",
+    "description": "resolved_75"
+  },
+  "streak_1": {
+    "title": "streak_1",
+    "description": "streak_1"
+  },
+  "streak_2": {
+    "title": "streak_2",
+    "description": "streak_2"
+  },
+  "streak_3": {
+    "title": "streak_3",
+    "description": "streak_3"
+  },
+  "streak_5": {
+    "title": "streak_5",
+    "description": "streak_5"
+  },
+  "streak_7": {
+    "title": "streak_7",
+    "description": "streak_7"
+  },
+  "streak_10": {
+    "title": "streak_10",
+    "description": "streak_10"
+  },
+  "streak_14": {
+    "title": "streak_14",
+    "description": "streak_14"
+  },
+  "streak_21": {
+    "title": "streak_21",
+    "description": "streak_21"
+  },
+  "streak_30": {
+    "title": "streak_30",
+    "description": "streak_30"
+  },
+  "streak_45": {
+    "title": "streak_45",
+    "description": "streak_45"
+  },
+  "streak_60": {
+    "title": "streak_60",
+    "description": "streak_60"
+  },
+  "streak_90": {
+    "title": "streak_90",
+    "description": "streak_90"
+  },
+  "streak_180": {
+    "title": "streak_180",
+    "description": "streak_180"
+  },
+  "streak_365": {
+    "title": "streak_365",
+    "description": "streak_365"
+  },
+  "first_solo": {
+    "title": "first_solo",
+    "description": "first_solo"
+  },
+  "solo_3": {
+    "title": "solo_3",
+    "description": "solo_3"
+  },
+  "solo_5": {
+    "title": "solo_5",
+    "description": "solo_5"
+  },
+  "solo_10": {
+    "title": "solo_10",
+    "description": "solo_10"
+  },
+  "solo_15": {
+    "title": "solo_15",
+    "description": "solo_15"
+  },
+  "solo_25": {
+    "title": "solo_25",
+    "description": "solo_25"
+  },
+  "solo_50": {
+    "title": "solo_50",
+    "description": "solo_50"
+  },
+  "solo_100": {
+    "title": "solo_100",
+    "description": "solo_100"
+  },
+  "gratitude_1": {
+    "title": "gratitude_1",
+    "description": "gratitude_1"
+  },
+  "gratitude_3": {
+    "title": "gratitude_3",
+    "description": "gratitude_3"
+  },
+  "gratitude_7": {
+    "title": "gratitude_7",
+    "description": "gratitude_7"
+  },
+  "gratitude_14": {
+    "title": "gratitude_14",
+    "description": "gratitude_14"
+  },
+  "gratitude_30": {
+    "title": "gratitude_30",
+    "description": "gratitude_30"
+  },
+  "gratitude_50": {
+    "title": "gratitude_50",
+    "description": "gratitude_50"
+  },
+  "gratitude_100": {
+    "title": "gratitude_100",
+    "description": "gratitude_100"
+  },
+  "gratitude_streak_3": {
+    "title": "gratitude_streak_3",
+    "description": "gratitude_streak_3"
+  },
+  "gratitude_streak_7": {
+    "title": "gratitude_streak_7",
+    "description": "gratitude_streak_7"
+  },
+  "gratitude_streak_14": {
+    "title": "gratitude_streak_14",
+    "description": "gratitude_streak_14"
+  },
+  "gratitude_streak_30": {
+    "title": "gratitude_streak_30",
+    "description": "gratitude_streak_30"
+  },
+  "gratitude_streak_60": {
+    "title": "gratitude_streak_60",
+    "description": "gratitude_streak_60"
+  },
+  "couple_connected": {
+    "title": "couple_connected",
+    "description": "couple_connected"
+  },
+  "couple_med_1": {
+    "title": "couple_med_1",
+    "description": "couple_med_1"
+  },
+  "couple_med_5": {
+    "title": "couple_med_5",
+    "description": "couple_med_5"
+  },
+  "couple_med_10": {
+    "title": "couple_med_10",
+    "description": "couple_med_10"
+  },
+  "couple_med_25": {
+    "title": "couple_med_25",
+    "description": "couple_med_25"
+  },
+  "gratitude_shared": {
+    "title": "gratitude_shared",
+    "description": "gratitude_shared"
+  },
+  "ai_conversation": {
+    "title": "ai_conversation",
+    "description": "ai_conversation"
+  },
+  "ai_3": {
+    "title": "ai_3",
+    "description": "ai_3"
+  },
+  "ai_5": {
+    "title": "ai_5",
+    "description": "ai_5"
+  },
+  "ai_10": {
+    "title": "ai_10",
+    "description": "ai_10"
+  },
+  "ai_25": {
+    "title": "ai_25",
+    "description": "ai_25"
+  },
+  "ai_phase1": {
+    "title": "ai_phase1",
+    "description": "ai_phase1"
+  },
+  "ai_phase2": {
+    "title": "ai_phase2",
+    "description": "ai_phase2"
+  },
+  "ai_phase3": {
+    "title": "ai_phase3",
+    "description": "ai_phase3"
+  },
+  "ai_phase4": {
+    "title": "ai_phase4",
+    "description": "ai_phase4"
+  },
+  "premium_member": {
+    "title": "premium_member",
+    "description": "premium_member"
+  },
+  "ambassador": {
+    "title": "ambassador",
+    "description": "ambassador"
+  },
+  "referral_3": {
+    "title": "referral_3",
+    "description": "referral_3"
+  },
+  "five_referrals": {
+    "title": "five_referrals",
+    "description": "five_referrals"
+  },
+  "referral_10": {
+    "title": "referral_10",
+    "description": "referral_10"
+  },
+  "referral_25": {
+    "title": "referral_25",
+    "description": "referral_25"
+  },
+  "first_mirror": {
+    "title": "first_mirror",
+    "description": "first_mirror"
+  },
+  "mirror_5": {
+    "title": "mirror_5",
+    "description": "mirror_5"
+  },
+  "mirror_10": {
+    "title": "mirror_10",
+    "description": "mirror_10"
+  },
+  "mirror_25": {
+    "title": "mirror_25",
+    "description": "mirror_25"
+  },
+  "screenshot_upload": {
+    "title": "screenshot_upload",
+    "description": "screenshot_upload"
+  },
+  "screenshot_5": {
+    "title": "screenshot_5",
+    "description": "screenshot_5"
+  },
+  "screenshot_10": {
+    "title": "screenshot_10",
+    "description": "screenshot_10"
+  },
+  "screenshot_25": {
+    "title": "screenshot_25",
+    "description": "screenshot_25"
+  },
+  "success_50": {
+    "title": "success_50",
+    "description": "success_50"
+  },
+  "success_75": {
+    "title": "success_75",
+    "description": "success_75"
+  },
+  "success_90": {
+    "title": "success_90",
+    "description": "success_90"
+  },
+  "success_100": {
+    "title": "success_100",
+    "description": "success_100"
+  },
+  "points_100": {
+    "title": "points_100",
+    "description": "points_100"
+  },
+  "points_500": {
+    "title": "points_500",
+    "description": "points_500"
+  },
+  "points_1000": {
+    "title": "points_1000",
+    "description": "points_1000"
+  },
+  "points_2500": {
+    "title": "points_2500",
+    "description": "points_2500"
+  },
+  "profile_complete": {
+    "title": "profile_complete",
+    "description": "profile_complete"
+  },
+  "avatar_set": {
+    "title": "avatar_set",
+    "description": "avatar_set"
+  },
+  "app_7days": {
+    "title": "app_7days",
+    "description": "app_7days"
+  },
+  "app_30days": {
+    "title": "app_30days",
+    "description": "app_30days"
+  },
+  "app_100days": {
+    "title": "app_100days",
+    "description": "app_100days"
+  },
+  "night_owl": {
+    "title": "night_owl",
+    "description": "night_owl"
+  },
+  "early_bird": {
+    "title": "early_bird",
+    "description": "early_bird"
+  },
+  "weekend_warrior": {
+    "title": "weekend_warrior",
+    "description": "weekend_warrior"
+  },
+  "comeback": {
+    "title": "comeback",
+    "description": "comeback"
+  }
+}

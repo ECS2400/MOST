@@ -1,0 +1,128 @@
+table_name,column_name,data_type
+couples,id,uuid
+couples,partner_1_id,uuid
+couples,partner_2_id,uuid
+disputes,resolved_at,timestamp with time zone
+disputes,resolved_by_both,boolean
+disputes,created_at,timestamp with time zone
+messages,id,uuid
+messages,dispute_id,uuid
+messages,sender_id,uuid
+messages,sentiment_score,numeric
+messages,created_at,timestamp with time zone
+payments,id,uuid
+payments,user_id,uuid
+payments,couple_id,uuid
+payments,amount,numeric
+payments,created_at,timestamp with time zone
+free_usage,user_id,uuid
+free_usage,disputes_used,integer
+free_usage,messages_used,integer
+free_usage,reset_at,timestamp with time zone
+free_usage,created_at,timestamp with time zone
+achievements,id,uuid
+achievements,couple_id,uuid
+achievements,unlocked_at,timestamp with time zone
+profiles,id,uuid
+profiles,created_at,timestamp with time zone
+profiles,plan_expires_at,timestamp without time zone
+profiles,couple_id,uuid
+profiles,partner_id,uuid
+screenshots,id,uuid
+screenshots,dispute_id,uuid
+screenshots,uploaded_by,uuid
+screenshots,is_unlocked,boolean
+screenshots,created_at,timestamp with time zone
+live_messages,id,uuid
+live_messages,mediation_id,uuid
+live_messages,is_private,boolean
+live_messages,recipient_id,uuid
+live_messages,created_at,timestamp with time zone
+live_messages,phase,integer
+live_messages,ai_analysis,jsonb
+mediations,id,uuid
+mediations,user_id,uuid
+mediations,couple_id,uuid
+mediations,screenshots,jsonb
+mediations,ai_analysis,jsonb
+mediations,created_at,timestamp without time zone
+mediations,updated_at,timestamp without time zone
+mediations,analysis,jsonb
+mediations,partner_joined,boolean
+mediations,partner_id,uuid
+mediations,partner_joined_at,timestamp without time zone
+mediations,live_summary,jsonb
+mediations,live_paused,boolean
+mediations,live_progress,integer
+mediations,partner_typing,boolean
+mediations,screenshot_urls,jsonb
+mediations,current_question_index,integer
+couples,subscription_expires,timestamp with time zone
+couples,subscription_paid_by,uuid
+couples,total_disputes_resolved,integer
+couples,streak_days,integer
+couples,streak_last_updated,date
+couples,created_at,timestamp with time zone
+disputes,id,uuid
+disputes,couple_id,uuid
+disputes,partner_1_submitted_at,timestamp with time zone
+disputes,partner_2_submitted_at,timestamp with time zone
+disputes,ai_suggestions,jsonb
+disputes,mirror_shown_at,timestamp with time zone
+disputes,messages_count,integer
+disputes,last_message_at,timestamp with time zone
+couples,invite_code,text
+couples,status,text
+couples,subscription_tier,text
+achievements,badge_icon,text
+live_messages,hint_for,text
+live_messages,sentiment,text
+profiles,name,text
+profiles,avatar_url,text
+profiles,preferred_language,text
+mediations,what_to_say,text
+profiles,email,text
+disputes,title,text
+disputes,category,text
+disputes,status,text
+disputes,current_phase,text
+disputes,partner_1_perspective,text
+profiles,avatar_color,text
+disputes,partner_2_perspective,text
+profiles,plan,text
+disputes,ai_analysis,text
+mediations,pasted_text,text
+mediations,live_phase,text
+mediations,invite_code,text
+profiles,invite_code,text
+disputes,resolution_summary,text
+mediations,what_upset,text
+mediations,description,text
+mediations,screenshot_url,text
+screenshots,image_url,text
+screenshots,ocr_text,text
+screenshots,ai_teaser,text
+messages,sender_type,text
+messages,content,text
+screenshots,ai_full_analysis,text
+messages,ai_suggestion_type,text
+mediations,status,text
+mediations,current_question,text
+mediations,what_angered,text
+mediations,combined_description,text
+payments,plan_type,text
+live_messages,sender_id,text
+payments,currency,text
+payments,status,text
+payments,provider,text
+live_messages,content,text
+mediations,what_happened,text
+free_usage,month_year,text
+mediations,what_annoyed,text
+live_messages,message_type,text
+mediations,how_felt,text
+mediations,what_needed,text
+live_messages,sender_name,text
+live_messages,target,text
+achievements,type,text
+achievements,title,text
