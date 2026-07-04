@@ -4,10 +4,14 @@
  * Role: resolves competing dynamic signals into a single ranked decision context.
  */
 
-import type { ConfidenceScore } from './common';
+import type { ConfidenceScore, TurnNumber } from './common';
 import type { ConfidenceValue } from './confidence';
 import type { ConversationMode } from './dynamics';
 import type { InterventionType, PrioritySignalType } from './engineTypes';
+import type { MediationState } from './mediationState';
+import type { ReflectionOutput } from './reflection';
+import type { SafetyOutput } from './safety';
+import type { StrategyEngineOutput } from './strategyEngineIo';
 
 export type { PrioritySignalType } from './engineTypes';
 
@@ -22,10 +26,19 @@ export interface PrioritySignal {
   confidence: ConfidenceValue<boolean>;
 }
 
+/** Input to Priority Engine for a single turn. */
+export interface PriorityInput {
+  state: MediationState;
+  reflection: ReflectionOutput;
+  safety: SafetyOutput | null;
+  strategy: StrategyEngineOutput;
+  turnNumber: TurnNumber;
+}
+
 /**
  * Output of Priority Engine for the current turn.
  *
- * Role: constrains Decision Engine and TSE — may preempt goal transitions.
+ * Role: constrains Decision Engine — may block or limit strategy after TSE.
  */
 export interface PriorityOutput {
   activeSignals: PrioritySignal[];

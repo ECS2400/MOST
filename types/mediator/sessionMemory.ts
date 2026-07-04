@@ -19,7 +19,10 @@ import type {
   NeedLabel,
 } from './engineTypes';
 import type { GoalTransition } from './goals';
-import type { ReflectionEntry } from './reflection';
+import type { ComplianceResult } from './constitution';
+import type { Intervention } from './interventions';
+import type { MediationState } from './mediationState';
+import type { ReflectionEntry, ReflectionOutput } from './reflection';
 import type { TherapeuticGoal } from './therapeuticGoal';
 
 /** Breakthrough record in session memory. */
@@ -39,6 +42,16 @@ export interface InterventionHistoryEntry {
   effective: boolean | null;
   confidence: ConfidenceScore;
   signature: InterventionSignature;
+}
+
+/** Input to Session Memory update pipeline step. */
+export interface SessionMemoryUpdateInput {
+  previousMemory: SessionMemory;
+  state: MediationState;
+  intervention: Intervention;
+  reflection: ReflectionOutput;
+  complianceResult: ComplianceResult;
+  turnNumber: TurnNumber;
 }
 
 /**

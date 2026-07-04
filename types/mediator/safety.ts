@@ -11,6 +11,8 @@ import type {
   SafetyLevel,
   SafetySignalCategory,
 } from './engineTypes';
+import type { MediationState } from './mediationState';
+import type { TranscriptMessage } from './reflection';
 
 export type { SafetyLevel, SafetySignalCategory } from './engineTypes';
 
@@ -26,6 +28,13 @@ export interface SafetySignal {
   detectedAt: IsoTimestamp;
   turnNumber: TurnNumber;
   detectionLayer: 'regex' | 'heuristic' | 'llm';
+}
+
+/** Input to Human Safety Layer for a single turn. */
+export interface SafetyInput {
+  state: MediationState;
+  transcriptDelta: TranscriptMessage[];
+  turnNumber: TurnNumber;
 }
 
 /**

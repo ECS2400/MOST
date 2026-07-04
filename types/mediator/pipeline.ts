@@ -20,7 +20,7 @@ import type { PriorityOutput } from './priority';
 import type { ReflectionOutput, TranscriptMessage } from './reflection';
 import type { SafetyOutput } from './safety';
 import type { SessionMemory } from './sessionMemory';
-import type { StrategyEngineOutput } from './strategyEngineIo';
+import type { InterventionIntent, StrategyEngineOutput } from './strategyEngineIo';
 
 /** Feature flag values controlling engine version rollout. */
 export type MediatorEngineVersion = 'v1' | 'v2.3';
@@ -62,6 +62,13 @@ export interface OrchestrateTurnResponse {
   engineVersion: MediatorEngineVersion;
 }
 
+/** Input to State Analyzer pipeline step. */
+export interface StateAnalyzerInput {
+  mediationState: MediationState | null;
+  transcriptDelta: TranscriptMessage[];
+  turnNumber: TurnNumber;
+}
+
 /** Output of State Analyzer pipeline step. */
 export interface StateAnalyzerOutput {
   updatedState: MediationState;
@@ -71,6 +78,16 @@ export interface StateAnalyzerOutput {
   decayEventsApplied: number;
 }
 
+/** Input to Decision Engine pipeline step. */
+export interface DecisionEngineInput {
+  state: MediationState;
+  reflection: ReflectionOutput;
+  strategy: StrategyEngineOutput;
+  priority: PriorityOutput;
+  safety: SafetyOutput | null;
+  turnNumber: TurnNumber;
+}
+
 /** Output of Decision Engine pipeline step. */
 export interface DecisionEngineOutput {
   selectedInterventionType: InterventionType;
@@ -78,6 +95,14 @@ export interface DecisionEngineOutput {
   intent: TherapeuticIntent;
   strategy: TherapeuticStrategy;
   rationale: string;
+}
+
+/** Input to Intervention Engine pipeline step. */
+export interface InterventionEngineInput {
+  state: MediationState;
+  intent: InterventionIntent;
+  decision: DecisionEngineOutput;
+  turnNumber: TurnNumber;
 }
 
 /** Aggregated module outputs passed to Explainability builder. */

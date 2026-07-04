@@ -5,7 +5,7 @@
  * Imports MediationState-free context slices to avoid cycles with strategies.ts.
  */
 
-import type { ConfidenceScore, InterventionTarget } from './common';
+import type { ConfidenceScore, InterventionTarget, TurnNumber } from './common';
 import type {
   ConversationPace,
   DynamicsSignalBundle,
@@ -18,7 +18,6 @@ import type {
 } from './engineTypes';
 import type { OutcomeCheck, SessionObjectives } from './goals';
 import type { SessionPersonality } from './personality';
-import type { PriorityOutput } from './priority';
 import type { ReflectionOutput } from './reflection';
 import type { RecoveryState } from './strategies';
 import type { SafetyOutput } from './safety';
@@ -47,8 +46,8 @@ export interface StrategyEngineStateContext {
 export interface StrategyEngineInput {
   state: StrategyEngineStateContext;
   reflection: ReflectionOutput;
-  priority: PriorityOutput;
   safety: SafetyOutput | null;
+  turnNumber: TurnNumber;
 }
 
 /** Output contract for Therapeutic Strategy Engine. */

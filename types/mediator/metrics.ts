@@ -15,7 +15,8 @@ import type {
   TurnNumber,
 } from './common';
 import type { InterventionType, TherapeuticStrategy } from './engineTypes';
-import type { SessionMemorySummary } from './sessionMemory';
+import type { ComplianceResult } from './constitution';
+import type { SessionMemory, SessionMemorySummary } from './sessionMemory';
 import type { TherapeuticGoal } from './therapeuticGoal';
 
 /** Per-goal metrics row in session analytics export. */
@@ -157,3 +158,18 @@ export interface LearningLayerPort {
 
 /** Alias — public architecture name for {@link SessionMetrics}. */
 export type Metrics = SessionMetrics;
+
+/** Input to per-turn Metrics pipeline step. */
+export interface MetricsTurnInput {
+  turnNumber: TurnNumber;
+  sessionId: SessionId;
+  mediationId: MediationId;
+  sessionMemory: SessionMemory;
+  complianceResult: ComplianceResult;
+}
+
+/** Output of per-turn Metrics pipeline step (Phase 0B: no-op recorder). */
+export interface MetricsTurnOutput {
+  /** Whether turn metrics were recorded. */
+  recorded: boolean;
+}
