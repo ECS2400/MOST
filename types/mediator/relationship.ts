@@ -1,23 +1,14 @@
 /**
  * Relationship Model types (future-ready) for Mediator AI Engine v2.3.
  *
- * Role: session-scoped pattern detection in v2.3 MVP; cross-session port
- * defined but not implemented until Learning Layer Phase 5.
+ * Role: session-scoped pattern detection; cross-session port for Phase 5.
  */
 
-import type { ConfidenceScore, IsoTimestamp, TurnNumber } from './common';
+import type { ConfidenceScore, IsoTimestamp, ParticipantRole, TurnNumber } from './common';
 import type { EvidencedConclusion } from './evidence';
-import type { ParticipantRole } from './common';
+import type { RelationshipPatternType } from './relationshipTypes';
 
-/** Recurring interaction pattern between partners. */
-export type RelationshipPatternType =
-  | 'withdraw_press'
-  | 'pursue_withdraw'
-  | 'blame_defend_cycle'
-  | 'fixer_invalidated'
-  | 'emotional_lead_follow'
-  | 'competitive_suffering'
-  | 'silent_treatment';
+export type { RelationshipPatternType } from './relationshipTypes';
 
 /** Behaviour label in a relationship pattern sequence step. */
 export type PatternBehavior =

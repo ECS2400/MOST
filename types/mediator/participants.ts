@@ -1,8 +1,8 @@
 /**
  * Participant and conflict models for Mediator AI Engine v2.3.
  *
- * Role: describes who is in the session and what they are mediating about —
- * surface-level topics and deep emotional themes.
+ * Role: describes who is in the session and what they are mediating about.
+ * Dictionary unions are defined in {@link engineTypes}.
  */
 
 import type {
@@ -15,73 +15,28 @@ import type {
   SessionId,
   UserId,
 } from './common';
+import type {
+  BreakthroughType,
+  DeepTheme,
+  EmotionLabel,
+  EmotionNamingConfidence,
+  MediatorActionType,
+  MessageTone,
+  NeedLabel,
+  SurfaceTopic,
+} from './engineTypes';
+import type { TherapeuticGoal } from './therapeuticGoal';
 
-/** Surface-level conflict topic taxonomy. */
-export type SurfaceTopic =
-  | 'money'
-  | 'chores'
-  | 'children'
-  | 'jealousy'
-  | 'intimacy'
-  | 'family'
-  | 'communication'
-  | 'time'
-  | 'other';
-
-/** Deep emotional theme underlying the surface conflict. */
-export type DeepTheme =
-  | 'safety'
-  | 'respect'
-  | 'loneliness'
-  | 'rejection'
-  | 'influence'
-  | 'fairness'
-  | 'not_heard'
-  | 'fear'
-  | 'trust_loss'
-  | 'other';
-
-/** Standardised emotion labels used in choice interventions and state tracking. */
-export type EmotionLabel =
-  | 'sadness'
-  | 'anger'
-  | 'fear'
-  | 'frustration'
-  | 'hurt'
-  | 'disappointment'
-  | 'loneliness'
-  | 'shame'
-  | 'guilt'
-  | 'anxiety'
-  | 'resentment'
-  | 'overwhelm'
-  | 'other';
-
-/** Standardised need labels used in need-naming interventions. */
-export type NeedLabel =
-  | 'respect'
-  | 'safety'
-  | 'understanding'
-  | 'connection'
-  | 'fairness'
-  | 'autonomy'
-  | 'support'
-  | 'recognition'
-  | 'peace'
-  | 'trust'
-  | 'closeness'
-  | 'other';
-
-/** How confidently a participant named their emotion (0 = unsure, 3 = explicit). */
-export type EmotionNamingConfidence = 0 | 1 | 2 | 3;
-
-/** Detected tone of the participant's most recent message. */
-export type MessageTone =
-  | 'calm'
-  | 'elevated'
-  | 'accusatory'
-  | 'vulnerable'
-  | 'reconciliatory';
+export type {
+  BreakthroughType,
+  DeepTheme,
+  EmotionLabel,
+  EmotionNamingConfidence,
+  MediatorActionType,
+  MessageTone,
+  NeedLabel,
+  SurfaceTopic,
+} from './engineTypes';
 
 /**
  * Static participant profile for the session.
@@ -98,7 +53,6 @@ export interface ParticipantProfile {
  * Dynamic per-participant state tracked across turns.
  *
  * Role: primary input to State Analyzer and Reflection Engine.
- * Updated after each partner message and mediator intervention.
  */
 export interface ParticipantState {
   profile: ParticipantProfile;
@@ -192,27 +146,6 @@ export interface BreakthroughEvent {
   detectedAt: IsoTimestamp;
 }
 
-/** Classification of a breakthrough detected during mediation. */
-export type BreakthroughType =
-  | 'apology'
-  | 'vulnerability'
-  | 'mutual_understanding'
-  | 'perspective_shift'
-  | 'need_acknowledgment'
-  | 'reconciliation'
-  | 'ownership'
-  | 'other';
-
-/** Types of mediator actions recorded in conversation memory. */
-export type MediatorActionType =
-  | 'intervention'
-  | 'summary'
-  | 'question'
-  | 'validation'
-  | 'pause_proposal'
-  | 'safety_response'
-  | 'goal_transition';
-
 /**
  * Lightweight record of a mediator move for anti-repeat tracking.
  *
@@ -223,6 +156,6 @@ export interface MediatorAction {
   type: MediatorActionType;
   turnNumber: number;
   timestamp: IsoTimestamp;
-  goalAtTime: import('./therapeuticGoal').TherapeuticGoal;
+  goalAtTime: TherapeuticGoal;
   signature: string;
 }

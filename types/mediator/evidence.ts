@@ -1,9 +1,8 @@
 /**
- * Evidence Layer and confidence model for Mediator AI Engine v2.3.
+ * Evidence Layer types for Mediator AI Engine v2.3.
  *
  * Role: every significant AI conclusion must be traceable to {@link EvidenceItem}
- * records. {@link EvidencedConclusion} wraps values with confidence, decay,
- * and provenance for State Analyzer, Reflection, and Explainability.
+ * records. Neutral layer — does not import Strategy Engine or MediationState.
  */
 
 import type {
@@ -12,9 +11,12 @@ import type {
   MediatorEntityId,
   TurnNumber,
 } from './common';
-import type { BreakthroughType } from './participants';
-import type { EmotionLabel, NeedLabel } from './participants';
-import type { TherapeuticStrategy } from './strategies';
+import type {
+  BreakthroughType,
+  EmotionLabel,
+  NeedLabel,
+  TherapeuticStrategy,
+} from './engineTypes';
 
 /** Origin of a piece of evidence supporting a conclusion. */
 export type EvidenceSource =
@@ -34,30 +36,6 @@ export type ConfidenceMethod =
   | 'weighted_sum'
   | 'max_source'
   | 'checklist_gate';
-
-/** Source category of a lightweight confidence assessment (pre-evidence layer). */
-export type ConfidenceAssessmentSource =
-  | 'regex'
-  | 'heuristic'
-  | 'llm'
-  | 'user_explicit'
-  | 'checklist';
-
-/**
- * Lightweight confidence wrapper for inline state fields and detector output.
- *
- * Role: used before full Evidence Layer bundling; still requires quote evidence
- * when confidence ≥ 70.
- */
-export interface ConfidenceValue<T> {
-  value: T;
-  confidence: ConfidenceScore;
-  source: ConfidenceAssessmentSource;
-  /** Inline quote snippets — max 3; prefer EvidenceItem IDs in pipeline modules. */
-  evidence: string[];
-  assessedAt: IsoTimestamp;
-  stale: boolean;
-}
 
 /**
  * Single traceable piece of evidence supporting a conclusion.
@@ -80,7 +58,7 @@ export interface EvidenceItem {
   stale: boolean;
 }
 
-/** Closed union of values storable in {@link EvidenceStore}. Avoids `unknown`. */
+/** Closed union of scalar values storable in {@link EvidenceStore}. */
 export type EvidencedConclusionValue =
   | boolean
   | number
@@ -94,8 +72,7 @@ export type EvidencedConclusionValue =
 /**
  * A conclusion backed by weighted evidence and decay metadata.
  *
- * Role: canonical output shape of State Analyzer for all significant analyses
- * (emotions, escalation, readiness, temperature, etc.).
+ * Role: canonical output shape of State Analyzer for all significant analyses.
  */
 export interface EvidencedConclusion<T extends EvidencedConclusionValue = EvidencedConclusionValue> {
   analysisId: MediatorEntityId;

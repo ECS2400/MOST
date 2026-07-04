@@ -1,50 +1,41 @@
 /**
  * Conversation dynamics, pace, load, and emotional temperature.
  *
- * Role: captures the *felt* quality of the dialogue — distinct from goal progress.
- * Feeds Priority Engine, Therapeutic Strategy Engine, and Metrics Layer.
+ * Role: captures the felt quality of the dialogue — distinct from goal progress.
  */
 
 import type {
   ConfidenceScore,
   IntensityScore,
   IsoTimestamp,
-  ParticipantRole,
   ProgressPercent,
   UserId,
 } from './common';
-import type { BreakthroughType } from './participants';
-import type { TherapeuticGoal } from './therapeuticGoal';
-import type { ConfidenceValue } from './evidence';
+import type { ConfidenceValue } from './confidence';
+import type {
+  BreakthroughType,
+  ConversationMode,
+  ConversationPace,
+  TrendDirection,
+} from './engineTypes';
+import type { GoalTransition } from './goals';
 import type {
   BreakthroughEvent,
   FactMemoryEntry,
   MediatorAction,
 } from './participants';
-import type { GoalTransition } from './goals';
+import type { TherapeuticGoal } from './therapeuticGoal';
 
-/** High-level conversation mode set by Priority Engine. */
-export type ConversationMode =
-  | 'NORMAL'
-  | 'DE_ESCALATING'
-  | 'REDIRECTING'
-  | 'BREAKTHROUGH'
-  | 'SAFETY';
-
-/** Trend direction for emotional temperature or load over recent turns. */
-export type TrendDirection = 'rising' | 'stable' | 'falling';
+export type { ConversationMode, ConversationPace, TrendDirection } from './engineTypes';
 
 /**
  * Emotional temperature of the conversation (distinct from individual load).
  *
  * Role: measures intensity and reactivity of the dialogue as a whole.
- * High temperature triggers de-escalation strategies (Constitution Art. 4, 7).
  */
 export interface EmotionalTemperature {
-  /** Current level 0 (calm) – 10 (critical). */
   current: IntensityScore;
   trend: TrendDirection;
-  /** Evidenced conclusion wrapping the scalar for pipeline modules. */
   assessed: ConfidenceValue<IntensityScore>;
   peak: IntensityScore;
   peakAtTurn: number | null;
@@ -54,12 +45,10 @@ export interface EmotionalTemperature {
  * Emotional load per participant and session aggregate.
  *
  * Role: detects exhaustion and disengagement even when temperature is moderate.
- * High load blocks deepen_emotions and prepare_agreement strategies.
  */
 export interface EmotionalLoad {
   host: ConfidenceValue<IntensityScore>;
   partner: ConfidenceValue<IntensityScore>;
-  /** max(host, partner) — session-level load indicator. */
   overall: IntensityScore;
   trend: TrendDirection;
   exhaustionDetected: ConfidenceValue<boolean>;
@@ -87,14 +76,10 @@ export interface ConversationDynamics {
   escalationLevel: number;
   mutualUnderstandingScore: ProgressPercent;
   agreementLevel: ProgressPercent;
-  /** Goal to return to after de-escalation regress. */
   lastStableGoal: TherapeuticGoal;
   pauseSuggested: boolean;
   pauseAcceptedBy: UserId[];
 }
-
-/** Therapeutic tempo of the session — slow / normal / fast. */
-export type ConversationPace = 'slow' | 'normal' | 'fast';
 
 /**
  * Stateful pace tracking with anti-oscillation guard.
@@ -106,7 +91,6 @@ export interface PaceState {
   confidence: ConfidenceScore;
   reason: string;
   sinceTurn: number;
-  /** Minimum turns before pace may change again (default 2). */
   minTurnsBeforeChange: number;
 }
 

@@ -1,22 +1,22 @@
 /**
  * Metrics Layer and Learning Layer port types for Mediator AI Engine v2.3.
  *
- * Role: post-session analytics contracts. MVP implements types + no-op emitter;
- * future Learning Layer consumes {@link SessionAnalyticsEvent} aggregates.
+ * Role: post-session analytics contracts.
  */
 
 import type {
   ConfidenceScore,
+  IsoTimestamp,
   MediationId,
+  MediatorLang,
   ProgressPercent,
   SessionId,
   SessionOutcome,
+  TurnNumber,
 } from './common';
-import type { TherapeuticGoal } from './therapeuticGoal';
-import type { InterventionType } from './interventions';
-import type { TherapeuticStrategy } from './strategies';
+import type { InterventionType, TherapeuticStrategy } from './engineTypes';
 import type { SessionMemorySummary } from './sessionMemory';
-import type { IsoTimestamp, MediatorLang, TurnNumber } from './common';
+import type { TherapeuticGoal } from './therapeuticGoal';
 
 /** Per-goal metrics row in session analytics export. */
 export interface GoalMetricRow {
@@ -65,7 +65,7 @@ export interface LibraryPatternMetrics {
   effectiveCount: number;
 }
 
-/** Breakdown maps keyed by strongly-typed union members (not open string records). */
+/** Breakdown maps keyed by strongly-typed union members. */
 export interface InterventionBreakdown {
   entries: Array<{ type: InterventionType; metrics: InterventionTypeMetrics }>;
 }
@@ -81,7 +81,7 @@ export interface PatternBreakdown {
 /**
  * Full session metrics aggregate computed post-session.
  *
- * Role: primary input to product analytics and future Learning Layer training.
+ * Role: primary input to product analytics and future Learning Layer.
  */
 export interface SessionMetrics {
   sessionId: SessionId;
@@ -127,7 +127,7 @@ export interface SessionMetrics {
 /**
  * Event emitted once when a session ends — Learning Layer input.
  *
- * Role: lighter-weight export for MVP analytics pipeline (no-op in Phase 0).
+ * Role: lighter-weight export for MVP analytics pipeline.
  */
 export interface SessionAnalyticsEvent {
   sessionId: SessionId;

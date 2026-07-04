@@ -1,9 +1,7 @@
 /**
- * Intervention types, content model, expected effects, and library patterns.
+ * Intervention content model, expected effects, and library patterns.
  *
- * Role: Intervention Engine vocabulary. The mediator generates {@link Intervention}
- * objects — not bare questions. Each intervention carries intent, expected effect,
- * and optional library pattern reference.
+ * Role: Intervention Engine vocabulary. Dictionary unions live in {@link engineTypes}.
  */
 
 import type {
@@ -15,41 +13,25 @@ import type {
   MediatorLang,
   TurnNumber,
 } from './common';
-import type { SessionPersonalityCore } from './strategies';
+import type {
+  ExpectedEffectSuccessCriterionType,
+  ExpectedEffectVerificationMethod,
+  InterventionType,
+  InterventionVisibility,
+  LibraryPatternStructure,
+  TherapeuticIntent,
+  TherapeuticStrategy,
+} from './engineTypes';
+import type { SessionPersonalityCore } from './personality';
 import type { TherapeuticGoal } from './therapeuticGoal';
-import type { TherapeuticIntent, TherapeuticStrategy } from './strategies';
 
-/**
- * Canonical intervention type taxonomy.
- *
- * Role: Decision Engine output — maps to Intervention Library patterns and
- * dedicated generators in the edge function pipeline.
- */
-export type InterventionType =
-  | 'welcome_open'
-  | 'choice_emotion'
-  | 'choice_need'
-  | 'open_deepen'
-  | 'validate'
-  | 'reflect'
-  | 'mirror'
-  | 'reframe'
-  | 'propose_rule'
-  | 'propose_future_plan'
-  | 'celebrate_breakthrough'
-  | 'deescalate'
-  | 'redirect_blame'
-  | 'gentle_redirect_evasion'
-  | 'pause_session'
-  | 'remind_goal'
-  | 'invite_reflection'
-  | 'summarize_close'
-  | 'confirm_agreement'
-  | 'safety_response'
-  | 'recover_acknowledge';
-
-/** Visibility of intervention content in the chat UI. */
-export type InterventionVisibility = 'public' | 'private';
+export type {
+  ExpectedEffectSuccessCriterionType,
+  ExpectedEffectVerificationMethod,
+  InterventionType,
+  InterventionVisibility,
+  LibraryPatternStructure,
+} from './engineTypes';
 
 /** Selectable option for choice-style interventions. */
 export interface InterventionOption {
@@ -64,19 +46,6 @@ export interface InterventionContent {
   secondaryMessage?: string;
   options?: InterventionOption[];
 }
-
-/** Method used by Reflection to verify an expected effect. */
-export type ExpectedEffectVerificationMethod =
-  | 'next_message'
-  | 'checklist_delta'
-  | 'confidence_delta';
-
-/** Criterion type for expected effect success evaluation. */
-export type ExpectedEffectSuccessCriterionType =
-  | 'message_contains'
-  | 'check_confirmed'
-  | 'score_increase'
-  | 'tone_shift';
 
 /** Quantified success criterion for {@link ExpectedEffect}. */
 export interface ExpectedEffectSuccessCriteria {
@@ -153,9 +122,6 @@ export interface MediatorIntervention {
   doNotRepeatBefore?: TurnNumber;
 }
 
-/** Structural skeleton of an Intervention Library pattern. */
-export type LibraryPatternStructure = 'single' | 'two_part' | 'choice';
-
 /** Template skeleton for Intervention Library YAML patterns. */
 export interface LibraryPatternSkeleton {
   structure: LibraryPatternStructure;
@@ -203,4 +169,15 @@ export interface InterventionPatternRef {
   patternId: string;
   locale: MediatorLang;
   version: string;
+}
+
+/** Metadata about the last intervention — persisted for Reflection. */
+export interface LastInterventionMeta {
+  interventionId: MediatorEntityId;
+  type: InterventionType;
+  intent: TherapeuticIntent;
+  expectedEffect: ExpectedEffect;
+  strategy: TherapeuticStrategy;
+  deliveredAt: IsoTimestamp;
+  turnNumber: TurnNumber;
 }

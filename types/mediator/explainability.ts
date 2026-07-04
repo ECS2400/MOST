@@ -1,31 +1,27 @@
 /**
  * Explainability Layer types for Mediator AI Engine v2.3.
  *
- * Role: deterministic audit trail per turn — answers "why did the mediator
- * decide this?" without reading LLM prompts. Generated in parallel with
- * Decision Engine and persisted for debugging, tests, and future analytics.
+ * Role: deterministic audit trail per turn for debugging and tests.
  */
 
 import type { IsoTimestamp, MediatorEntityId, TurnNumber } from './common';
 import type { ConversationPace } from './dynamics';
 import type { ComplianceResult } from './constitution';
+import type {
+  ExplainabilityGoalTransition,
+  InterventionType,
+  TherapeuticIntent,
+  TherapeuticStrategy,
+} from './engineTypes';
 import type { PriorityOutputSummary } from './priority';
 import type {
   ReadinessAssessmentSummary,
   ReflectionOutputSummary,
 } from './reflection';
-import type { StrategyEngineOutputSummary } from './strategies';
+import type { StrategyEngineOutputSummary } from './strategyEngineIo';
 import type { TherapeuticGoal } from './therapeuticGoal';
-import type { TherapeuticIntent, TherapeuticStrategy } from './strategies';
-import type { InterventionType } from './interventions';
 
-/** Goal transition decision recorded in explainability output. */
-export type ExplainabilityGoalTransition =
-  | 'stay'
-  | 'advance'
-  | 'regress'
-  | 'skip'
-  | null;
+export type { ExplainabilityGoalTransition } from './engineTypes';
 
 /** Decision outcome snapshot embedded in {@link DecisionExplanation}. */
 export interface DecisionOutcome {

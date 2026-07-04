@@ -1,23 +1,15 @@
 /**
  * Priority Engine types for Mediator AI Engine v2.3.
  *
- * Role: resolves competing dynamic signals (escalation, breakthrough, blame loop,
- * evasion, safety) into a single ranked decision context each turn.
+ * Role: resolves competing dynamic signals into a single ranked decision context.
  */
 
 import type { ConfidenceScore } from './common';
+import type { ConfidenceValue } from './confidence';
 import type { ConversationMode } from './dynamics';
-import type { ConfidenceValue } from './evidence';
-import type { InterventionType } from './interventions';
+import type { InterventionType, PrioritySignalType } from './engineTypes';
 
-/** Dynamic event types ranked by Priority Engine. */
-export type PrioritySignalType =
-  | 'safety'
-  | 'escalation'
-  | 'blame_loop'
-  | 'breakthrough'
-  | 'evasion'
-  | 'stuck';
+export type { PrioritySignalType } from './engineTypes';
 
 /**
  * Single active signal with numeric priority rank.
@@ -33,15 +25,13 @@ export interface PrioritySignal {
 /**
  * Output of Priority Engine for the current turn.
  *
- * Role: constrains Decision Engine and TSE — may preempt goal transitions
- * and forbid intervention types.
+ * Role: constrains Decision Engine and TSE — may preempt goal transitions.
  */
 export interface PriorityOutput {
   activeSignals: PrioritySignal[];
   conversationMode: ConversationMode;
   allowedInterventionTypes: InterventionType[];
   forbiddenInterventionTypes: InterventionType[];
-  /** When true, Decision Engine must not advance the therapeutic goal this turn. */
   preemptsGoalTransition: boolean;
   recommendedInterventionType: InterventionType;
 }

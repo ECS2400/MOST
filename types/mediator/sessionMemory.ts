@@ -2,15 +2,23 @@
  * Session memory types for Mediator AI Engine v2.3.
  *
  * Role: condensed operational knowledge accumulated during one session.
- * Answers anti-repeat, effectiveness, and closure summarisation questions
- * without re-scanning the full transcript each turn.
  */
 
-import type { ConfidenceScore, InterventionSignature, IsoTimestamp, ParticipantRole, TurnNumber } from './common';
-import type { ConfidenceValue } from './evidence';
+import type {
+  ConfidenceScore,
+  InterventionSignature,
+  IsoTimestamp,
+  ParticipantRole,
+  TurnNumber,
+} from './common';
+import type { ConfidenceValue } from './confidence';
+import type {
+  BreakthroughType,
+  EmotionLabel,
+  InterventionType,
+  NeedLabel,
+} from './engineTypes';
 import type { GoalTransition } from './goals';
-import type { InterventionType } from './interventions';
-import type { BreakthroughType, EmotionLabel, NeedLabel } from './participants';
 import type { ReflectionEntry } from './reflection';
 import type { TherapeuticGoal } from './therapeuticGoal';
 
@@ -28,7 +36,6 @@ export interface InterventionHistoryEntry {
   turnNumber: TurnNumber;
   type: InterventionType;
   goal: TherapeuticGoal;
-  /** null until Reflection evaluates expected effect. */
   effective: boolean | null;
   confidence: ConfidenceScore;
   signature: InterventionSignature;
@@ -38,7 +45,6 @@ export interface InterventionHistoryEntry {
  * Operational memory persisted across turns within a single session.
  *
  * Role: updated by SESSION MEMORY UPDATE pipeline step after each turn.
- * Size limits enforced by implementer (see architecture §9.4).
  */
 export interface SessionMemory {
   breakthroughs: SessionBreakthroughRecord[];

@@ -1,26 +1,26 @@
 /**
  * Pipeline orchestration contracts for Mediator AI Engine v2.3.
  *
- * Role: request/response shapes for the orchestrate_turn edge function entry
- * point and individual engine module I/O boundaries.
+ * Role: request/response shapes for orchestrate_turn edge function.
  */
 
-import type {
-  MediationId,
-  SessionId,
-  TurnNumber,
-} from './common';
+import type { MediationId, SessionId, TurnNumber } from './common';
+import type { ComplianceResult } from './constitution';
 import type { EvidenceStore } from './evidence';
+import type {
+  ExplainabilityGoalTransition,
+  InterventionType,
+  TherapeuticIntent,
+  TherapeuticStrategy,
+} from './engineTypes';
 import type { Explainability } from './explainability';
 import type { Intervention } from './interventions';
 import type { MediationState } from './mediationState';
 import type { PriorityOutput } from './priority';
-import type { ReflectionOutput } from './reflection';
+import type { ReflectionOutput, TranscriptMessage } from './reflection';
 import type { SafetyOutput } from './safety';
 import type { SessionMemory } from './sessionMemory';
-import type { StrategyEngineOutput } from './strategies';
-import type { ComplianceResult } from './constitution';
-import type { TranscriptMessage } from './reflection';
+import type { StrategyEngineOutput } from './strategyEngineIo';
 
 /** Feature flag values controlling engine version rollout. */
 export type MediatorEngineVersion = 'v1' | 'v2.3';
@@ -42,9 +42,7 @@ export interface OrchestrateTurnRequest {
   sessionId: SessionId;
   trigger: OrchestrateTurnTrigger;
   turnNumber: TurnNumber;
-  /** Current persisted state — null on first turn of a new v2.3 session. */
   mediationState: MediationState | null;
-  /** New messages since last orchestration. */
   transcriptDelta: TranscriptMessage[];
   engineVersion: MediatorEngineVersion;
 }
@@ -52,8 +50,7 @@ export interface OrchestrateTurnRequest {
 /**
  * Response payload from orchestrate_turn edge function.
  *
- * Role: returned to liveMediationV2 client wrapper; includes intervention
- * plus audit artifacts for debugging.
+ * Role: returned to liveMediationV2 client wrapper.
  */
 export interface OrchestrateTurnResponse {
   mediationState: MediationState;
@@ -76,10 +73,10 @@ export interface StateAnalyzerOutput {
 
 /** Output of Decision Engine pipeline step. */
 export interface DecisionEngineOutput {
-  selectedInterventionType: import('./interventions').InterventionType;
-  goalTransition: import('./explainability').ExplainabilityGoalTransition;
-  intent: import('./strategies').TherapeuticIntent;
-  strategy: import('./strategies').TherapeuticStrategy;
+  selectedInterventionType: InterventionType;
+  goalTransition: ExplainabilityGoalTransition;
+  intent: TherapeuticIntent;
+  strategy: TherapeuticStrategy;
   rationale: string;
 }
 

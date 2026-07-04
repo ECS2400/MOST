@@ -1,34 +1,28 @@
 /**
  * Core mediation state model for Mediator AI Engine v2.3.
  *
- * Role: replaces legacy ConversationState. Single source of truth persisted
- * in live_messages.metadata (action: conversation_state). All pipeline modules
- * read and write slices of this structure each turn.
+ * Role: root aggregate persisted between turns in live_messages.metadata.
  */
 
-import type { SessionOutcome } from './common';
+import type { InterventionTarget, SessionOutcome } from './common';
 import type {
   ConversationDynamics,
   ConversationMemory,
   EmotionalLoadState,
   PaceState,
 } from './dynamics';
+import type { EvidenceStore } from './evidence';
+import type { MediatorActionType } from './engineTypes';
 import type { GoalState, GoalTransition, SessionObjectives } from './goals';
 import type {
   ConflictModel,
   MediationStateMeta,
   ParticipantStates,
 } from './participants';
-import type { EvidenceStore } from './evidence';
-import type {
-  ActiveStrategyState,
-  LastInterventionMeta,
-  RecoveryState,
-  SessionPersonality,
-} from './strategies';
+import type { SessionPersonality } from './personality';
+import type { ActiveStrategyState, RecoveryState } from './strategies';
+import type { LastInterventionMeta } from './interventions';
 import type { TherapeuticGoal } from './therapeuticGoal';
-import type { MediatorActionType } from './participants';
-import type { InterventionTarget } from './common';
 
 /** Pending user-facing action awaiting partner response. */
 export interface PendingAction {
@@ -51,8 +45,7 @@ export interface SessionAgreements {
 /**
  * Complete in-session state of the Mediator AI Engine.
  *
- * Role: root aggregate persisted between turns. Schema version must match
- * {@link MediationStateMeta.schemaVersion} (`2.3`).
+ * Role: single source of truth for v2.3 engine persistence.
  */
 export interface MediationState {
   meta: MediationStateMeta;
@@ -66,14 +59,12 @@ export interface MediationState {
   pendingAction: PendingAction | null;
   agreements: SessionAgreements;
   sessionOutcome: SessionOutcome;
-  /** v2.2+ therapeutic metadata */
   pace: PaceState;
   load: EmotionalLoadState;
   personality: SessionPersonality;
   recovery: RecoveryState | null;
   activeStrategy: ActiveStrategyState | null;
   lastInterventionMeta: LastInterventionMeta | null;
-  /** v2.3 Evidence Layer persistence */
   evidenceStore: EvidenceStore;
 }
 

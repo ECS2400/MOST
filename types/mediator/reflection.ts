@@ -2,26 +2,17 @@
  * Reflection Engine types for Mediator AI Engine v2.3.
  *
  * Role: meta-cognitive layer — evaluates mediator effectiveness each turn.
- * Never generates user-facing messages; outputs metadata for Decision and TSE.
  */
 
-import type { ConfidenceScore, IsoTimestamp, TurnNumber } from './common';
+import type { ConfidenceScore, InterventionTarget, IsoTimestamp, TurnNumber } from './common';
+import type { ConfidenceValue } from './confidence';
 import type { ConversationPace } from './dynamics';
-import type { ConfidenceValue } from './evidence';
+import type { StrategyShift, TherapeuticStrategy } from './engineTypes';
 import type { OutcomeCheck } from './goals';
 import type { ExpectedEffectEvaluation, MediatorIntervention } from './interventions';
 import type { MediationStateSnapshot } from './mediationState';
-import type { TherapeuticStrategy } from './strategies';
-import type { InterventionTarget } from './common';
 
-/** Recommended shift in therapeutic approach after self-evaluation. */
-export type StrategyShift =
-  | 'continue'
-  | 'switch_to_choice'
-  | 'switch_to_reflect'
-  | 'advance_goal'
-  | 'regress_goal'
-  | 'pause';
+export type { StrategyShift } from './engineTypes';
 
 /** Transcript message slice used in Reflection diffing. */
 export interface TranscriptMessage {
