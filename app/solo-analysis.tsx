@@ -263,9 +263,7 @@ export default function SoloAnalysis() {
 
             <View style={styles.paymentMethods}>
               <MaterialIcons name="lock" size={12} color={Colors.textMuted} />
-              <Text style={styles.paymentText}>
-                Bezpieczna płatność · Google Pay · Stripe
-              </Text>
+              <Text style={styles.paymentText}>{extras.errors.securePayment}</Text>
             </View>
 
             <Pressable

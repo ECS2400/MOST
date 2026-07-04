@@ -169,7 +169,7 @@ export const EN = {
     mock: 'DEMO — payments coming soon',
     soloTitle: 'Solo Analysis',
     soloDesc: 'One-time analysis without partner — €2.99',
-    paymentMethods: 'Apple Pay · Google Pay · Stripe',
+    paymentMethods: 'Apple Pay · Google Pay',
     activeTitle: 'Premium is active! 💜',
     activeSub: 'You have full access to everything Most offers. Thank you for being with us.',
     backBtn: "Let's go!",

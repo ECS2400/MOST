@@ -169,7 +169,7 @@ export const PL_EXTENDED = {
     mock: 'DEMO — płatności wkrótce',
     soloTitle: 'Analiza Solo',
     soloDesc: 'Jednorazowa analiza bez partnera — 9,99 zł',
-    paymentMethods: 'Apple Pay · Google Pay · Stripe',
+    paymentMethods: 'Apple Pay · Google Pay',
     activeTitle: 'Premium jest aktywne! 💜',
     activeSub: 'Możecie korzystać ze wszystkiego, co oferuje Most. Dziękujemy, że z nami jesteście.',
     backBtn: 'Super, wracam!',

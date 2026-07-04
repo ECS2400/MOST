@@ -42,7 +42,7 @@ export const SOLO_EXTRAS_ES: SoloExtrasBundle = {
     purchaseFailed: 'Compra fallida. Inténtalo de nuevo.',
     analyzeFailed: 'No se pudo analizar la situación. Inténtalo de nuevo.',
     screenshotAnalyzed: 'Captura analizada — datos completados',
-    securePayment: 'Pago seguro · Google Pay · Stripe',
+    securePayment: 'Pago seguro · App Store · Google Play',
     premiumLink: '¿Prefieres acceso ilimitado?',
     analyzePrepareFailed: 'No se pudo preparar el análisis.',
     sayTip: 'Dilo con calma, en primera persona — evita "Tú siempre…".',

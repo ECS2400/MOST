@@ -169,7 +169,7 @@ export const DE = {
     mock: 'DEMO — Zahlungen demnächst',
     soloTitle: 'Solo-Analyse',
     soloDesc: 'Einmalige Analyse ohne Partner — €2,99',
-    paymentMethods: 'Google Pay · Stripe',
+    paymentMethods: 'App Store · Google Play',
     activeTitle: 'Premium ist aktiv! 💜',
     activeSub: 'Ihr habt vollen Zugang zu allem, was Most bietet. Danke, dass ihr dabei seid.',
     backBtn: 'Super, ich gehe zurück!',

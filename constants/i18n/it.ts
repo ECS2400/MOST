@@ -169,7 +169,7 @@ export const IT = {
     mock: 'DEMO — pagamenti presto disponibili',
     soloTitle: 'Analisi Solo',
     soloDesc: 'Analisi una tantum senza partner — €2,99',
-    paymentMethods: 'Apple Pay · Google Pay · Stripe',
+    paymentMethods: 'Apple Pay · Google Pay',
     activeTitle: 'Premium è attivo! 💜',
     activeSub: 'Avete accesso completo a tutto ciò che Most offre. Grazie per essere con noi.',
     backBtn: 'Ottimo, torno!',

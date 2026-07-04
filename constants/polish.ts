@@ -151,7 +151,7 @@ export const PL = {
     mock: 'DEMO — płatności wkrótce',
     soloTitle: 'Analiza Solo',
     soloDesc: 'Jednorazowa analiza bez partnera — 9,99 zł',
-    paymentMethods: 'Google Pay · Stripe',
+    paymentMethods: 'App Store · Google Play',
   },
   solo: {
     title: 'Analiza Solo',

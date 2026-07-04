@@ -49,7 +49,6 @@
         "npm:@react-navigation/stack@7.2.10",
         "npm:@shopify/flash-list@1.7.6",
         "npm:@shopify/react-native-skia@2.0.0-next.4",
-        "npm:@stripe/stripe-react-native@0.45.0",
         "npm:@supabase/supabase-js@^2.50.0",
         "npm:@types/react@~19.0.10",
         "npm:date-fns@^2.28.0",
