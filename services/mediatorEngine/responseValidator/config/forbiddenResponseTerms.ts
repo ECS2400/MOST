@@ -65,3 +65,15 @@ export const POLISH_COMMON_WORDS =
 
 export const ENGLISH_COMMON_WORDS =
   /\b(I hear|I understand|please|let us|let's|let's pause|take your time|take a|moment|both of you|speak|pause|safety|breath|slow breath|one at a time|this is difficult)\b/i;
+
+export const SPANISH_COMMON_WORDS =
+  /\b(escucho|entend|ambos|momento|respir|difícil|pausa|seguridad|hablemos|tomemos)\b/i;
+
+export const ITALIAN_COMMON_WORDS =
+  /\b(sento|entrambi|momento|respir|difficile|pausa|sicurezza|parliamo|prendiamo)\b/i;
+
+export const GERMAN_COMMON_WORDS =
+  /\b(höre|schwierig|moment|atmet|bitte|pause|sicherheit|sprechen|innehalten)\b/i;
+
+export const FRENCH_COMMON_WORDS =
+  /\b(entends|difficile|moment|respiration|sécurité|parlons|prenons|pause)\b/i;

@@ -1,4 +1,8 @@
 import type { MediatorLang } from '@/types/mediator';
+import {
+  LANGUAGE_DISPLAY_NAMES,
+  SUPPORTED_MEDIATOR_LANGS,
+} from '@/services/mediatorEngine/llm/config/localizedMediatorTexts';
 
 const SYSTEM_RULES_EN = [
   'You are an AI mediator for couples in conflict.',
@@ -20,25 +24,30 @@ const SYSTEM_RULES_PL = [
   'Odpowiedz jedną wypowiedzią mediatora.',
 ] as const;
 
-const LANGUAGE_INSTRUCTION: Record<'pl' | 'en', string> = {
+const LANGUAGE_INSTRUCTION: Record<MediatorLang, string> = {
   pl: 'Write the mediator response in Polish.',
   en: 'Write the mediator response in English.',
+  es: 'Write the mediator response in Spanish.',
+  it: 'Write the mediator response in Italian.',
+  de: 'Write the mediator response in German.',
+  fr: 'Write the mediator response in French.',
 };
 
 /** Returns core system prompt rules for the session language. */
 export function systemRulesForLanguage(language: MediatorLang): readonly string[] {
   if (language === 'pl') return SYSTEM_RULES_PL;
-  if (language === 'en') return SYSTEM_RULES_EN;
   return SYSTEM_RULES_EN;
 }
 
 /** Returns language-specific writing instruction. */
 export function languageInstruction(language: MediatorLang): string {
-  if (language === 'pl' || language === 'en') {
+  if (SUPPORTED_MEDIATOR_LANGS.includes(language)) {
     return LANGUAGE_INSTRUCTION[language];
   }
-  return `Write the mediator response in ${language}.`;
+  return LANGUAGE_INSTRUCTION.en;
 }
+
+export { LANGUAGE_INSTRUCTION, LANGUAGE_DISPLAY_NAMES, SUPPORTED_MEDIATOR_LANGS };
 
 /** Constitution constraints included in developer prompt. */
 export const CONSTITUTION_CONSTRAINTS = [

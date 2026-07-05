@@ -1,35 +1,26 @@
-import type { LlmProviderPort, LlmProviderRequest, LlmProviderResponse } from '@/types/mediator';
-
-const STUB_NORMAL_EN =
-  'I hear that this feels heavy for both of you. Let us speak one at a time, without rush.';
-
-const STUB_NORMAL_PL =
-  'Słyszę, że oboje jest wam teraz ciężko. Mówmy po kolei, bez pośpiechu.';
-
-const STUB_SAFETY_EN =
-  'I need to pause here for safety. Please take a slow breath together before we continue.';
-
-const STUB_SAFETY_PL =
-  'Chcę zatrzymać mediację na chwilę ze względu na bezpieczeństwo. Weźcie proszę spokojny oddech.';
+import type { LlmProviderPort, LlmProviderRequest, LlmProviderResponse, MediatorLang } from '@/types/mediator';
+import {
+  localizedMediatorText,
+  LOCALIZED_NORMAL_TEXT,
+  LOCALIZED_SAFETY_TEXT,
+} from '@/services/mediatorEngine/llm/config/localizedMediatorTexts';
 
 function isSafetyActive(safetyLevel: string): boolean {
   return safetyLevel === 'L2_pause' || safetyLevel === 'L3_stop';
 }
 
-/** Deterministic stub provider — no network, safety-aware output. */
+function stubText(language: MediatorLang, safety: boolean): string {
+  const mode = safety ? 'safety' : 'normal';
+  return localizedMediatorText(language, mode);
+}
+
+/** Deterministic stub provider — no network, safety-aware output for all 6 languages. */
 export function createDeterministicStubProvider(): LlmProviderPort {
   return {
     providerId: 'deterministic-stub',
     async generateText(request: LlmProviderRequest): Promise<LlmProviderResponse> {
       const { safetyLevel, language } = request.metadata;
-      const safety = isSafetyActive(safetyLevel);
-
-      let text: string;
-      if (safety) {
-        text = language === 'pl' ? STUB_SAFETY_PL : STUB_SAFETY_EN;
-      } else {
-        text = language === 'pl' ? STUB_NORMAL_PL : STUB_NORMAL_EN;
-      }
+      const text = stubText(language, isSafetyActive(safetyLevel));
 
       return {
         text,
@@ -42,4 +33,7 @@ export function createDeterministicStubProvider(): LlmProviderPort {
   };
 }
 
-export { STUB_NORMAL_EN, STUB_NORMAL_PL, STUB_SAFETY_EN, STUB_SAFETY_PL };
+export {
+  LOCALIZED_NORMAL_TEXT as STUB_NORMAL_BY_LANG,
+  LOCALIZED_SAFETY_TEXT as STUB_SAFETY_BY_LANG,
+};

@@ -1,18 +1,14 @@
 import type { ResponseValidationRuleResult } from '@/types/mediator';
 import type { ResponseValidationContext } from '@/types/mediator';
-import {
-  NORMAL_MEDIATION_PHRASES,
-  SAFETY_WORDING_PATTERNS_EN,
-  SAFETY_WORDING_PATTERNS_PL,
-} from '@/services/mediatorEngine/responseValidator/config/forbiddenResponseTerms';
+import { NORMAL_MEDIATION_PHRASES } from '@/services/mediatorEngine/responseValidator/config/forbiddenResponseTerms';
+import { hasSafetyWordingForLanguage } from '@/services/mediatorEngine/llm/config/safetyLanguagePatterns';
 
 function isSafetyActive(level: ResponseValidationContext['safetyLevel']): boolean {
   return level === 'L2_pause' || level === 'L3_stop';
 }
 
 function hasSafetyWording(text: string, language: ResponseValidationContext['language']): boolean {
-  const patterns = language === 'pl' ? SAFETY_WORDING_PATTERNS_PL : SAFETY_WORDING_PATTERNS_EN;
-  return patterns.some((pattern) => pattern.test(text));
+  return hasSafetyWordingForLanguage(text, language);
 }
 
 /** Ensures L2/L3 replies include safety/pause wording and avoid normal mediation. */

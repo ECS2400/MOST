@@ -2,17 +2,15 @@ import type { MediatorLang, SafetyLevel } from '@/types/mediator';
 import {
   CONFLICT_ESCALATION_PHRASES,
   FORBIDDEN_LLM_TERMS,
-  SAFETY_REQUIRED_PATTERNS_EN,
-  SAFETY_REQUIRED_PATTERNS_PL,
 } from '@/services/mediatorEngine/llm/config/forbiddenLlmOutput';
+import { hasSafetyWordingForLanguage } from '@/services/mediatorEngine/llm/config/safetyLanguagePatterns';
 
 function isSafetyLevelActive(level: SafetyLevel): boolean {
   return level === 'L2_pause' || level === 'L3_stop';
 }
 
 function hasSafetyWording(text: string, language: MediatorLang): boolean {
-  const patterns = language === 'pl' ? SAFETY_REQUIRED_PATTERNS_PL : SAFETY_REQUIRED_PATTERNS_EN;
-  return patterns.some((pattern) => pattern.test(text));
+  return hasSafetyWordingForLanguage(text, language);
 }
 
 function hasConflictEscalation(text: string): boolean {
