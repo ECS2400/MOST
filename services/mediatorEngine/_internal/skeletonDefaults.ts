@@ -267,12 +267,14 @@ export function createEmptyStrategyOutput(): StrategyEngineOutput {
   return {
     primaryStrategy: 'build_safety',
     secondaryStrategy: null,
+    therapeuticIntent: 'increase_emotional_safety',
     confidence: 0,
     rationale: '',
     blockedStrategies: [],
     suggestedGoalTransition: 'stay',
     strategyDurationHint: 1,
     alignmentWithGoal: 'SAFE_OPENING',
+    recoveryStrategy: null,
   };
 }
 

@@ -19,7 +19,7 @@ import type {
 import type { OutcomeCheck, SessionObjectives } from './goals';
 import type { SessionPersonality } from './personality';
 import type { ReflectionOutput } from './reflection';
-import type { RecoveryState } from './strategies';
+import type { RecoveryState, RecoveryStrategy } from './strategies';
 import type { SafetyOutput } from './safety';
 import type { SessionMemory } from './sessionMemory';
 import type { TherapeuticGoal } from './therapeuticGoal';
@@ -54,6 +54,8 @@ export interface StrategyEngineInput {
 export interface StrategyEngineOutput {
   primaryStrategy: TherapeuticStrategy;
   secondaryStrategy: TherapeuticStrategy | null;
+  /** Fine-grained intent aligned with the selected primary strategy. */
+  therapeuticIntent: TherapeuticIntent;
   confidence: ConfidenceScore;
   rationale: string;
   blockedStrategies: TherapeuticStrategy[];
@@ -61,6 +63,8 @@ export interface StrategyEngineOutput {
   /** Recommended strategy duration in turns (1–3). */
   strategyDurationHint: number;
   alignmentWithGoal: TherapeuticGoal;
+  /** Active recovery configuration when recovery mode is engaged. */
+  recoveryStrategy: RecoveryStrategy | null;
 }
 
 /** Compact summary for Explainability Layer module inputs. */
