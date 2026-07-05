@@ -3,13 +3,12 @@
  *
  * Runner: Node built-in test (`node --test`). No extra packages required.
  *
- *   node --test services/mediatorEngine/__tests__/architecture.test.mjs
+ *   npm run test:mediator:architecture:static
+ *   npm run test:mediator:architecture
  *
- * Runtime response-shape test (TypeScript):
+ * Runtime response-shape test (TypeScript, Node 22+):
  *
- *   node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs \
- *     --experimental-strip-types \
- *     --test services/mediatorEngine/__tests__/architecture.runtime.test.ts
+ *   npm run test:mediator:architecture:runtime
  */
 
 import assert from 'node:assert/strict';

@@ -3,9 +3,8 @@
  *
  * Requires Node 22+ with --experimental-strip-types and path-alias-loader.mjs:
  *
- *   node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs \
- *     --experimental-strip-types \
- *     --test services/mediatorEngine/__tests__/architecture.runtime.test.ts
+ *   npm run test:mediator:architecture:runtime
+ *   npm run test:mediator:architecture
  */
 
 import assert from 'node:assert/strict';
