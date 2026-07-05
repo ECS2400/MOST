@@ -24,7 +24,8 @@
     "test:mediator:prompt": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/promptComposer/*.test.ts",
     "test:mediator:llm": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/llm/*.test.ts",
     "test:mediator:response": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/responseValidator/*.test.ts",
-    "test:mediator:runtime": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/runtime/*.test.ts"
+    "test:mediator:runtime": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/runtime/*.test.ts",
+    "test:mediator:integration": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/integration/*.test.ts"
   },
   "dependencies": {
     "@apollo/client": "^3.4.10",
