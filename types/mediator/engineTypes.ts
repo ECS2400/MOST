@@ -216,6 +216,10 @@ export type SuggestedGoalTransition =
 /** Recommended shift in therapeutic approach after Reflection self-evaluation. */
 export type StrategyShift =
   | 'continue'
+  | 'slow_down'
+  | 'deescalate'
+  | 'recover'
+  | 'consolidate'
   | 'switch_to_choice'
   | 'switch_to_reflect'
   | 'advance_goal'

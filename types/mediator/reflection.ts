@@ -7,10 +7,11 @@
 import type { ConfidenceScore, InterventionTarget, IsoTimestamp, TurnNumber } from './common';
 import type { ConfidenceValue } from './confidence';
 import type { ConversationPace } from './dynamics';
-import type { StrategyShift, TherapeuticStrategy } from './engineTypes';
+import type { SafetyLevel, StrategyShift, TherapeuticStrategy, InterventionType } from './engineTypes';
 import type { OutcomeCheck } from './goals';
 import type { ExpectedEffectEvaluation, MediatorIntervention } from './interventions';
 import type { MediationStateSnapshot } from './mediationState';
+import type { ComplianceResultSummary } from './sessionMemory';
 
 export type { StrategyShift } from './engineTypes';
 
@@ -30,6 +31,16 @@ export interface ReflectionInput {
   stateAfter: MediationStateSnapshot;
   transcriptDelta: TranscriptMessage[];
   goalChecksDelta: OutcomeCheck[];
+  /** Explicit turn index — falls back to stateAfter.meta.currentTurnNumber. */
+  turnNumber?: TurnNumber;
+  /** Prior turn reflection output, when available. */
+  previousReflection?: ReflectionOutput | null;
+  /** Compliance summary for the last intervention (prior turn). */
+  lastComplianceResult?: ComplianceResultSummary | null;
+  /** Safety level from Safety Layer, when available. */
+  safetyLevel?: SafetyLevel | null;
+  /** Intervention types flagged ineffective in session memory. */
+  recentIneffectiveTypes?: InterventionType[];
 }
 
 /** Per-participant readiness assessment for goal advance. */
