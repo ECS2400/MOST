@@ -33,7 +33,7 @@ export const collectSafetySignal: PrioritySignalCollector = {
     return {
       type: 'safety',
       priority: PRIORITY_RANKS.safety,
-      confidence: activeSignalConfidence(confidence, safety.signals.map((s) => s.quote)),
+      confidence: activeSignalConfidence(confidence, safety.signals.map((s) => s.evidenceRef)),
       reason: safety.preempted
         ? 'Safety layer preempted standard pipeline'
         : `Safety level ${safety.level}`,

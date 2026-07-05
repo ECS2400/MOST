@@ -63,15 +63,16 @@ export type InterventionType =
   | 'safety_response'
   | 'recover_acknowledge';
 
-/** Category of safety signal detected in partner messages. */
+/** Category of safety signal detected in partner messages (L1). */
 export type SafetySignalCategory =
-  | 'hopelessness'
-  | 'withdrawal'
+  | 'self_harm'
+  | 'suicide'
+  | 'violence_threat'
+  | 'child_safety'
+  | 'coercion_control'
   | 'severe_distress'
-  | 'silence'
-  | 'complete_disengagement'
-  | 'self_harm_hint'
-  | 'abuse_hint';
+  | 'abuse_disclosure'
+  | 'immediate_danger';
 
 /** Response level triggered by accumulated safety signals. */
 export type SafetyLevel = 'none' | 'L1_gentle' | 'L2_pause' | 'L3_stop';

@@ -156,7 +156,9 @@ export function withSafety(overrides: Partial<SafetyOutput> = {}): Partial<Strat
         {
           category: 'severe_distress',
           confidence: 90,
-          quote: PRIVATE_TEXT,
+          matchedPatternId: 'test-severe-distress',
+          messageId: 'test-msg-1',
+          evidenceRef: 'test-severe-distress:test-msg-1',
           detectedAt: '2026-07-05T00:00:00.000Z',
           turnNumber: 3,
           detectionLayer: 'heuristic',

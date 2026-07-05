@@ -76,7 +76,9 @@ export function createPreemptiveSafetyOutput(
       {
         category: 'severe_distress',
         confidence: 90,
-        quote: 'I cannot do this anymore',
+        matchedPatternId: 'test-severe-distress',
+        messageId: 'test-msg-1',
+        evidenceRef: 'test-severe-distress:test-msg-1',
         detectedAt: TIMESTAMP,
         turnNumber: 3,
         detectionLayer: 'heuristic',

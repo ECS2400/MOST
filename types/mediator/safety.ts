@@ -4,7 +4,7 @@
  * Role: detects exceptional partner distress and preempts the standard pipeline.
  */
 
-import type { ConfidenceScore, IsoTimestamp, TurnNumber } from './common';
+import type { ConfidenceScore, IsoTimestamp, MediatorEntityId, TurnNumber } from './common';
 import type { ConfidenceValue } from './confidence';
 import type {
   InterventionType,
@@ -17,17 +17,21 @@ import type { TranscriptMessage } from './reflection';
 export type { SafetyLevel, SafetySignalCategory } from './engineTypes';
 
 /**
- * Detected safety signal with confidence and source quote.
+ * Detected safety signal — structural metadata only, no user message content.
  *
  * Role: input to Safety Layer aggregation before preemption decision.
  */
 export interface SafetySignal {
   category: SafetySignalCategory;
   confidence: ConfidenceScore;
-  quote: string;
+  matchedPatternId: string;
+  messageId: string | null;
+  /** Stable reference: `{patternId}:{messageId|state}`. */
+  evidenceRef: string;
   detectedAt: IsoTimestamp;
   turnNumber: TurnNumber;
-  detectionLayer: 'regex' | 'heuristic' | 'llm';
+  detectionLayer: 'regex' | 'heuristic';
+  quote?: never;
 }
 
 /** Input to Human Safety Layer for a single turn. */
