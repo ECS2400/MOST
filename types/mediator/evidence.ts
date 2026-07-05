@@ -22,6 +22,7 @@ import type {
 export type EvidenceSource =
   | 'user_quote'
   | 'transcript_fragment'
+  | 'transcript_metadata'
   | 'linguistic_signal'
   | 'emotional_signal'
   | 'heuristic_rule'
@@ -37,6 +38,11 @@ export type ConfidenceMethod =
   | 'max_source'
   | 'checklist_gate';
 
+/** Structured metadata for non-textual evidence such as transcript_metadata. */
+export type EvidenceItemMetadataValue = string | number | boolean | string[] | null;
+
+export type EvidenceItemMetadata = Record<string, EvidenceItemMetadataValue>;
+
 /**
  * Single traceable piece of evidence supporting a conclusion.
  *
@@ -48,6 +54,8 @@ export interface EvidenceItem {
   source: EvidenceSource;
   /** Quote text or heuristic description. */
   content: string;
+  /** Structured fields for sources that must not store payload text in content. */
+  metadata?: EvidenceItemMetadata;
   messageIds?: string[];
   turnNumber?: TurnNumber;
   /** Contribution weight 0.0–1.0 toward parent conclusion confidence. */

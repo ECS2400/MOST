@@ -16,7 +16,8 @@
     "test:mediator:priority": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/priority/resolvePriority.test.ts",
     "test:mediator:memory": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/memory/updateSessionMemory.test.ts",
     "test:mediator:decision": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/decision/makeDecision.test.ts",
-    "test:mediator:intervention": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/intervention/generateIntervention.test.ts"
+    "test:mediator:intervention": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/intervention/generateIntervention.test.ts",
+    "test:mediator:state": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/stateAnalyzer/analyzeState.test.ts"
   },
   "dependencies": {
     "@apollo/client": "^3.4.10",

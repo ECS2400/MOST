@@ -2,14 +2,14 @@
  * State Analyzer — Mediator AI Engine v2.3 pipeline step 1.
  *
  * Role: ingests transcript delta and prior state; produces updated {@link MediationState}
- * and refreshed {@link EvidenceStore}. Phase 0B: pass-through placeholder only.
+ * and refreshed {@link EvidenceStore}. Phase 1F: deterministic L1 — no LLM.
  */
 
 import type { StateAnalyzerInput, StateAnalyzerOutput } from '@/types/mediator';
 import {
-  createEmptyEvidenceStore,
-  createEmptyMediationState,
-} from '@/services/mediatorEngine/_internal/skeletonDefaults';
+  buildStateAnalyzerOutput,
+  createMinimalStateAnalyzerOutput,
+} from '@/services/mediatorEngine/stateAnalyzer/analyze/buildStateAnalyzerOutput';
 
 /**
  * Analyzes incoming messages and updates mediation state.
@@ -18,24 +18,9 @@ import {
  * @returns Updated state snapshot and evidence store delta metadata.
  */
 export function analyzeState(input: StateAnalyzerInput): StateAnalyzerOutput {
-  // TODO(Phase 1): implement participant field updates, dynamics, and confidence decay.
-  const updatedState =
-    input.mediationState ??
-    createEmptyMediationState({
-      mediationId: '',
-      sessionId: '',
-      trigger: 'session_start',
-      turnNumber: input.turnNumber,
-      mediationState: null,
-      transcriptDelta: input.transcriptDelta,
-      engineVersion: 'v2.3',
-    });
-
-  return {
-    updatedState,
-    evidenceStore: updatedState.evidenceStore ?? createEmptyEvidenceStore(),
-    dynamicsUpdated: false,
-    participantFieldsUpdated: false,
-    decayEventsApplied: 0,
-  };
+  try {
+    return buildStateAnalyzerOutput(input);
+  } catch {
+    return createMinimalStateAnalyzerOutput(input);
+  }
 }
