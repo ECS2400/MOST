@@ -91,8 +91,12 @@ export type ConversationPace = 'slow' | 'normal' | 'fast';
 export type PrioritySignalType =
   | 'safety'
   | 'escalation'
+  | 'recovery'
   | 'blame_loop'
   | 'breakthrough'
+  | 'exhaustion'
+  | 'readiness'
+  | 'default_strategy'
   | 'evasion'
   | 'stuck';
 

@@ -2,11 +2,15 @@
  * Priority Engine — Mediator AI Engine v2.3 pipeline step 5.
  *
  * Role: resolves competing dynamic signals into a single ranked decision context.
- * Phase 0B: returns an empty priority output.
+ * Phase 1B: deterministic L1 signal ranking — no LLM.
  */
 
 import type { PriorityInput, PriorityOutput } from '@/types/mediator';
-import { createEmptyPriorityOutput } from '@/services/mediatorEngine/_internal/skeletonDefaults';
+import {
+  buildPriorityOutput,
+  createMinimalSafePriorityOutput,
+} from '@/services/mediatorEngine/priority/resolve/buildPriorityOutput';
+import { collectPrioritySignals } from '@/services/mediatorEngine/priority/signals/index';
 
 /**
  * Resolves active priority signals and constrains intervention selection.
@@ -15,7 +19,14 @@ import { createEmptyPriorityOutput } from '@/services/mediatorEngine/_internal/s
  * @returns Ranked signals, conversation mode, and intervention constraints.
  */
 export function resolvePriority(input: PriorityInput): PriorityOutput {
-  // TODO(Phase 1): rank dynamic signals and set conversation mode.
-  void input;
-  return createEmptyPriorityOutput();
+  try {
+    const signals = collectPrioritySignals({ input });
+    return buildPriorityOutput(signals, input);
+  } catch {
+    try {
+      return buildPriorityOutput([], input);
+    } catch {
+      return createMinimalSafePriorityOutput(input);
+    }
+  }
 }

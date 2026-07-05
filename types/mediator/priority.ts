@@ -24,6 +24,8 @@ export interface PrioritySignal {
   type: PrioritySignalType;
   priority: number;
   confidence: ConfidenceValue<boolean>;
+  reason: string;
+  recommendedInterventionType: InterventionType;
 }
 
 /** Input to Priority Engine for a single turn. */
