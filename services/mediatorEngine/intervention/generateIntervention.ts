@@ -2,11 +2,14 @@
  * Intervention Engine — Mediator AI Engine v2.3 pipeline step 7.
  *
  * Role: generates deliverable intervention content from decision and intent.
- * Phase 0B: returns an empty intervention shell.
+ * Phase 1E: deterministic L1 shell — placeholder content, no LLM.
  */
 
 import type { Intervention, InterventionEngineInput } from '@/types/mediator';
-import { createEmptyIntervention } from '@/services/mediatorEngine/_internal/skeletonDefaults';
+import {
+  buildIntervention,
+  createMinimalIntervention,
+} from '@/services/mediatorEngine/intervention/builder/buildIntervention';
 
 /**
  * Generates a complete intervention ready for constitution validation.
@@ -15,7 +18,13 @@ import { createEmptyIntervention } from '@/services/mediatorEngine/_internal/ske
  * @returns Fully typed intervention placeholder.
  */
 export function generateIntervention(input: InterventionEngineInput): Intervention {
-  // TODO(Phase 1): select library pattern and personalise content.
-  void input;
-  return createEmptyIntervention(input.turnNumber);
+  try {
+    return buildIntervention(input);
+  } catch {
+    const turnNumber =
+      typeof input?.turnNumber === 'number' && Number.isFinite(input.turnNumber)
+        ? input.turnNumber
+        : 1;
+    return createMinimalIntervention(turnNumber);
+  }
 }
