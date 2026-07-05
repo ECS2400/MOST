@@ -28,3 +28,4 @@ export * from './metrics';
 export * from './pipeline';
 export * from './relationshipTypes';
 export * from './relationship';
+export * from './promptComposer';
