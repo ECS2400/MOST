@@ -99,6 +99,15 @@ function extractImportSpecifiers(source) {
   return specifiers;
 }
 
+/** Returns true when an import stays inside the same pipeline module folder. */
+function isSameModuleInternalImport(relativePath, specifier) {
+  const moduleDir = relativePath.split('/')[0];
+  return (
+    specifier.startsWith(`@/services/mediatorEngine/${moduleDir}/`) ||
+    specifier.includes(`/services/mediatorEngine/${moduleDir}/`)
+  );
+}
+
 describe('Mediator AI Engine v2.3 — architecture validation', () => {
   it('declares canonical pipeline step order in pipelineOrder.ts', () => {
     const source = fs.readFileSync(pipelineOrderPath, 'utf8');
@@ -136,6 +145,7 @@ describe('Mediator AI Engine v2.3 — architecture validation', () => {
         if (!isMediatorEngineImport) continue;
         const isInternal = specifier.includes('/mediatorEngine/_internal/');
         if (isInternal) continue;
+        if (isSameModuleInternalImport(relativePath, specifier)) continue;
         violations.push({ file: relativePath, specifier });
       }
     }

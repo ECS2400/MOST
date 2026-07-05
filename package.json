@@ -11,7 +11,8 @@
     "ios": "expo run:ios",
     "test:mediator:architecture:static": "node --test services/mediatorEngine/__tests__/architecture.test.mjs",
     "test:mediator:architecture:runtime": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/architecture.runtime.test.ts",
-    "test:mediator:architecture": "npm run test:mediator:architecture:static && npm run test:mediator:architecture:runtime"
+    "test:mediator:architecture": "npm run test:mediator:architecture:static && npm run test:mediator:architecture:runtime",
+    "test:mediator:constitution": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/constitution/validateConstitution.test.ts"
   },
   "dependencies": {
     "@apollo/client": "^3.4.10",

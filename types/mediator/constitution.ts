@@ -5,8 +5,9 @@
  * after Intervention Engine generation. Constitution > ADR > implementation.
  */
 
-import type { ConfidenceScore, IsoTimestamp, TurnNumber } from './common';
+import type { ConfidenceScore, InterventionSignature, IsoTimestamp, TurnNumber } from './common';
 import type { Intervention } from './interventions';
+import type { SessionPersonality } from './personality';
 
 /** Severity of a constitution violation detected by the validator. */
 export type ConstitutionViolationSeverity = 'block' | 'warn';
@@ -71,6 +72,10 @@ export interface ConstitutionValidatorInput {
   applicableRules: ConstitutionRule[];
   turnNumber: TurnNumber;
   attemptNumber: number;
+  /** Session personality constraints — optional for L1 structural checks. */
+  sessionPersonality?: SessionPersonality | null;
+  /** Recent intervention signatures used to block short-interval repeats. */
+  recentInterventionSignatures?: InterventionSignature[];
 }
 
 /** Output alias for validator pipeline step. */
