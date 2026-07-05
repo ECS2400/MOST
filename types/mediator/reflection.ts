@@ -63,7 +63,7 @@ export interface LoadRecommendation {
 /**
  * Output of Reflection Engine for the current turn.
  *
- * Role: consumed by TSE and Decision Engine; logged in SessionMemory.reflectionLog.
+ * Role: consumed by TSE and Decision Engine; summarized in SessionMemory.reflectionLog.
  */
 export interface ReflectionOutput {
   understoodPartners: ConfidenceValue<boolean>;

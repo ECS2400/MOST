@@ -2,10 +2,13 @@
  * Session Memory — Mediator AI Engine v2.3 pipeline step 9.
  *
  * Role: accumulates operational session knowledge after each turn.
- * Phase 0B: returns the previous memory unchanged.
+ * Phase 1C: deterministic L1 updates — no LLM, no transcript storage.
  */
 
 import type { SessionMemory, SessionMemoryUpdateInput } from '@/types/mediator';
+import { createEmptySessionMemory } from '@/services/mediatorEngine/_internal/skeletonDefaults';
+import { buildSessionMemoryUpdate } from '@/services/mediatorEngine/memory/update/buildSessionMemoryUpdate';
+import { normalizeMemory } from '@/services/mediatorEngine/memory/lib/normalizeMemory';
 
 /**
  * Updates session memory with turn outcomes.
@@ -14,6 +17,9 @@ import type { SessionMemory, SessionMemoryUpdateInput } from '@/types/mediator';
  * @returns Updated session memory for persistence and downstream modules.
  */
 export function updateSessionMemory(input: SessionMemoryUpdateInput): SessionMemory {
-  // TODO(Phase 1): append intervention history, breakthroughs, and reflection log.
-  return input.previousMemory;
+  try {
+    return buildSessionMemoryUpdate(input);
+  } catch {
+    return normalizeMemory(input.previousMemory ?? createEmptySessionMemory());
+  }
 }

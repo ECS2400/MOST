@@ -17,31 +17,63 @@ import type {
   EmotionLabel,
   InterventionType,
   NeedLabel,
+  StrategyShift,
+  TherapeuticIntent,
+  TherapeuticStrategy,
 } from './engineTypes';
 import type { GoalTransition } from './goals';
 import type { ComplianceResult } from './constitution';
-import type { Intervention } from './interventions';
+import type { ExpectedEffectEvaluation, Intervention } from './interventions';
 import type { MediationState } from './mediationState';
-import type { ReflectionEntry, ReflectionOutput } from './reflection';
+import type { ReflectionOutput } from './reflection';
 import type { TherapeuticGoal } from './therapeuticGoal';
 
-/** Breakthrough record in session memory. */
+/** Breakthrough record in session memory — structural metadata only, no utterance text. */
 export interface SessionBreakthroughRecord {
-  quote: string;
   type: BreakthroughType;
   confidence: ConfidenceScore;
   turnNumber: TurnNumber;
   participant: ParticipantRole;
+  /** Stable reference to the source event (turn/type/participant), not user content. */
+  sourceEventId: string | null;
+  /** Evidence item IDs linked to the breakthrough, when available. */
+  evidenceRefIds: string[];
+}
+
+/** Compact compliance snapshot stored in intervention history. */
+export interface ComplianceResultSummary {
+  compliant: boolean;
+  violationCount: number;
+  blockingViolationCount: number;
+  fallbackUsed: boolean;
+  attemptNumber: number;
 }
 
 /** Intervention effectiveness record in session memory. */
 export interface InterventionHistoryEntry {
+  interventionId: string;
   turnNumber: TurnNumber;
   type: InterventionType;
   goal: TherapeuticGoal;
+  intent: TherapeuticIntent;
+  strategy: TherapeuticStrategy;
+  expectedEffectId: string;
+  signature: InterventionSignature;
+  compliance: ComplianceResultSummary;
   effective: boolean | null;
   confidence: ConfidenceScore;
-  signature: InterventionSignature;
+}
+
+/** Compact reflection snapshot appended to session memory each turn. */
+export interface SessionReflectionLogEntry {
+  turnNumber: TurnNumber;
+  lastInterventionHelpful: boolean | null;
+  lastInterventionHelpfulConfidence: ConfidenceScore;
+  conversationMovedForward: boolean | null;
+  conversationMovedForwardConfidence: ConfidenceScore;
+  shouldChangeStrategy: boolean;
+  recommendedStrategyShift: StrategyShift;
+  expectedEffectEvaluation: ExpectedEffectEvaluation | null;
 }
 
 /** Input to Session Memory update pipeline step. */
@@ -73,7 +105,7 @@ export interface SessionMemory {
   recentInterventionTypes: InterventionType[];
   askedInterventionSignatures: InterventionSignature[];
   regressHistory: GoalTransition[];
-  reflectionLog: ReflectionEntry[];
+  reflectionLog: SessionReflectionLogEntry[];
 }
 
 /** Condensed session memory exported to analytics events. */
