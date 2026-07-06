@@ -19,3 +19,6 @@ export {
   type MediatorEngineTurnInput,
 } from '@/services/mediatorEngine/orchestrator/orchestrateTurn';
 export { runMediatorEngineTurn } from '@/services/mediatorEngine/runtime/runMediatorEngineTurn';
+export { handleMediatorRuntimeTurn } from '@/services/mediatorEngine/edge/handleMediatorRuntimeTurn';
+export { parseMediatorRuntimeRequest } from '@/services/mediatorEngine/edge/request';
+export { buildMediatorRuntimeEdgeSuccess } from '@/services/mediatorEngine/edge/response';

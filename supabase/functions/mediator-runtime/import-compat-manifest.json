@@ -1,0 +1,12 @@
+{
+  "deployStrategy": "esbuild-prebundle",
+  "status": "bundle-deploy-ready",
+  "sourceOfTruth": "services/mediatorEngine/edge/",
+  "bundleOutput": "supabase/functions/mediator-runtime/_generated/mediatorRuntime.bundle.ts",
+  "buildCommand": "npm run build:mediator:edge",
+  "graphFileCount": 223,
+  "extensionlessAtImportCountInSource": 194,
+  "extensionlessAtImportCountInDeployGraph": 0,
+  "denoCheckVerified": true,
+  "notes": "Deploy imports prebundled ESM; Deno entrypoint only loads std/http + generated bundle."
+}
