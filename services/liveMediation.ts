@@ -23,7 +23,12 @@ import {
   buildLiveRuntimeTurnInput,
   logMediatorRuntimeRolloutFailure,
   routeLiveMediatorTurn,
+  toRuntimeLanguage,
 } from '@/services/mediatorRuntimeClient/liveMediationBridge';
+import {
+  scheduleMediatorShadowRun,
+  shouldRunMediatorShadow,
+} from '@/services/mediatorShadow';
 
 function liveStrings(lang: Language = 'pl') {
   return getLiveMediationExtras(lang).service;
@@ -4203,6 +4208,9 @@ export async function processMediationTurn(
     sessionMemory: null,
   });
 
+  const legacyPathActive = !isMediatorRuntimeEnabled();
+  const mediatorTurnStartedAt = Date.now();
+
   try {
     const result = await routeLiveMediatorTurn(runtimeTurnInput, {
       isRuntimeEnabled: isMediatorRuntimeEnabled,
@@ -4210,6 +4218,13 @@ export async function processMediationTurn(
       callLegacy: () => callEdge<LiveMediatorResponse>(EDGE.liveMediator, legacyPayload),
       onRuntimeFailure: logMediatorRuntimeRolloutFailure,
     });
+
+    if (legacyPathActive && shouldRunMediatorShadow()) {
+      scheduleMediatorShadowRun(runtimeTurnInput, result ?? {}, {
+        language: toRuntimeLanguage(language),
+        legacyLatencyMs: Date.now() - mediatorTurnStartedAt,
+      });
+    }
 
     if (
       result &&
