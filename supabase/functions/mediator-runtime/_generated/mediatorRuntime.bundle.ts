@@ -5351,12 +5351,13 @@ var NORMAL_MEDIATION_PHRASES = [
   "kontynuujmy mediacj",
   "przeanalizujmy konflikt"
 ];
-var POLISH_MARKERS = /[ąćęłńóśźż]/i;
-var POLISH_COMMON_WORDS = /\b(słyszę|rozumiem|proszę|chcę|zatrzymaj|zatrzymajmy|spokojnie|po kolei|zatrzymajmy się|to trudne|rozmow|bezpiecze|pauz|oddech|trudne|oboje|was|mówcie)\b/i;
+var POLISH_MARKERS = /[ąćęłńśźż]/i;
+var POLISH_COMMON_WORDS = /\b(słyszę|rozumiem|proszę|chcę|zatrzymaj|zatrzymajmy|spokojnie|po kolei|zatrzymajmy się|to trudne|rozmow|bezpiecze|pauz|oddech|trudne|oboje|mówcie|weźcie)\b/i;
 var ENGLISH_COMMON_WORDS = /\b(I hear|I understand|please|let us|let's|let's pause|take your time|take a|moment|both of you|speak|pause|safety|breath|slow breath|one at a time|this is difficult)\b/i;
-var SPANISH_COMMON_WORDS = /\b(escucho|entend|ambos|momento|respir|difícil|pausa|seguridad|hablemos|tomemos)\b/i;
+var ENGLISH_STRONG_MARKERS = /\b(I hear|I understand|both of you|let us speak|let's speak|one at a time|this is difficult|take your time)\b/i;
+var SPANISH_COMMON_WORDS = /\b(escucho|entiendo|comprendo|entend|siento|ambos|momento|respir|difícil|pausa|seguridad|hablemos|tomemos|gracias|pueden|parece|importante|ustedes|escucha)\b/i;
 var ITALIAN_COMMON_WORDS = /\b(sento|entrambi|momento|respir|difficile|pausa|sicurezza|parliamo|prendiamo)\b/i;
-var GERMAN_COMMON_WORDS = /\b(höre|schwierig|moment|atmet|bitte|pause|sicherheit|sprechen|innehalten)\b/i;
+var GERMAN_COMMON_WORDS = /\b(höre|verstehe|verständlich|schwierig|moment|atmet|bitte|pause|sicherheit|sprechen|innehalten|gehört|lassen|wichtig|danke|können|merke)\b/i;
 var FRENCH_COMMON_WORDS = /\b(entends|difficile|moment|respiration|sécurité|parlons|prenons|pause)\b/i;
 
 // services/mediatorEngine/responseValidator/lib/termMatching.ts
@@ -5425,6 +5426,9 @@ function looksPolish(text) {
 function looksEnglish(text) {
   return ENGLISH_COMMON_WORDS.test(text) && !POLISH_MARKERS.test(text);
 }
+function looksEnglishStrong(text) {
+  return ENGLISH_STRONG_MARKERS.test(text) && !POLISH_MARKERS.test(text);
+}
 function looksSpanish(text) {
   return SPANISH_COMMON_WORDS.test(text);
 }
@@ -5447,7 +5451,12 @@ var LANGUAGE_DETECTORS = {
 };
 function looksLikeWrongPrimaryLanguage(text, expected) {
   if (expected !== "pl" && looksPolish(text)) return true;
-  if (expected !== "en" && looksEnglish(text)) return true;
+  if (expected !== "en" && looksEnglishStrong(text)) return true;
+  return false;
+}
+function looksLikeWrongSecondaryLanguage(text, expected) {
+  if (looksPolish(text)) return true;
+  if (expected !== "en" && looksEnglishStrong(text)) return true;
   return false;
 }
 function detectLanguageLite(text, expectedLanguage) {
@@ -5474,11 +5483,12 @@ function detectLanguageLite(text, expectedLanguage) {
     };
   }
   if (SECONDARY_LANGS.includes(expectedLanguage)) {
-    if (looksPolish(trimmed)) {
+    if (looksLikeWrongSecondaryLanguage(trimmed, expectedLanguage)) {
+      const wrongLang = looksPolish(trimmed) ? "Polish" : "English";
       return {
         matchesExpected: false,
         severity: "block",
-        reason: `Expected ${expectedLanguage} reply but Polish markers detected`
+        reason: `Expected ${expectedLanguage} reply but ${wrongLang} markers detected`
       };
     }
     return {

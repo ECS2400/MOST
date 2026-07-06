@@ -1,6 +1,7 @@
 import type { MediatorLang } from '@/types/mediator';
 import {
   ENGLISH_COMMON_WORDS,
+  ENGLISH_STRONG_MARKERS,
   FRENCH_COMMON_WORDS,
   GERMAN_COMMON_WORDS,
   ITALIAN_COMMON_WORDS,
@@ -23,6 +24,10 @@ function looksPolish(text: string): boolean {
 
 function looksEnglish(text: string): boolean {
   return ENGLISH_COMMON_WORDS.test(text) && !POLISH_MARKERS.test(text);
+}
+
+function looksEnglishStrong(text: string): boolean {
+  return ENGLISH_STRONG_MARKERS.test(text) && !POLISH_MARKERS.test(text);
 }
 
 function looksSpanish(text: string): boolean {
@@ -52,7 +57,13 @@ const LANGUAGE_DETECTORS: Partial<Record<MediatorLang, (text: string) => boolean
 
 function looksLikeWrongPrimaryLanguage(text: string, expected: MediatorLang): boolean {
   if (expected !== 'pl' && looksPolish(text)) return true;
-  if (expected !== 'en' && looksEnglish(text)) return true;
+  if (expected !== 'en' && looksEnglishStrong(text)) return true;
+  return false;
+}
+
+function looksLikeWrongSecondaryLanguage(text: string, expected: MediatorLang): boolean {
+  if (looksPolish(text)) return true;
+  if (expected !== 'en' && looksEnglishStrong(text)) return true;
   return false;
 }
 
@@ -87,11 +98,14 @@ export function detectLanguageLite(
   }
 
   if (SECONDARY_LANGS.includes(expectedLanguage)) {
-    if (looksPolish(trimmed)) {
+    if (looksLikeWrongSecondaryLanguage(trimmed, expectedLanguage)) {
+      const wrongLang = looksPolish(trimmed)
+        ? 'Polish'
+        : 'English';
       return {
         matchesExpected: false,
         severity: 'block',
-        reason: `Expected ${expectedLanguage} reply but Polish markers detected`,
+        reason: `Expected ${expectedLanguage} reply but ${wrongLang} markers detected`,
       };
     }
     return {
@@ -104,4 +118,12 @@ export function detectLanguageLite(
   return { matchesExpected: true, severity: 'none', reason: 'Language check skipped for locale' };
 }
 
-export { looksPolish, looksEnglish, looksSpanish, looksItalian, looksGerman, looksFrench };
+export {
+  looksPolish,
+  looksEnglish,
+  looksEnglishStrong,
+  looksSpanish,
+  looksItalian,
+  looksGerman,
+  looksFrench,
+};

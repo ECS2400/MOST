@@ -58,22 +58,28 @@ export const SAFETY_WORDING_PATTERNS_PL = [
   /\bspokojniej/i,
 ] as const;
 
-export const POLISH_MARKERS = /[ąćęłńóśźż]/i;
+/** Polish-exclusive letters — excludes ó (shared with Spanish) to avoid false positives. */
+export const POLISH_MARKERS = /[ąćęłńśźż]/i;
 
 export const POLISH_COMMON_WORDS =
-  /\b(słyszę|rozumiem|proszę|chcę|zatrzymaj|zatrzymajmy|spokojnie|po kolei|zatrzymajmy się|to trudne|rozmow|bezpiecze|pauz|oddech|trudne|oboje|was|mówcie)\b/i;
+  /\b(słyszę|rozumiem|proszę|chcę|zatrzymaj|zatrzymajmy|spokojnie|po kolei|zatrzymajmy się|to trudne|rozmow|bezpiecze|pauz|oddech|trudne|oboje|mówcie|weźcie)\b/i;
 
+/** Broad English detection for expected-language confirmation. */
 export const ENGLISH_COMMON_WORDS =
   /\b(I hear|I understand|please|let us|let's|let's pause|take your time|take a|moment|both of you|speak|pause|safety|breath|slow breath|one at a time|this is difficult)\b/i;
 
+/** Unambiguous English phrases for wrong-language blocking (avoids DE/ES/FR loanwords like pause/moment). */
+export const ENGLISH_STRONG_MARKERS =
+  /\b(I hear|I understand|both of you|let us speak|let's speak|one at a time|this is difficult|take your time)\b/i;
+
 export const SPANISH_COMMON_WORDS =
-  /\b(escucho|entend|ambos|momento|respir|difícil|pausa|seguridad|hablemos|tomemos)\b/i;
+  /\b(escucho|entiendo|comprendo|entend|siento|ambos|momento|respir|difícil|pausa|seguridad|hablemos|tomemos|gracias|pueden|parece|importante|ustedes|escucha)\b/i;
 
 export const ITALIAN_COMMON_WORDS =
   /\b(sento|entrambi|momento|respir|difficile|pausa|sicurezza|parliamo|prendiamo)\b/i;
 
 export const GERMAN_COMMON_WORDS =
-  /\b(höre|schwierig|moment|atmet|bitte|pause|sicherheit|sprechen|innehalten)\b/i;
+  /\b(höre|verstehe|verständlich|schwierig|moment|atmet|bitte|pause|sicherheit|sprechen|innehalten|gehört|lassen|wichtig|danke|können|merke)\b/i;
 
 export const FRENCH_COMMON_WORDS =
   /\b(entends|difficile|moment|respiration|sécurité|parlons|prenons|pause)\b/i;
