@@ -609,32 +609,83 @@ function safetyTypesInPermitted(permitted) {
   const safetySet = new Set(SAFETY_FALLBACK_INTERVENTION_ORDER);
   return permitted.filter((type) => safetySet.has(type));
 }
-function filterByStrategyCompatibility(permitted, strategy) {
+function continuityAvoidTypes(continuity, safetyMode) {
+  if (!continuity || safetyMode) return [];
+  return continuity.suggestedAvoidTypes ?? [];
+}
+function continuityPreferTypes(continuity, safetyMode) {
+  if (!continuity || safetyMode) return [];
+  return continuity.suggestedPreferTypes ?? [];
+}
+function shouldAvoidForContinuity(type, avoid, safetyMode) {
+  if (safetyMode && SAFETY_FALLBACK_INTERVENTION_ORDER.includes(type)) {
+    return false;
+  }
+  return avoid.includes(type);
+}
+function pickWithContinuityAwareness(order, permitted, avoid, prefer, safetyMode) {
+  for (const candidate of prefer) {
+    if (permitted.includes(candidate) && !shouldAvoidForContinuity(candidate, avoid, safetyMode)) {
+      return candidate;
+    }
+  }
+  for (const candidate of order) {
+    if (permitted.includes(candidate) && !shouldAvoidForContinuity(candidate, avoid, safetyMode)) {
+      return candidate;
+    }
+  }
+  return pickFromFallbackOrder(order, permitted);
+}
+function filterByStrategyCompatibility(permitted, strategy, forbidden) {
   if (!strategy) return permitted;
   const compatible = STRATEGY_INTERVENTION_COMPATIBILITY[strategy];
   if (!compatible?.length) return permitted;
   const compatibleSet = new Set(compatible);
   const filtered = permitted.filter((type) => compatibleSet.has(type));
-  return filtered.length > 0 ? filtered : [...compatible];
+  if (filtered.length > 0) return filtered;
+  return compatible.filter((type) => !isForbiddenIntervention(type, forbidden));
 }
-function chooseInterventionType(priority, overrideRecommended, safetyMode = false, primaryStrategy) {
+function pickLastResortNonForbidden(forbidden, allowed, fallbackOrder) {
+  const allowedNotForbidden = permittedTypes(allowed, forbidden);
+  if (allowedNotForbidden.length > 0) return allowedNotForbidden[0];
+  const fallbackNotForbidden = fallbackOrder.filter(
+    (type) => !isForbiddenIntervention(type, forbidden)
+  );
+  const fromFallback = pickFromFallbackOrder(fallbackOrder, fallbackNotForbidden);
+  if (fromFallback) return fromFallback;
+  const defaultNotForbidden = permittedTypes(
+    [...DEFAULT_ALLOWED_INTERVENTIONS, ...SAFE_FALLBACK_INTERVENTION_ORDER],
+    forbidden
+  );
+  return defaultNotForbidden[0] ?? "deescalate";
+}
+function chooseInterventionType(priority, overrideRecommended, safetyMode = false, primaryStrategy, continuity) {
   const allowedRaw = normalizeInterventionTypes(priority?.allowedInterventionTypes);
   const allowed = allowedRaw.length > 0 ? allowedRaw : safetyMode ? [...DEFAULT_SAFETY_ALLOWED_INTERVENTIONS] : [...DEFAULT_ALLOWED_INTERVENTIONS];
   const forbidden = normalizeInterventionTypes(priority?.forbiddenInterventionTypes);
   const permitted = filterByStrategyCompatibility(
     permittedTypes(allowed, forbidden),
-    safetyMode ? "build_safety" : primaryStrategy
+    safetyMode ? "build_safety" : primaryStrategy,
+    forbidden
   );
   const fallbackOrder = safetyMode ? SAFETY_FALLBACK_INTERVENTION_ORDER : SAFE_FALLBACK_INTERVENTION_ORDER;
+  const avoid = continuityAvoidTypes(continuity, safetyMode);
+  const prefer = continuityPreferTypes(continuity, safetyMode);
   const recommended = overrideRecommended ?? (typeof priority?.recommendedInterventionType === "string" ? priority.recommendedInterventionType : void 0);
-  if (recommended && isAllowedIntervention(recommended, permitted) && !isForbiddenIntervention(recommended, forbidden)) {
+  if (recommended && isAllowedIntervention(recommended, permitted) && !isForbiddenIntervention(recommended, forbidden) && !shouldAvoidForContinuity(recommended, avoid, safetyMode)) {
     return {
       selectedInterventionType: recommended,
       usedRecommended: true,
       fallbackUsed: false
     };
   }
-  const fromFallback = pickFromFallbackOrder(fallbackOrder, permitted);
+  const fromFallback = pickWithContinuityAwareness(
+    fallbackOrder,
+    permitted,
+    avoid,
+    prefer,
+    safetyMode
+  );
   if (fromFallback) {
     return {
       selectedInterventionType: fromFallback,
@@ -658,10 +709,11 @@ function chooseInterventionType(priority, overrideRecommended, safetyMode = fals
       fallbackUsed: true
     };
   }
+  const lastResort = pickLastResortNonForbidden(forbidden, allowed, fallbackOrder);
   return {
-    selectedInterventionType: permitted[0] ?? "reflect",
+    selectedInterventionType: lastResort,
     usedRecommended: false,
-    fallbackUsed: permitted.length === 0 || permitted[0] !== recommended
+    fallbackUsed: lastResort !== recommended
   };
 }
 
@@ -794,7 +846,8 @@ function buildDecisionOutput(input) {
     input.priority,
     safetyActive ? resolveSafetyRecommendedType(input) : void 0,
     safetyActive,
-    primaryStrategy
+    primaryStrategy,
+    input.continuityContext
   );
   const goalTransition = chooseGoalTransition(input);
   const goalTransitionBlocked = isGoalTransitionBlocked({
@@ -845,6 +898,477 @@ function makeDecision(input) {
   } catch {
     return createMinimalSafeDecisionOutput();
   }
+}
+
+// services/mediatorEngine/_internal/skeletonDefaults.ts
+var SKELETON_TIMESTAMP = "1970-01-01T00:00:00.000Z";
+function skeletonConfidence(value) {
+  return {
+    value,
+    confidence: 0,
+    source: "heuristic",
+    evidence: [],
+    assessedAt: SKELETON_TIMESTAMP,
+    stale: false
+  };
+}
+function createEmptyEvidenceStore() {
+  return {
+    conclusions: {},
+    indexByTurn: {},
+    maxConclusions: 80
+  };
+}
+function createEmptySessionMemory() {
+  return {
+    breakthroughs: [],
+    confirmedEmotions: [],
+    confirmedNeeds: [],
+    recurringNeeds: [],
+    interventionHistory: [],
+    effectivePatterns: [],
+    ineffectivePatterns: [],
+    completedGoals: [],
+    closedTopics: [],
+    openTopics: [],
+    recentInterventionTypes: [],
+    askedInterventionSignatures: [],
+    regressHistory: [],
+    reflectionLog: []
+  };
+}
+function resolveRequestLanguage(request) {
+  return request.language ?? "en";
+}
+function createEmptyMediationState(request) {
+  const evidenceStore = createEmptyEvidenceStore();
+  return {
+    meta: {
+      schemaVersion: "2.3",
+      sessionId: request.sessionId,
+      mediationId: request.mediationId,
+      language: resolveRequestLanguage(request),
+      startedAt: SKELETON_TIMESTAMP,
+      lastUpdatedAt: SKELETON_TIMESTAMP,
+      currentTurnNumber: request.turnNumber
+    },
+    participants: {
+      host: {
+        profile: { userId: "", displayName: "Host", role: "host" },
+        namedEmotion: null,
+        emotionConfidence: 0,
+        emotionExplanation: null,
+        emotionValidated: false,
+        emotionAcknowledgedByOther: false,
+        namedNeed: null,
+        needExplanation: null,
+        needValidated: false,
+        feelsHeard: false,
+        feelsUnderstood: false,
+        feelsRespected: false,
+        lastMessageTone: "calm",
+        consecutiveEvasiveAnswers: 0,
+        consecutiveAccusatoryMessages: 0,
+        lastStatementSummary: null
+      },
+      partner: {
+        profile: { userId: "", displayName: "Partner", role: "partner" },
+        namedEmotion: null,
+        emotionConfidence: 0,
+        emotionExplanation: null,
+        emotionValidated: false,
+        emotionAcknowledgedByOther: false,
+        namedNeed: null,
+        needExplanation: null,
+        needValidated: false,
+        feelsHeard: false,
+        feelsUnderstood: false,
+        feelsRespected: false,
+        lastMessageTone: "calm",
+        consecutiveEvasiveAnswers: 0,
+        consecutiveAccusatoryMessages: 0,
+        lastStatementSummary: null
+      }
+    },
+    conflict: {
+      surfaceTopic: null,
+      surfaceTopicConfidence: 0,
+      hypothesizedDeepThemes: [],
+      confirmedDeepTheme: null,
+      conflictSummary: "",
+      preAnalysisContext: {
+        hostEmotions: [],
+        hostNeeds: [],
+        partnerEmotions: [],
+        partnerNeeds: [],
+        keyTrigger: null
+      }
+    },
+    dynamics: {
+      mode: "NORMAL",
+      emotionalTemperature: 0,
+      temperatureTrend: "stable",
+      breakthroughDetected: false,
+      breakthroughQuote: null,
+      breakthroughAt: null,
+      blameLoopDetected: false,
+      blameLoopCount: 0,
+      escalationDetected: false,
+      escalationLevel: 0,
+      mutualUnderstandingScore: 0,
+      agreementLevel: 0,
+      lastStableGoal: "SAFE_OPENING",
+      pauseSuggested: false,
+      pauseAcceptedBy: []
+    },
+    memory: {
+      askedQuestionSignatures: [],
+      recentMediatorMoves: [],
+      coveredTopics: [],
+      factMemory: [],
+      breakthroughHistory: [],
+      regressHistory: []
+    },
+    currentGoal: "SAFE_OPENING",
+    goals: [],
+    sessionObjectives: null,
+    pendingAction: null,
+    agreements: {
+      sharedRule: null,
+      hostCommitment: null,
+      partnerCommitment: null,
+      futurePlan: null,
+      acceptedByBoth: false
+    },
+    sessionOutcome: "in_progress",
+    pace: {
+      current: "normal",
+      confidence: 0,
+      reason: "",
+      sinceTurn: 1,
+      minTurnsBeforeChange: 2
+    },
+    load: {
+      host: skeletonConfidence(0),
+      partner: skeletonConfidence(0),
+      overall: 0,
+      trend: "stable",
+      exhaustionDetected: skeletonConfidence(false),
+      disengagementRisk: skeletonConfidence(false)
+    },
+    personality: {
+      core: {
+        calm: 50,
+        warm: 50,
+        structured: 50,
+        neutral: 50,
+        empathetic: 50,
+        confident: 50
+      },
+      profile: "steady_mediator",
+      adaptiveModifiers: {
+        warmthBoost: 0,
+        structureBoost: 0,
+        lastAdjustedTurn: 0
+      },
+      immutableRuleRefs: []
+    },
+    recovery: null,
+    activeStrategy: null,
+    lastInterventionMeta: null,
+    evidenceStore
+  };
+}
+function createEmptySafetyOutput() {
+  return {
+    level: "none",
+    preempted: false,
+    signals: [],
+    recommendedInterventionType: "welcome_open",
+    blockGoalTransitions: false,
+    blockStandardInterventions: false,
+    allowedInterventionTypes: [],
+    assessed: skeletonConfidence(false)
+  };
+}
+function createEmptyReflectionOutput() {
+  const readiness = {
+    readyToAdvance: skeletonConfidence(false),
+    needsMoreTime: skeletonConfidence(false),
+    needsDifferentApproach: skeletonConfidence(false),
+    signals: []
+  };
+  return {
+    understoodPartners: skeletonConfidence(false),
+    lastInterventionHelpful: skeletonConfidence(false),
+    conversationMovedForward: skeletonConfidence(false),
+    shouldChangeStrategy: false,
+    repeatRisk: skeletonConfidence(false),
+    drillDownRisk: skeletonConfidence(false),
+    stuckRisk: skeletonConfidence(false),
+    recommendedStrategyShift: "continue",
+    reflectionNotes: "",
+    expectedEffectEvaluation: null,
+    partnerReadiness: { host: readiness, partner: readiness },
+    strategyRecommendation: {
+      preferStrategyChange: false,
+      suggestedStrategy: null,
+      reason: "",
+      confidence: 0
+    },
+    paceRecommendation: { suggestedPace: null, reason: "" },
+    loadRecommendation: { acknowledgeLoad: false, targetParticipant: null }
+  };
+}
+function createEmptyStrategyOutput() {
+  return {
+    primaryStrategy: "build_safety",
+    secondaryStrategy: null,
+    therapeuticIntent: "increase_emotional_safety",
+    confidence: 0,
+    rationale: "",
+    blockedStrategies: [],
+    suggestedGoalTransition: "stay",
+    strategyDurationHint: 1,
+    alignmentWithGoal: "SAFE_OPENING",
+    recoveryStrategy: null
+  };
+}
+function createEmptyExplainability(turnNumber) {
+  return {
+    decisionExplanation: {
+      turnNumber,
+      timestamp: SKELETON_TIMESTAMP,
+      decisionId: "skeleton-decision",
+      outcome: {
+        strategy: "build_safety",
+        interventionType: "welcome_open",
+        intent: "increase_emotional_safety",
+        goalTransition: "stay",
+        pace: "normal"
+      },
+      reasoning: [],
+      constitutionArticleRefs: [],
+      evidenceRefs: [],
+      moduleInputs: {
+        reflection: {
+          lastInterventionHelpful: false,
+          shouldChangeStrategy: false,
+          recommendedStrategyShift: "continue",
+          expectedEffectAchieved: null
+        },
+        priority: {
+          conversationMode: "NORMAL",
+          topSignalType: null,
+          preemptsGoalTransition: false,
+          recommendedInterventionType: "welcome_open"
+        },
+        strategy: {
+          primaryStrategy: "build_safety",
+          secondaryStrategy: null,
+          suggestedGoalTransition: "stay",
+          confidence: 0
+        },
+        readiness: { hostReadyToAdvance: false, partnerReadyToAdvance: false }
+      },
+      rejectedAlternatives: []
+    },
+    contributions: [],
+    currentGoal: "SAFE_OPENING"
+  };
+}
+
+// services/mediatorEngine/memory/continuity/detectRepeatedMove.ts
+var REPEATED_MOVE_THRESHOLD = 3;
+function detectRepeatedMove(recentInterventionTypes) {
+  if (recentInterventionTypes.length < REPEATED_MOVE_THRESHOLD) {
+    return { repeatedMoveDetected: false, repeatedMoveReason: null };
+  }
+  const head = recentInterventionTypes.slice(0, REPEATED_MOVE_THRESHOLD);
+  const first = head[0];
+  const allSame = head.every((type) => type === first);
+  if (!allSame || typeof first !== "string") {
+    return { repeatedMoveDetected: false, repeatedMoveReason: null };
+  }
+  return {
+    repeatedMoveDetected: true,
+    repeatedMoveReason: `${first} used ${REPEATED_MOVE_THRESHOLD} times in recent turns`
+  };
+}
+
+// services/mediatorEngine/memory/continuity/detectStaleTopic.ts
+function detectStaleTopic(memory, recentInterventionTypes, ineffectivePatterns) {
+  const openTopics = Array.isArray(memory?.openTopics) ? memory.openTopics.filter((topic) => typeof topic === "string" && topic.length > 0) : [];
+  if (openTopics.length === 0 || recentInterventionTypes.length < 2) {
+    return { staleTopicDetected: false, staleTopicReason: null };
+  }
+  const dominantRecent = recentInterventionTypes[0];
+  const repeatedOnTopic = typeof dominantRecent === "string" && recentInterventionTypes.filter((type) => type === dominantRecent).length >= 2 && ineffectivePatterns.includes(dominantRecent);
+  if (!repeatedOnTopic) {
+    return { staleTopicDetected: false, staleTopicReason: null };
+  }
+  return {
+    staleTopicDetected: true,
+    staleTopicReason: "Open topic unchanged while recent moves appear ineffective"
+  };
+}
+
+// services/mediatorEngine/memory/continuity/scoreInterventionEffectiveness.ts
+function lastTypeWithEffectiveness(memory, effective) {
+  const history = Array.isArray(memory.interventionHistory) ? memory.interventionHistory : [];
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    const entry = history[i];
+    if (entry?.effective === effective && typeof entry.type === "string") {
+      return entry.type;
+    }
+  }
+  return null;
+}
+function scoreInterventionEffectiveness(memory) {
+  if (!memory) {
+    return {
+      effectivePatterns: [],
+      ineffectivePatterns: [],
+      lastEffectiveInterventionType: null,
+      lastIneffectiveInterventionType: null
+    };
+  }
+  const effectivePatterns = Array.isArray(memory.effectivePatterns) ? memory.effectivePatterns.filter((type) => typeof type === "string") : [];
+  const ineffectivePatterns = Array.isArray(memory.ineffectivePatterns) ? memory.ineffectivePatterns.filter((type) => typeof type === "string") : [];
+  return {
+    effectivePatterns,
+    ineffectivePatterns,
+    lastEffectiveInterventionType: lastTypeWithEffectiveness(memory, true),
+    lastIneffectiveInterventionType: lastTypeWithEffectiveness(memory, false)
+  };
+}
+
+// services/mediatorEngine/memory/continuity/selectContinuityHint.ts
+function selectContinuityHint(partial) {
+  const lastIneffective = partial.lastIneffectiveInterventionType;
+  if (lastIneffective && partial.suggestedAvoidTypes.includes(lastIneffective)) {
+    if (lastIneffective === "reflect") {
+      return "The last reflection appeared ineffective; prefer a validating or clarifying move.";
+    }
+    return `The last ${lastIneffective} move appeared ineffective; use a different angle.`;
+  }
+  if (partial.repeatedMoveDetected) {
+    return "Do not repeat the previous mediator move. Use a different angle.";
+  }
+  if (partial.staleTopicDetected) {
+    return "The current topic may be stuck; try a validating, reframing, or clarifying move.";
+  }
+  if (partial.suggestedPreferTypes.length > 0) {
+    return "Build on what worked recently; vary tone while keeping the same therapeutic direction.";
+  }
+  return null;
+}
+
+// services/mediatorEngine/memory/continuity/summarizeRecentInterventions.ts
+function summarizeRecentInterventions(memory) {
+  const recentInterventionTypes = Array.isArray(memory?.recentInterventionTypes) ? memory.recentInterventionTypes.filter((type) => typeof type === "string") : [];
+  const recentSignatures = Array.isArray(memory?.askedInterventionSignatures) ? memory.askedInterventionSignatures.filter(
+    (sig) => typeof sig === "string"
+  ) : [];
+  return { recentInterventionTypes, recentSignatures };
+}
+
+// services/mediatorEngine/memory/continuity/buildContinuityContext.ts
+var REPEATED_TYPE_THRESHOLD = 3;
+function dedupeTypes(types) {
+  const seen = /* @__PURE__ */ new Set();
+  const result = [];
+  for (const type of types) {
+    if (!seen.has(type)) {
+      seen.add(type);
+      result.push(type);
+    }
+  }
+  return result;
+}
+function countRecentType(recent, type) {
+  return recent.filter((entry) => entry === type).length;
+}
+function buildSuggestedAvoidTypes(memory, recent, effectiveness, repeated, recommended) {
+  const avoid = [];
+  if (effectiveness.lastIneffectiveInterventionType && typeof effectiveness.lastIneffectiveInterventionType === "string") {
+    avoid.push(effectiveness.lastIneffectiveInterventionType);
+  }
+  for (const type of effectiveness.ineffectivePatterns) {
+    avoid.push(type);
+  }
+  if (repeated.repeatedMoveDetected && recent[0]) {
+    avoid.push(recent[0]);
+  }
+  for (const type of recent) {
+    if (countRecentType(recent, type) >= REPEATED_TYPE_THRESHOLD) {
+      avoid.push(type);
+    }
+  }
+  if (recommended && countRecentType(recent, recommended) >= 2) {
+    const signatures = memory.askedInterventionSignatures ?? [];
+    if (signatures.length > 0) {
+      avoid.push(recommended);
+    }
+  }
+  return dedupeTypes(avoid);
+}
+function buildSuggestedPreferTypes(effectiveness) {
+  const prefer = [];
+  if (effectiveness.lastEffectiveInterventionType) {
+    prefer.push(effectiveness.lastEffectiveInterventionType);
+  }
+  for (const type of effectiveness.effectivePatterns) {
+    prefer.push(type);
+  }
+  return dedupeTypes(prefer);
+}
+function computeConfidence(repeated, stale, effectiveness) {
+  let score = 0;
+  if (repeated.repeatedMoveDetected) score += 40;
+  if (stale.staleTopicDetected) score += 20;
+  if (effectiveness.lastIneffectiveInterventionType) score += 25;
+  if (effectiveness.lastEffectiveInterventionType) score += 15;
+  return Math.min(100, score);
+}
+function buildContinuityContext(input) {
+  const normalizedInput = input && typeof input === "object" && "sessionMemory" in input ? input : { sessionMemory: input };
+  const memory = normalizedInput.sessionMemory ?? createEmptySessionMemory();
+  const { recentInterventionTypes, recentSignatures } = summarizeRecentInterventions(memory);
+  const effectiveness = scoreInterventionEffectiveness(memory);
+  const repeated = detectRepeatedMove(recentInterventionTypes);
+  const stale = detectStaleTopic(memory, recentInterventionTypes, effectiveness.ineffectivePatterns);
+  const suggestedAvoidTypes = buildSuggestedAvoidTypes(
+    memory,
+    recentInterventionTypes,
+    effectiveness,
+    repeated,
+    normalizedInput.recommendedInterventionType
+  );
+  const suggestedPreferTypes = buildSuggestedPreferTypes(effectiveness);
+  const partial = {
+    repeatedMoveDetected: repeated.repeatedMoveDetected,
+    staleTopicDetected: stale.staleTopicDetected,
+    lastIneffectiveInterventionType: effectiveness.lastIneffectiveInterventionType,
+    suggestedAvoidTypes,
+    suggestedPreferTypes
+  };
+  return {
+    recentInterventionTypes,
+    recentSignatures,
+    effectivePatterns: effectiveness.effectivePatterns,
+    ineffectivePatterns: effectiveness.ineffectivePatterns,
+    repeatedMoveDetected: repeated.repeatedMoveDetected,
+    repeatedMoveReason: repeated.repeatedMoveReason,
+    staleTopicDetected: stale.staleTopicDetected,
+    staleTopicReason: stale.staleTopicReason,
+    lastEffectiveInterventionType: effectiveness.lastEffectiveInterventionType,
+    lastIneffectiveInterventionType: effectiveness.lastIneffectiveInterventionType,
+    suggestedAvoidTypes,
+    suggestedPreferTypes,
+    continuityHint: selectContinuityHint(partial),
+    confidence: computeConfidence(repeated, stale, effectiveness)
+  };
 }
 
 // services/mediatorEngine/intervention/config/doNotRepeatBefore.ts
@@ -1125,284 +1649,6 @@ function generateIntervention(input) {
     const turnNumber = typeof input?.turnNumber === "number" && Number.isFinite(input.turnNumber) ? input.turnNumber : 1;
     return createMinimalIntervention(turnNumber);
   }
-}
-
-// services/mediatorEngine/_internal/skeletonDefaults.ts
-var SKELETON_TIMESTAMP = "1970-01-01T00:00:00.000Z";
-function skeletonConfidence(value) {
-  return {
-    value,
-    confidence: 0,
-    source: "heuristic",
-    evidence: [],
-    assessedAt: SKELETON_TIMESTAMP,
-    stale: false
-  };
-}
-function createEmptyEvidenceStore() {
-  return {
-    conclusions: {},
-    indexByTurn: {},
-    maxConclusions: 80
-  };
-}
-function createEmptySessionMemory() {
-  return {
-    breakthroughs: [],
-    confirmedEmotions: [],
-    confirmedNeeds: [],
-    recurringNeeds: [],
-    interventionHistory: [],
-    effectivePatterns: [],
-    ineffectivePatterns: [],
-    completedGoals: [],
-    closedTopics: [],
-    openTopics: [],
-    recentInterventionTypes: [],
-    askedInterventionSignatures: [],
-    regressHistory: [],
-    reflectionLog: []
-  };
-}
-function resolveRequestLanguage(request) {
-  return request.language ?? "en";
-}
-function createEmptyMediationState(request) {
-  const evidenceStore = createEmptyEvidenceStore();
-  return {
-    meta: {
-      schemaVersion: "2.3",
-      sessionId: request.sessionId,
-      mediationId: request.mediationId,
-      language: resolveRequestLanguage(request),
-      startedAt: SKELETON_TIMESTAMP,
-      lastUpdatedAt: SKELETON_TIMESTAMP,
-      currentTurnNumber: request.turnNumber
-    },
-    participants: {
-      host: {
-        profile: { userId: "", displayName: "Host", role: "host" },
-        namedEmotion: null,
-        emotionConfidence: 0,
-        emotionExplanation: null,
-        emotionValidated: false,
-        emotionAcknowledgedByOther: false,
-        namedNeed: null,
-        needExplanation: null,
-        needValidated: false,
-        feelsHeard: false,
-        feelsUnderstood: false,
-        feelsRespected: false,
-        lastMessageTone: "calm",
-        consecutiveEvasiveAnswers: 0,
-        consecutiveAccusatoryMessages: 0,
-        lastStatementSummary: null
-      },
-      partner: {
-        profile: { userId: "", displayName: "Partner", role: "partner" },
-        namedEmotion: null,
-        emotionConfidence: 0,
-        emotionExplanation: null,
-        emotionValidated: false,
-        emotionAcknowledgedByOther: false,
-        namedNeed: null,
-        needExplanation: null,
-        needValidated: false,
-        feelsHeard: false,
-        feelsUnderstood: false,
-        feelsRespected: false,
-        lastMessageTone: "calm",
-        consecutiveEvasiveAnswers: 0,
-        consecutiveAccusatoryMessages: 0,
-        lastStatementSummary: null
-      }
-    },
-    conflict: {
-      surfaceTopic: null,
-      surfaceTopicConfidence: 0,
-      hypothesizedDeepThemes: [],
-      confirmedDeepTheme: null,
-      conflictSummary: "",
-      preAnalysisContext: {
-        hostEmotions: [],
-        hostNeeds: [],
-        partnerEmotions: [],
-        partnerNeeds: [],
-        keyTrigger: null
-      }
-    },
-    dynamics: {
-      mode: "NORMAL",
-      emotionalTemperature: 0,
-      temperatureTrend: "stable",
-      breakthroughDetected: false,
-      breakthroughQuote: null,
-      breakthroughAt: null,
-      blameLoopDetected: false,
-      blameLoopCount: 0,
-      escalationDetected: false,
-      escalationLevel: 0,
-      mutualUnderstandingScore: 0,
-      agreementLevel: 0,
-      lastStableGoal: "SAFE_OPENING",
-      pauseSuggested: false,
-      pauseAcceptedBy: []
-    },
-    memory: {
-      askedQuestionSignatures: [],
-      recentMediatorMoves: [],
-      coveredTopics: [],
-      factMemory: [],
-      breakthroughHistory: [],
-      regressHistory: []
-    },
-    currentGoal: "SAFE_OPENING",
-    goals: [],
-    sessionObjectives: null,
-    pendingAction: null,
-    agreements: {
-      sharedRule: null,
-      hostCommitment: null,
-      partnerCommitment: null,
-      futurePlan: null,
-      acceptedByBoth: false
-    },
-    sessionOutcome: "in_progress",
-    pace: {
-      current: "normal",
-      confidence: 0,
-      reason: "",
-      sinceTurn: 1,
-      minTurnsBeforeChange: 2
-    },
-    load: {
-      host: skeletonConfidence(0),
-      partner: skeletonConfidence(0),
-      overall: 0,
-      trend: "stable",
-      exhaustionDetected: skeletonConfidence(false),
-      disengagementRisk: skeletonConfidence(false)
-    },
-    personality: {
-      core: {
-        calm: 50,
-        warm: 50,
-        structured: 50,
-        neutral: 50,
-        empathetic: 50,
-        confident: 50
-      },
-      profile: "steady_mediator",
-      adaptiveModifiers: {
-        warmthBoost: 0,
-        structureBoost: 0,
-        lastAdjustedTurn: 0
-      },
-      immutableRuleRefs: []
-    },
-    recovery: null,
-    activeStrategy: null,
-    lastInterventionMeta: null,
-    evidenceStore
-  };
-}
-function createEmptySafetyOutput() {
-  return {
-    level: "none",
-    preempted: false,
-    signals: [],
-    recommendedInterventionType: "welcome_open",
-    blockGoalTransitions: false,
-    blockStandardInterventions: false,
-    allowedInterventionTypes: [],
-    assessed: skeletonConfidence(false)
-  };
-}
-function createEmptyReflectionOutput() {
-  const readiness = {
-    readyToAdvance: skeletonConfidence(false),
-    needsMoreTime: skeletonConfidence(false),
-    needsDifferentApproach: skeletonConfidence(false),
-    signals: []
-  };
-  return {
-    understoodPartners: skeletonConfidence(false),
-    lastInterventionHelpful: skeletonConfidence(false),
-    conversationMovedForward: skeletonConfidence(false),
-    shouldChangeStrategy: false,
-    repeatRisk: skeletonConfidence(false),
-    drillDownRisk: skeletonConfidence(false),
-    stuckRisk: skeletonConfidence(false),
-    recommendedStrategyShift: "continue",
-    reflectionNotes: "",
-    expectedEffectEvaluation: null,
-    partnerReadiness: { host: readiness, partner: readiness },
-    strategyRecommendation: {
-      preferStrategyChange: false,
-      suggestedStrategy: null,
-      reason: "",
-      confidence: 0
-    },
-    paceRecommendation: { suggestedPace: null, reason: "" },
-    loadRecommendation: { acknowledgeLoad: false, targetParticipant: null }
-  };
-}
-function createEmptyStrategyOutput() {
-  return {
-    primaryStrategy: "build_safety",
-    secondaryStrategy: null,
-    therapeuticIntent: "increase_emotional_safety",
-    confidence: 0,
-    rationale: "",
-    blockedStrategies: [],
-    suggestedGoalTransition: "stay",
-    strategyDurationHint: 1,
-    alignmentWithGoal: "SAFE_OPENING",
-    recoveryStrategy: null
-  };
-}
-function createEmptyExplainability(turnNumber) {
-  return {
-    decisionExplanation: {
-      turnNumber,
-      timestamp: SKELETON_TIMESTAMP,
-      decisionId: "skeleton-decision",
-      outcome: {
-        strategy: "build_safety",
-        interventionType: "welcome_open",
-        intent: "increase_emotional_safety",
-        goalTransition: "stay",
-        pace: "normal"
-      },
-      reasoning: [],
-      constitutionArticleRefs: [],
-      evidenceRefs: [],
-      moduleInputs: {
-        reflection: {
-          lastInterventionHelpful: false,
-          shouldChangeStrategy: false,
-          recommendedStrategyShift: "continue",
-          expectedEffectAchieved: null
-        },
-        priority: {
-          conversationMode: "NORMAL",
-          topSignalType: null,
-          preemptsGoalTransition: false,
-          recommendedInterventionType: "welcome_open"
-        },
-        strategy: {
-          primaryStrategy: "build_safety",
-          secondaryStrategy: null,
-          suggestedGoalTransition: "stay",
-          confidence: 0
-        },
-        readiness: { hostReadyToAdvance: false, partnerReadyToAdvance: false }
-      },
-      rejectedAlternatives: []
-    },
-    contributions: [],
-    currentGoal: "SAFE_OPENING"
-  };
 }
 
 // services/mediatorEngine/memory/config/memoryLimits.ts
@@ -4211,13 +4457,19 @@ function orchestrateTurn(input) {
     strategy: strategyOutput,
     turnNumber: request.turnNumber
   });
+  const continuityContext = buildContinuityContext({
+    sessionMemory,
+    recommendedInterventionType: priorityOutput.recommendedInterventionType
+  });
   const decisionOutput = makeDecision({
     state,
     reflection: reflectionOutput,
     strategy: strategyOutput,
     priority: priorityOutput,
     safety: safetyOutput,
-    turnNumber: request.turnNumber
+    turnNumber: request.turnNumber,
+    sessionMemory,
+    continuityContext
   });
   const intervention = generateIntervention({
     state,
@@ -4293,13 +4545,18 @@ function buildContextSummary(ctx) {
   const mode = priorityOutput.conversationMode ?? "NORMAL";
   const strategy = strategyOutput.primaryStrategy ?? "build_safety";
   const goalTransition = ctx.decisionOutput.goalTransition ?? "stay";
-  return [
+  const parts = [
     `Turn ${turnNumber}.`,
     `Current goal: ${currentGoal}.`,
     `Conversation mode: ${mode}.`,
     `Strategy: ${strategy}.`,
     `Goal transition: ${goalTransition}.`
-  ].join(" ");
+  ];
+  const hint = ctx.continuityContext?.continuityHint;
+  if (typeof hint === "string" && hint.length > 0) {
+    parts.push(`Continuity: ${hint}`);
+  }
+  return parts.join(" ");
 }
 
 // services/mediatorEngine/llm/config/localizedMediatorTexts.ts
@@ -4699,7 +4956,8 @@ function safePromptInput(input) {
     decisionOutput: raw.decisionOutput && typeof raw.decisionOutput === "object" ? raw.decisionOutput : {},
     intervention: raw.intervention && typeof raw.intervention === "object" ? raw.intervention : {},
     complianceResult: raw.complianceResult && typeof raw.complianceResult === "object" ? raw.complianceResult : { compliant: true, violations: [], attemptNumber: 1, fallbackUsed: false, validatedAt: "", validatorLayer: "deterministic" },
-    transcriptWindow: safeArray(raw.transcriptWindow)
+    transcriptWindow: safeArray(raw.transcriptWindow),
+    continuityContext: raw.continuityContext && typeof raw.continuityContext === "object" ? raw.continuityContext : null
   };
 }
 
@@ -4961,13 +5219,19 @@ function buildPromptComposerInputFromTurn(request, sessionMemory, orchestrated, 
     strategy: strategyOutput,
     turnNumber
   });
+  const continuityContext = buildContinuityContext({
+    sessionMemory,
+    recommendedInterventionType: priorityOutput.recommendedInterventionType
+  });
   const decisionOutput = makeDecision({
     state,
     reflection: reflectionOutput,
     strategy: strategyOutput,
     priority: priorityOutput,
     safety: safetyOutput,
-    turnNumber
+    turnNumber,
+    sessionMemory,
+    continuityContext
   });
   return {
     mediationState: state,
@@ -4981,7 +5245,8 @@ function buildPromptComposerInputFromTurn(request, sessionMemory, orchestrated, 
     complianceResult: orchestrated.complianceResult,
     transcriptWindow: Array.isArray(request.transcriptDelta) ? request.transcriptDelta : [],
     language,
-    turnNumber
+    turnNumber,
+    continuityContext
   };
 }
 

@@ -1,5 +1,6 @@
 import type {
   ComplianceResult,
+  ContinuityContext,
   DecisionEngineOutput,
   Intervention,
   MediationState,
@@ -31,6 +32,7 @@ export interface SafePromptContext {
   intervention: Intervention;
   complianceResult: ComplianceResult;
   transcriptWindow: TranscriptMessage[];
+  continuityContext: ContinuityContext | null;
 }
 
 const SUPPORTED_LANGUAGES: MediatorLang[] = ['pl', 'en', 'it', 'de', 'fr', 'es'];
@@ -116,5 +118,9 @@ export function safePromptInput(input: unknown): SafePromptContext {
         ? raw.complianceResult
         : { compliant: true, violations: [], attemptNumber: 1, fallbackUsed: false, validatedAt: '', validatorLayer: 'deterministic' as const },
     transcriptWindow: safeArray<TranscriptMessage>(raw.transcriptWindow),
+    continuityContext:
+      raw.continuityContext && typeof raw.continuityContext === 'object'
+        ? raw.continuityContext
+        : null,
   };
 }

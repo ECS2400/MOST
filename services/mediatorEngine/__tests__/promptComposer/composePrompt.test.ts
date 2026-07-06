@@ -18,6 +18,8 @@ import {
   PRIVATE_SESSION_ID,
   PROMPT_LIMITS,
 } from '@/services/mediatorEngine/__tests__/promptComposer/fixtures';
+import { buildContinuityContext } from '@/services/mediatorEngine/memory/continuity';
+import { createBaselineSessionMemory } from '@/services/mediatorEngine/__tests__/memory/fixtures';
 import type { PromptComposerOutput } from '@/types/mediator';
 
 const REQUIRED_FIELDS: Array<keyof PromptComposerOutput> = [
@@ -263,5 +265,70 @@ describe('composePrompt — L1 prompt assembly', () => {
     assert.match(result.developerPrompt, /Safety fallback/i);
     assert.equal(result.modelHints.temperature, PROMPT_LIMITS.safetyTemperature);
     assert.equal(result.modelHints.maxOutputTokens, PROMPT_LIMITS.safetyMaxOutputTokens);
+  });
+});
+
+describe('composePrompt — continuity hints (Phase 3A)', () => {
+  it('contains continuity hint in contextSummary when repeated moves detected', () => {
+    const sessionMemory = createBaselineSessionMemory({
+      recentInterventionTypes: ['reflect', 'reflect', 'reflect'],
+      ineffectivePatterns: ['reflect'],
+      interventionHistory: [
+        {
+          interventionId: 'int-r1',
+          turnNumber: 2,
+          type: 'reflect',
+          goal: 'SAFE_OPENING',
+          intent: 'increase_emotional_safety',
+          strategy: 'validate_emotions',
+          expectedEffectId: 'effect-r1',
+          signature: 'reflect:SAFE_OPENING:both',
+          compliance: {
+            compliant: true,
+            violationCount: 0,
+            blockingViolationCount: 0,
+            fallbackUsed: false,
+            attemptNumber: 1,
+          },
+          effective: false,
+          confidence: 80,
+        },
+      ],
+    });
+    const continuityContext = buildContinuityContext({ sessionMemory });
+
+    const result = composePrompt(
+      createPromptComposerInput({
+        sessionMemory,
+        continuityContext,
+      })
+    );
+
+    assert.match(result.contextSummary, /Continuity:/);
+    assert.match(
+      result.contextSummary,
+      /different angle|ineffective|Do not repeat/i
+    );
+  });
+
+  it('does not contain raw session memory payload', () => {
+    const sessionMemory = createBaselineSessionMemory({
+      recentInterventionTypes: ['reflect', 'reflect', 'reflect'],
+      ineffectivePatterns: ['reflect'],
+    });
+    const continuityContext = buildContinuityContext({ sessionMemory });
+
+    const result = composePrompt(
+      createPromptComposerInput({
+        sessionMemory,
+        continuityContext,
+      })
+    );
+
+    const text = fullPromptText(result);
+    assert.ok(!text.includes('"interventionHistory"'));
+    assert.ok(!text.includes('"recentInterventionTypes"'));
+    assert.ok(!text.includes('"continuityContext"'));
+    assert.ok(!text.includes('sessionMemory'));
   });
 });

@@ -12,6 +12,7 @@ import type { MediationState } from './mediationState';
 import type { PriorityOutput } from './priority';
 import type { ReflectionOutput, TranscriptMessage } from './reflection';
 import type { SafetyLevel, SafetyOutput } from './safety';
+import type { ContinuityContext } from './continuity';
 import type { SessionMemory } from './sessionMemory';
 import type { StrategyEngineOutput } from './strategyEngineIo';
 
@@ -35,6 +36,8 @@ export interface PromptComposerInput {
   transcriptWindow: TranscriptMessage[];
   language: MediatorLang;
   turnNumber: TurnNumber;
+  /** Structural continuity hints for prompt — no transcript or PII. */
+  continuityContext?: ContinuityContext;
 }
 
 /** Safety constraints embedded in the composed prompt. */

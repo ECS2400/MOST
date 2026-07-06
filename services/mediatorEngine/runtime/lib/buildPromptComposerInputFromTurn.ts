@@ -8,6 +8,7 @@ import type {
   StrategyEngineStateContext,
 } from '@/types/mediator';
 import { makeDecision } from '@/services/mediatorEngine/decision/makeDecision';
+import { buildContinuityContext } from '@/services/mediatorEngine/memory/continuity';
 import { runReflection } from '@/services/mediatorEngine/reflection/runReflection';
 import { resolvePriority } from '@/services/mediatorEngine/priority/resolvePriority';
 import { evaluateSafety } from '@/services/mediatorEngine/safety/evaluateSafety';
@@ -102,6 +103,11 @@ export function buildPromptComposerInputFromTurn(
     turnNumber,
   });
 
+  const continuityContext = buildContinuityContext({
+    sessionMemory,
+    recommendedInterventionType: priorityOutput.recommendedInterventionType,
+  });
+
   const decisionOutput = makeDecision({
     state,
     reflection: reflectionOutput,
@@ -109,6 +115,8 @@ export function buildPromptComposerInputFromTurn(
     priority: priorityOutput,
     safety: safetyOutput,
     turnNumber,
+    sessionMemory,
+    continuityContext,
   });
 
   return {
@@ -124,6 +132,7 @@ export function buildPromptComposerInputFromTurn(
     transcriptWindow: Array.isArray(request.transcriptDelta) ? request.transcriptDelta : [],
     language,
     turnNumber,
+    continuityContext,
   };
 }
 

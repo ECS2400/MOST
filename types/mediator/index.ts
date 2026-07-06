@@ -21,6 +21,7 @@ export * from './priority';
 export * from './safety';
 export * from './reflection';
 export * from './sessionMemory';
+export * from './continuity';
 export * from './mediationState';
 export * from './explainability';
 export * from './constitution';

@@ -15,6 +15,7 @@ import type {
 } from '@/types/mediator';
 import { validateConstitution } from '@/services/mediatorEngine/constitution/validateConstitution';
 import { makeDecision } from '@/services/mediatorEngine/decision/makeDecision';
+import { buildContinuityContext } from '@/services/mediatorEngine/memory/continuity';
 import { generateIntervention } from '@/services/mediatorEngine/intervention/generateIntervention';
 import { updateSessionMemory } from '@/services/mediatorEngine/memory/updateSessionMemory';
 import { recordMetrics } from '@/services/mediatorEngine/metrics/recordMetrics';
@@ -152,6 +153,11 @@ export function orchestrateTurn(input: MediatorEngineTurnInput): OrchestrateTurn
     turnNumber: request.turnNumber,
   });
 
+  const continuityContext = buildContinuityContext({
+    sessionMemory,
+    recommendedInterventionType: priorityOutput.recommendedInterventionType,
+  });
+
   const decisionOutput = makeDecision({
     state,
     reflection: reflectionOutput,
@@ -159,6 +165,8 @@ export function orchestrateTurn(input: MediatorEngineTurnInput): OrchestrateTurn
     priority: priorityOutput,
     safety: safetyOutput,
     turnNumber: request.turnNumber,
+    sessionMemory,
+    continuityContext,
   });
 
   const intervention = generateIntervention({

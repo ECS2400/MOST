@@ -10,6 +10,7 @@ import { runMediatorEngineTurn } from '@/services/mediatorEngine/runtime/runMedi
 import { isRuntimeMetadataTranscriptSafe } from '@/services/mediatorEngine/runtime/resolve/buildRuntimeOutput';
 import { orchestrateTurn } from '@/services/mediatorEngine/orchestrator/orchestrateTurn';
 import { createEmptySessionMemory } from '@/services/mediatorEngine/_internal/skeletonDefaults';
+import { createBaselineSessionMemory } from '@/services/mediatorEngine/__tests__/memory/fixtures';
 import {
   createRuntimeInput,
   createRuntimeTurnInput,
@@ -229,6 +230,56 @@ describe('runMediatorEngineTurn — engine runtime', () => {
 
     assert.equal(result.orchestratedTurn.complianceResult.compliant, true);
     assert.equal(result.finalMediatorMessage.accepted, true);
+  });
+});
+
+describe('runMediatorEngineTurn — continuity E2E (Phase 3A)', () => {
+  function repeatedIneffectiveReflectMemory() {
+    return createBaselineSessionMemory({
+      recentInterventionTypes: ['reflect', 'reflect', 'reflect'],
+      ineffectivePatterns: ['reflect'],
+      askedInterventionSignatures: ['reflect:SAFE_OPENING:both'],
+      interventionHistory: [
+        {
+          interventionId: 'int-r1',
+          turnNumber: 2,
+          type: 'reflect',
+          goal: 'SAFE_OPENING',
+          intent: 'increase_emotional_safety',
+          strategy: 'validate_emotions',
+          expectedEffectId: 'effect-r1',
+          signature: 'reflect:SAFE_OPENING:both',
+          compliance: {
+            compliant: true,
+            violationCount: 0,
+            blockingViolationCount: 0,
+            fallbackUsed: false,
+            attemptNumber: 1,
+          },
+          effective: false,
+          confidence: 80,
+        },
+      ],
+    });
+  }
+
+  it('with repeated ineffective reflect picks different intervention or avoid-repeat hint', async () => {
+    const sessionMemory = repeatedIneffectiveReflectMemory();
+    const result = await runMediatorEngineTurn(
+      createRuntimeInput({
+        sessionMemory,
+        turnInput: createRuntimeTurnInput({ turnNumber: 4 }),
+      })
+    );
+
+    const selectedType = result.orchestratedTurn.intervention.type;
+    const promptText = JSON.stringify(result.promptComposerOutput);
+    const avoidedRepeat =
+      selectedType !== 'reflect' ||
+      /different angle|Do not repeat|ineffective/i.test(promptText);
+
+    assert.ok(avoidedRepeat, `expected different type or continuity hint, got ${selectedType}`);
+    assert.ok(!JSON.stringify(result.orchestratedTurn.sessionMemory).includes('transcript'));
   });
 });
 

@@ -7,11 +7,18 @@ export function buildContextSummary(ctx: SafePromptContext): string {
   const strategy = strategyOutput.primaryStrategy ?? 'build_safety';
   const goalTransition = ctx.decisionOutput.goalTransition ?? 'stay';
 
-  return [
+  const parts = [
     `Turn ${turnNumber}.`,
     `Current goal: ${currentGoal}.`,
     `Conversation mode: ${mode}.`,
     `Strategy: ${strategy}.`,
     `Goal transition: ${goalTransition}.`,
-  ].join(' ');
+  ];
+
+  const hint = ctx.continuityContext?.continuityHint;
+  if (typeof hint === 'string' && hint.length > 0) {
+    parts.push(`Continuity: ${hint}`);
+  }
+
+  return parts.join(' ');
 }

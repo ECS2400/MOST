@@ -19,6 +19,7 @@ import type { MediationState } from './mediationState';
 import type { PriorityOutput } from './priority';
 import type { ReflectionOutput, TranscriptMessage } from './reflection';
 import type { SafetyOutput } from './safety';
+import type { ContinuityContext } from './continuity';
 import type { SessionMemory } from './sessionMemory';
 import type { InterventionIntent, StrategyEngineOutput } from './strategyEngineIo';
 
@@ -88,6 +89,10 @@ export interface DecisionEngineInput {
   priority: PriorityOutput;
   safety: SafetyOutput | null;
   turnNumber: TurnNumber;
+  /** Pre-turn session memory for continuity-aware intervention selection. */
+  sessionMemory?: SessionMemory;
+  /** Structural continuity hints — no transcript or PII. */
+  continuityContext?: ContinuityContext;
 }
 
 /** Output of Decision Engine pipeline step. */

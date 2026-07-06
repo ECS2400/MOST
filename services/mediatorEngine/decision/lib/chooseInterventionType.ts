@@ -1,4 +1,4 @@
-import type { InterventionType, PriorityOutput, TherapeuticStrategy } from '@/types/mediator';
+import type { ContinuityContext, InterventionType, PriorityOutput, TherapeuticStrategy } from '@/types/mediator';
 import { STRATEGY_INTERVENTION_COMPATIBILITY } from '@/services/mediatorEngine/constitution/config/strategyInterventionMap';
 import {
   DEFAULT_ALLOWED_INTERVENTIONS,
@@ -36,6 +36,61 @@ function safetyTypesInPermitted(permitted: readonly InterventionType[]): Interve
   return permitted.filter((type) => safetySet.has(type));
 }
 
+function continuityAvoidTypes(
+  continuity: ContinuityContext | null | undefined,
+  safetyMode: boolean
+): InterventionType[] {
+  if (!continuity || safetyMode) return [];
+  return continuity.suggestedAvoidTypes ?? [];
+}
+
+function continuityPreferTypes(
+  continuity: ContinuityContext | null | undefined,
+  safetyMode: boolean
+): InterventionType[] {
+  if (!continuity || safetyMode) return [];
+  return continuity.suggestedPreferTypes ?? [];
+}
+
+function shouldAvoidForContinuity(
+  type: InterventionType,
+  avoid: readonly InterventionType[],
+  safetyMode: boolean
+): boolean {
+  if (safetyMode && SAFETY_FALLBACK_INTERVENTION_ORDER.includes(type)) {
+    return false;
+  }
+  return avoid.includes(type);
+}
+
+function pickWithContinuityAwareness(
+  order: readonly InterventionType[],
+  permitted: readonly InterventionType[],
+  avoid: readonly InterventionType[],
+  prefer: readonly InterventionType[],
+  safetyMode: boolean
+): InterventionType | null {
+  for (const candidate of prefer) {
+    if (
+      permitted.includes(candidate) &&
+      !shouldAvoidForContinuity(candidate, avoid, safetyMode)
+    ) {
+      return candidate;
+    }
+  }
+
+  for (const candidate of order) {
+    if (
+      permitted.includes(candidate) &&
+      !shouldAvoidForContinuity(candidate, avoid, safetyMode)
+    ) {
+      return candidate;
+    }
+  }
+
+  return pickFromFallbackOrder(order, permitted);
+}
+
 export interface ChooseInterventionTypeResult {
   selectedInterventionType: InterventionType;
   usedRecommended: boolean;
@@ -44,14 +99,37 @@ export interface ChooseInterventionTypeResult {
 
 function filterByStrategyCompatibility(
   permitted: InterventionType[],
-  strategy: TherapeuticStrategy | undefined
+  strategy: TherapeuticStrategy | undefined,
+  forbidden: readonly InterventionType[]
 ): InterventionType[] {
   if (!strategy) return permitted;
   const compatible = STRATEGY_INTERVENTION_COMPATIBILITY[strategy];
   if (!compatible?.length) return permitted;
   const compatibleSet = new Set<InterventionType>(compatible);
   const filtered = permitted.filter((type) => compatibleSet.has(type));
-  return filtered.length > 0 ? filtered : [...compatible];
+  if (filtered.length > 0) return filtered;
+  return compatible.filter((type) => !isForbiddenIntervention(type, forbidden));
+}
+
+function pickLastResortNonForbidden(
+  forbidden: readonly InterventionType[],
+  allowed: readonly InterventionType[],
+  fallbackOrder: readonly InterventionType[]
+): InterventionType {
+  const allowedNotForbidden = permittedTypes(allowed, forbidden);
+  if (allowedNotForbidden.length > 0) return allowedNotForbidden[0];
+
+  const fallbackNotForbidden = fallbackOrder.filter(
+    (type) => !isForbiddenIntervention(type, forbidden)
+  );
+  const fromFallback = pickFromFallbackOrder(fallbackOrder, fallbackNotForbidden);
+  if (fromFallback) return fromFallback;
+
+  const defaultNotForbidden = permittedTypes(
+    [...DEFAULT_ALLOWED_INTERVENTIONS, ...SAFE_FALLBACK_INTERVENTION_ORDER],
+    forbidden
+  );
+  return defaultNotForbidden[0] ?? 'deescalate';
 }
 
 /** Selects an intervention type respecting priority allowed/forbidden constraints. */
@@ -59,7 +137,8 @@ export function chooseInterventionType(
   priority: PriorityOutput | null | undefined,
   overrideRecommended?: InterventionType,
   safetyMode = false,
-  primaryStrategy?: TherapeuticStrategy
+  primaryStrategy?: TherapeuticStrategy,
+  continuity?: ContinuityContext | null
 ): ChooseInterventionTypeResult {
   const allowedRaw = normalizeInterventionTypes(priority?.allowedInterventionTypes);
   const allowed =
@@ -71,11 +150,14 @@ export function chooseInterventionType(
   const forbidden = normalizeInterventionTypes(priority?.forbiddenInterventionTypes);
   const permitted = filterByStrategyCompatibility(
     permittedTypes(allowed, forbidden),
-    safetyMode ? 'build_safety' : primaryStrategy
+    safetyMode ? 'build_safety' : primaryStrategy,
+    forbidden
   );
   const fallbackOrder = safetyMode
     ? SAFETY_FALLBACK_INTERVENTION_ORDER
     : SAFE_FALLBACK_INTERVENTION_ORDER;
+  const avoid = continuityAvoidTypes(continuity, safetyMode);
+  const prefer = continuityPreferTypes(continuity, safetyMode);
 
   const recommended =
     overrideRecommended ??
@@ -86,7 +168,8 @@ export function chooseInterventionType(
   if (
     recommended &&
     isAllowedIntervention(recommended, permitted) &&
-    !isForbiddenIntervention(recommended, forbidden)
+    !isForbiddenIntervention(recommended, forbidden) &&
+    !shouldAvoidForContinuity(recommended, avoid, safetyMode)
   ) {
     return {
       selectedInterventionType: recommended,
@@ -95,7 +178,13 @@ export function chooseInterventionType(
     };
   }
 
-  const fromFallback = pickFromFallbackOrder(fallbackOrder, permitted);
+  const fromFallback = pickWithContinuityAwareness(
+    fallbackOrder,
+    permitted,
+    avoid,
+    prefer,
+    safetyMode
+  );
   if (fromFallback) {
     return {
       selectedInterventionType: fromFallback,
@@ -122,9 +211,10 @@ export function chooseInterventionType(
     };
   }
 
+  const lastResort = pickLastResortNonForbidden(forbidden, allowed, fallbackOrder);
   return {
-    selectedInterventionType: permitted[0] ?? 'reflect',
+    selectedInterventionType: lastResort,
     usedRecommended: false,
-    fallbackUsed: permitted.length === 0 || permitted[0] !== recommended,
+    fallbackUsed: lastResort !== recommended,
   };
 }

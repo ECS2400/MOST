@@ -17,6 +17,8 @@ import {
   createBaselineStrategyOutput,
   createDecisionInput,
 } from '@/services/mediatorEngine/__tests__/decision/fixtures';
+import { createBaselineSessionMemory } from '@/services/mediatorEngine/__tests__/memory/fixtures';
+import { buildContinuityContext } from '@/services/mediatorEngine/memory/continuity';
 import { createPreemptiveSafetyOutput } from '@/services/mediatorEngine/__tests__/priority/fixtures';
 
 describe('makeDecision — L1 deterministic rules', () => {
@@ -412,5 +414,191 @@ describe('makeDecision — invariant helpers', () => {
     );
     assert.equal(result.selectedInterventionType, expectedFallback);
     assert.ok(!allowed.includes(result.selectedInterventionType));
+  });
+});
+
+describe('makeDecision — continuity awareness (Phase 3A)', () => {
+  function ineffectiveReflectMemory() {
+    return createBaselineSessionMemory({
+      recentInterventionTypes: ['reflect', 'reflect', 'reflect'],
+      ineffectivePatterns: ['reflect'],
+      interventionHistory: [
+        {
+          interventionId: 'int-r1',
+          turnNumber: 2,
+          type: 'reflect',
+          goal: 'SAFE_OPENING',
+          intent: 'increase_emotional_safety',
+          strategy: 'validate_emotions',
+          expectedEffectId: 'effect-r1',
+          signature: 'reflect:SAFE_OPENING:both',
+          compliance: {
+            compliant: true,
+            violationCount: 0,
+            blockingViolationCount: 0,
+            fallbackUsed: false,
+            attemptNumber: 1,
+          },
+          effective: false,
+          confidence: 80,
+        },
+      ],
+    });
+  }
+
+  it('avoids repeated ineffective reflect when compatible alternative exists', () => {
+    const sessionMemory = ineffectiveReflectMemory();
+    const continuityContext = buildContinuityContext({
+      sessionMemory,
+      recommendedInterventionType: 'reflect',
+    });
+
+    const result = makeDecision(
+      createDecisionInput({
+        strategy: createBaselineStrategyOutput({ primaryStrategy: 'validate_emotions' }),
+        priority: createBaselinePriorityOutput({
+          recommendedInterventionType: 'reflect',
+          allowedInterventionTypes: ['reflect', 'validate', 'mirror'],
+          forbiddenInterventionTypes: [],
+          preemptsGoalTransition: false,
+        }),
+        sessionMemory,
+        continuityContext,
+      })
+    );
+
+    assert.notEqual(result.selectedInterventionType, 'reflect');
+    assert.ok(['validate', 'mirror'].includes(result.selectedInterventionType));
+  });
+
+  it('does not avoid safety_response in safety mode', () => {
+    const sessionMemory = createBaselineSessionMemory({
+      recentInterventionTypes: ['safety_response', 'safety_response', 'safety_response'],
+      ineffectivePatterns: ['safety_response'],
+    });
+    const continuityContext = buildContinuityContext({
+      sessionMemory,
+      recommendedInterventionType: 'safety_response',
+    });
+
+    const result = makeDecision(
+      createDecisionInput({
+        safety: createPreemptiveSafetyOutput(),
+        priority: createBaselinePriorityOutput({
+          conversationMode: 'SAFETY',
+          recommendedInterventionType: 'safety_response',
+          allowedInterventionTypes: ['safety_response', 'deescalate'],
+          forbiddenInterventionTypes: [],
+          preemptsGoalTransition: true,
+        }),
+        sessionMemory,
+        continuityContext,
+      })
+    );
+
+    assert.equal(result.selectedInterventionType, 'safety_response');
+  });
+
+  it('forbidden still wins over continuity prefer', () => {
+    const sessionMemory = createBaselineSessionMemory({
+      effectivePatterns: ['validate'],
+      recentInterventionTypes: ['validate'],
+    });
+    const continuityContext = buildContinuityContext({
+      sessionMemory,
+      recommendedInterventionType: 'validate',
+    });
+
+    const result = makeDecision(
+      createDecisionInput({
+        strategy: createBaselineStrategyOutput({ primaryStrategy: 'validate_emotions' }),
+        priority: createBaselinePriorityOutput({
+          recommendedInterventionType: 'validate',
+          allowedInterventionTypes: ['validate', 'reflect'],
+          forbiddenInterventionTypes: ['validate'],
+          preemptsGoalTransition: false,
+        }),
+        sessionMemory,
+        continuityContext,
+      })
+    );
+
+    assert.notEqual(result.selectedInterventionType, 'validate');
+    assert.equal(result.selectedInterventionType, 'reflect');
+  });
+
+  it('strategy compatibility still maintained with continuity', () => {
+    const sessionMemory = ineffectiveReflectMemory();
+    const continuityContext = buildContinuityContext({
+      sessionMemory,
+      recommendedInterventionType: 'reflect',
+    });
+    const strategy = 'validate_emotions';
+
+    const result = makeDecision(
+      createDecisionInput({
+        strategy: createBaselineStrategyOutput({ primaryStrategy: strategy }),
+        priority: createBaselinePriorityOutput({
+          recommendedInterventionType: 'reflect',
+          allowedInterventionTypes: ['reflect', 'validate', 'mirror'],
+          forbiddenInterventionTypes: [],
+        }),
+        sessionMemory,
+        continuityContext,
+      })
+    );
+
+    const compatible = STRATEGY_INTERVENTION_COMPATIBILITY[strategy] ?? [];
+    assert.ok(compatible.includes(result.selectedInterventionType));
+    assert.notEqual(result.selectedInterventionType, 'reflect');
+  });
+});
+
+describe('makeDecision — strategy compatibility fallback respects forbidden (Phase 3A-fix)', () => {
+  it('does not restore forbidden reflect from strategy-compatible fallback', () => {
+    const strategy = 'validate_emotions';
+    const forbidden: InterventionType[] = ['reflect'];
+
+    const result = makeDecision(
+      createDecisionInput({
+        strategy: createBaselineStrategyOutput({ primaryStrategy: strategy }),
+        priority: createBaselinePriorityOutput({
+          recommendedInterventionType: 'open_deepen',
+          allowedInterventionTypes: ['open_deepen', 'choice_need'],
+          forbiddenInterventionTypes: forbidden,
+          preemptsGoalTransition: false,
+        }),
+      })
+    );
+
+    assert.notEqual(result.selectedInterventionType, 'reflect');
+    assert.ok(!isForbiddenIntervention(result.selectedInterventionType, forbidden));
+    assert.ok(
+      ['validate', 'mirror', 'choice_emotion'].includes(result.selectedInterventionType),
+      `expected compatible non-forbidden fallback, got ${result.selectedInterventionType}`
+    );
+  });
+
+  it('uses non-forbidden last resort when all strategy-compatible fallbacks are forbidden', () => {
+    const strategy = 'validate_emotions';
+    const forbidden: InterventionType[] = ['validate', 'reflect', 'mirror', 'choice_emotion'];
+
+    const result = makeDecision(
+      createDecisionInput({
+        strategy: createBaselineStrategyOutput({ primaryStrategy: strategy }),
+        priority: createBaselinePriorityOutput({
+          recommendedInterventionType: 'validate',
+          allowedInterventionTypes: ['open_deepen', 'choice_need'],
+          forbiddenInterventionTypes: forbidden,
+          preemptsGoalTransition: false,
+        }),
+      })
+    );
+
+    assert.ok(!isForbiddenIntervention(result.selectedInterventionType, forbidden));
+    assert.ok(
+      ['open_deepen', 'choice_need'].includes(result.selectedInterventionType),
+      `expected allowed non-forbidden last resort, got ${result.selectedInterventionType}`
+    );
   });
 });
