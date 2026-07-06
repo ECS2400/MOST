@@ -818,7 +818,15 @@ function chooseGoalTransition(input) {
   if (blocked || isSafetyActive(input)) {
     return "stay";
   }
-  return mapSuggestedGoalTransition(input.strategy?.suggestedGoalTransition);
+  const fromStrategy = mapSuggestedGoalTransition(input.strategy?.suggestedGoalTransition);
+  const gc = input.goalContinuityContext;
+  if (fromStrategy === "stay" && gc && gc.confidence >= 40 && gc.completionDetected && (gc.recommendedGoalTransition === "advance" || gc.recommendedGoalTransition === "closure")) {
+    return "advance";
+  }
+  if (fromStrategy === "stay" && gc && gc.confidence >= 40 && gc.recommendedGoalTransition === "regress") {
+    return "regress";
+  }
+  return fromStrategy;
 }
 function isSafetyDecisionMode(input) {
   return isSafetyActive(input);
@@ -1368,6 +1376,391 @@ function buildContinuityContext(input) {
     suggestedPreferTypes,
     continuityHint: selectContinuityHint(partial),
     confidence: computeConfidence(repeated, stale, effectiveness)
+  };
+}
+
+// services/mediatorEngine/goalContinuity/buildGoalContinuityHint.ts
+function buildGoalContinuityHint(ctx) {
+  if ((ctx.recommendedGoalTransition === "advance" || ctx.recommendedGoalTransition === "closure") && ctx.recommendedNextGoal) {
+    if (ctx.completionDetected) {
+      return `The current goal appears complete; move toward ${ctx.recommendedNextGoal}.`;
+    }
+    return `Consider advancing toward ${ctx.recommendedNextGoal}.`;
+  }
+  if (ctx.recommendedGoalTransition === "stay" && ctx.goalStagnationDetected) {
+    const reason = ctx.suggestedStayReason ?? "progress is still needed";
+    return `Stay on ${ctx.currentGoal} because ${reason.toLowerCase()}.`;
+  }
+  if (ctx.recommendedGoalTransition === "stay" && ctx.suggestedStayReason) {
+    return `Stay on ${ctx.currentGoal} because ${ctx.suggestedStayReason.toLowerCase()}.`;
+  }
+  if (ctx.suggestedAdvanceReason && ctx.recommendedNextGoal) {
+    return `Move toward ${ctx.recommendedNextGoal}: ${ctx.suggestedAdvanceReason}`;
+  }
+  return null;
+}
+
+// services/mediatorEngine/goalContinuity/config/goalFlow.ts
+var GOAL_FLOW_ORDER = [
+  "SAFE_OPENING",
+  "EMOTION_NAMING",
+  "EMOTION_UNDERSTANDING",
+  "NEED_NAMING",
+  "PERSPECTIVE_SHARING",
+  "REFRAME",
+  "AGREEMENT",
+  "FUTURE_PLAN",
+  "CLOSURE"
+];
+var GOAL_STAGNATION_TURN_THRESHOLD = 5;
+var MUTUAL_UNDERSTANDING_COMPLETE_THRESHOLD = 70;
+var AGREEMENT_LEVEL_COMPLETE_THRESHOLD = 70;
+function nextGoalInFlow(current) {
+  const index = GOAL_FLOW_ORDER.indexOf(current);
+  if (index < 0 || index >= GOAL_FLOW_ORDER.length - 1) return null;
+  return GOAL_FLOW_ORDER[index + 1] ?? null;
+}
+function dedupeGoals(goals) {
+  const seen = /* @__PURE__ */ new Set();
+  const result = [];
+  for (const goal of goals) {
+    if (!seen.has(goal)) {
+      seen.add(goal);
+      result.push(goal);
+    }
+  }
+  return result;
+}
+
+// services/mediatorEngine/goalContinuity/chooseGoalContinuityRecommendation.ts
+function isSafetyActive2(safety) {
+  if (!safety) return false;
+  if (safety.preempted === true) return true;
+  const level = safety.level;
+  return level === "L1_gentle" || level === "L2_pause" || level === "L3_stop";
+}
+function isClosureReady(currentGoal, completion) {
+  if (currentGoal === "CLOSURE") return false;
+  const next = nextGoalInFlow(currentGoal);
+  return next === "CLOSURE" && completion.completedGoals.includes("AGREEMENT");
+}
+function chooseGoalContinuityRecommendation(currentGoal, completion, stagnation, safety, mutualUnderstandingScore) {
+  if (isSafetyActive2(safety)) {
+    return {
+      recommendedGoalTransition: "stay",
+      recommendedNextGoal: null,
+      suggestedStayReason: "Safety is active",
+      suggestedAdvanceReason: null
+    };
+  }
+  const nextGoal = nextGoalInFlow(currentGoal);
+  const completedButCurrent = completion.completedGoals.includes(currentGoal);
+  if (completion.completionDetected || completedButCurrent) {
+    if (nextGoal === "CLOSURE" && isClosureReady(currentGoal, completion)) {
+      return {
+        recommendedGoalTransition: "closure",
+        recommendedNextGoal: "CLOSURE",
+        suggestedStayReason: null,
+        suggestedAdvanceReason: "Agreement reached; prepare closure"
+      };
+    }
+    if (nextGoal) {
+      return {
+        recommendedGoalTransition: "advance",
+        recommendedNextGoal: nextGoal,
+        suggestedStayReason: null,
+        suggestedAdvanceReason: completion.completionReason ?? `Move toward ${nextGoal}`
+      };
+    }
+  }
+  if (stagnation.goalStagnationDetected && !completion.completionDetected) {
+    if (mutualUnderstandingScore < 50 && currentGoal === "PERSPECTIVE_SHARING") {
+      return {
+        recommendedGoalTransition: "stay",
+        recommendedNextGoal: null,
+        suggestedStayReason: "Mutual understanding is still low",
+        suggestedAdvanceReason: null
+      };
+    }
+    if (stagnation.repeatedGoalDetected && nextGoal) {
+      return {
+        recommendedGoalTransition: "advance",
+        recommendedNextGoal: nextGoal,
+        suggestedStayReason: null,
+        suggestedAdvanceReason: "Goal stagnation detected; try next stage"
+      };
+    }
+  }
+  if (currentGoal !== "SAFE_OPENING" && mutualUnderstandingScore < 40) {
+    const priorIndex = GOAL_FLOW_ORDER.indexOf(currentGoal);
+    const priorGoal = priorIndex > 0 ? GOAL_FLOW_ORDER[priorIndex - 1] : null;
+    if (priorGoal && stagnation.goalStagnationDetected) {
+      return {
+        recommendedGoalTransition: "regress",
+        recommendedNextGoal: priorGoal,
+        suggestedStayReason: null,
+        suggestedAdvanceReason: null
+      };
+    }
+  }
+  return {
+    recommendedGoalTransition: "stay",
+    recommendedNextGoal: null,
+    suggestedStayReason: stagnation.goalStagnationReason ?? "Continue current therapeutic stage",
+    suggestedAdvanceReason: null
+  };
+}
+
+// services/mediatorEngine/goalContinuity/detectGoalCompletion.ts
+function isSafetyActive3(safety) {
+  if (!safety) return false;
+  if (safety.preempted === true) return true;
+  const level = safety.level;
+  return level === "L1_gentle" || level === "L2_pause" || level === "L3_stop";
+}
+function movedForward(reflection) {
+  const moved = reflection?.conversationMovedForward;
+  return moved?.value === true;
+}
+function effectAchieved(reflection) {
+  const evaluation = reflection?.expectedEffectEvaluation;
+  return evaluation?.achieved === true;
+}
+function isSafeOpeningComplete(turnNumber, safety, lastComplianceCompliant, reflection) {
+  if (turnNumber < 2) return false;
+  if (isSafetyActive3(safety)) return false;
+  if (lastComplianceCompliant === false) return false;
+  return movedForward(reflection) || effectAchieved(reflection) || lastComplianceCompliant === true;
+}
+function isAgreementComplete(state) {
+  return state.agreements?.acceptedByBoth === true;
+}
+function isPerspectiveSharingComplete(state) {
+  const score = state.dynamics?.mutualUnderstandingScore;
+  const agreementLevel = state.dynamics?.agreementLevel;
+  return typeof score === "number" && score >= MUTUAL_UNDERSTANDING_COMPLETE_THRESHOLD || typeof agreementLevel === "number" && agreementLevel >= AGREEMENT_LEVEL_COMPLETE_THRESHOLD;
+}
+function isClosureComplete(state) {
+  if (state.agreements?.acceptedByBoth === true) return true;
+  return state.sessionOutcome === "completed" || state.sessionOutcome === "agreement_reached";
+}
+function isGoalCompleteForCurrent(goal, state, turnNumber, safety, lastComplianceCompliant, reflection) {
+  switch (goal) {
+    case "SAFE_OPENING":
+      if (isSafeOpeningComplete(turnNumber, safety, lastComplianceCompliant, reflection)) {
+        return { complete: true, reason: "Opening phase complete with safety clear and forward movement" };
+      }
+      return { complete: false, reason: null };
+    case "AGREEMENT":
+    case "FUTURE_PLAN":
+      if (isAgreementComplete(state)) {
+        return { complete: true, reason: "Agreement accepted by both participants" };
+      }
+      return { complete: false, reason: null };
+    case "PERSPECTIVE_SHARING":
+      if (isPerspectiveSharingComplete(state)) {
+        return { complete: true, reason: "Mutual understanding threshold reached" };
+      }
+      return { complete: false, reason: null };
+    case "CLOSURE":
+      if (isClosureComplete(state)) {
+        return { complete: true, reason: "Session outcome supports closure" };
+      }
+      return { complete: false, reason: null };
+    case "EMOTION_NAMING":
+    case "EMOTION_UNDERSTANDING":
+    case "EMOTION_ACKNOWLEDGMENT":
+    case "NEED_NAMING":
+    case "REFRAME":
+      if (movedForward(reflection) && effectAchieved(reflection)) {
+        return { complete: true, reason: `${goal} effect achieved with forward movement` };
+      }
+      return { complete: false, reason: null };
+    default:
+      return { complete: false, reason: null };
+  }
+}
+function detectGoalCompletion(state, sessionMemory, reflection, safety, turnNumber, lastComplianceCompliant) {
+  const memoryCompleted = Array.isArray(sessionMemory.completedGoals) ? sessionMemory.completedGoals.filter((g) => typeof g === "string") : [];
+  const current = state.currentGoal;
+  const currentCheck = isGoalCompleteForCurrent(
+    current,
+    state,
+    turnNumber,
+    safety,
+    lastComplianceCompliant,
+    reflection
+  );
+  const completedGoals = [...memoryCompleted];
+  if (currentCheck.complete && !completedGoals.includes(current)) {
+    completedGoals.push(current);
+  }
+  return {
+    completionDetected: currentCheck.complete,
+    completionReason: currentCheck.reason,
+    completedGoals
+  };
+}
+
+// services/mediatorEngine/goalContinuity/detectGoalStagnation.ts
+function countTurnsOnGoal(memory, goal) {
+  const history = Array.isArray(memory.interventionHistory) ? memory.interventionHistory : [];
+  return history.filter((entry) => entry?.goal === goal).length;
+}
+function hasRepeatedInterventionsWithoutMovement(memory, reflection) {
+  const recent = memory.recentInterventionTypes ?? [];
+  if (recent.length < 3) return false;
+  const first = recent[0];
+  const allSame = recent.slice(0, 3).every((type) => type === first);
+  const moved = reflection?.conversationMovedForward?.value;
+  const lowConfidence = (reflection?.conversationMovedForward?.confidence ?? 100) < 50;
+  return allSame && (moved === false || lowConfidence);
+}
+function noCompletedGoalsAfterTurns(turnNumber, completedCount) {
+  return turnNumber >= GOAL_STAGNATION_TURN_THRESHOLD && completedCount === 0;
+}
+function detectGoalStagnation(currentGoal, sessionMemory, reflection, turnNumber, completedGoals) {
+  const activeGoalTurnCount = Math.max(
+    countTurnsOnGoal(sessionMemory, currentGoal),
+    turnNumber > 1 ? 1 : 0
+  );
+  const repeatedGoalDetected = activeGoalTurnCount >= GOAL_STAGNATION_TURN_THRESHOLD;
+  const repeatedGoalReason = repeatedGoalDetected ? `${currentGoal} active for ${activeGoalTurnCount} turns` : null;
+  const completedButStillCurrent = completedGoals.includes(currentGoal);
+  const repeatedInterventions = hasRepeatedInterventionsWithoutMovement(sessionMemory, reflection);
+  const noProgress = noCompletedGoalsAfterTurns(turnNumber, completedGoals.length);
+  const goalStagnationDetected = repeatedGoalDetected || completedButStillCurrent || repeatedInterventions || noProgress;
+  let goalStagnationReason = null;
+  if (completedButStillCurrent) {
+    goalStagnationReason = "Completed goal is still marked as current";
+  } else if (repeatedInterventions) {
+    goalStagnationReason = "Repeated intervention types without forward movement";
+  } else if (repeatedGoalDetected) {
+    goalStagnationReason = repeatedGoalReason;
+  } else if (noProgress) {
+    goalStagnationReason = "No completed goals after several turns";
+  }
+  return {
+    activeGoalTurnCount,
+    repeatedGoalDetected,
+    repeatedGoalReason,
+    goalStagnationDetected,
+    goalStagnationReason
+  };
+}
+
+// services/mediatorEngine/goalContinuity/buildGoalContinuityContext.ts
+var EMPTY_STATE_REQUEST = {
+  mediationId: "goal-continuity",
+  sessionId: "goal-continuity",
+  trigger: "session_start",
+  turnNumber: 1,
+  mediationState: null,
+  transcriptDelta: [],
+  engineVersion: "v2.3"
+};
+var RECENT_COMPLETED_LIMIT = 5;
+function normalizeGoal(value) {
+  const goals = [
+    "SAFE_OPENING",
+    "EMOTION_NAMING",
+    "EMOTION_UNDERSTANDING",
+    "EMOTION_ACKNOWLEDGMENT",
+    "NEED_NAMING",
+    "PERSPECTIVE_SHARING",
+    "REFRAME",
+    "AGREEMENT",
+    "FUTURE_PLAN",
+    "CLOSURE"
+  ];
+  if (typeof value === "string" && goals.includes(value)) {
+    return value;
+  }
+  return "SAFE_OPENING";
+}
+function lastComplianceFromMemory(input) {
+  if (typeof input.lastComplianceCompliant === "boolean") {
+    return input.lastComplianceCompliant;
+  }
+  const history = input.sessionMemory?.interventionHistory ?? [];
+  const last = history.at(-1);
+  if (last?.compliance && typeof last.compliance.compliant === "boolean") {
+    return last.compliance.compliant;
+  }
+  return null;
+}
+function computeConfidence2(completion, stagnation) {
+  let score = 0;
+  if (completion.completionDetected) score += 45;
+  if (stagnation.goalStagnationDetected) score += 30;
+  if (stagnation.repeatedGoalDetected) score += 15;
+  if (completion.completedGoals.length > 0) score += 10;
+  return Math.min(100, score);
+}
+function resolveState(input) {
+  if (input.state && typeof input.state === "object" && input.state.currentGoal) {
+    return input.state;
+  }
+  return createEmptyMediationState(EMPTY_STATE_REQUEST);
+}
+function buildGoalContinuityContext(input) {
+  const normalized = input ?? {};
+  const state = resolveState(normalized);
+  const sessionMemory = normalized.sessionMemory ?? createEmptySessionMemory();
+  const turnNumber = typeof normalized.turnNumber === "number" && normalized.turnNumber > 0 ? normalized.turnNumber : 1;
+  const currentGoal = normalizeGoal(state.currentGoal);
+  const lastCompliance = lastComplianceFromMemory(normalized);
+  const completion = detectGoalCompletion(
+    { ...state, currentGoal },
+    sessionMemory,
+    normalized.reflection,
+    normalized.safety,
+    turnNumber,
+    lastCompliance
+  );
+  const completedGoals = dedupeGoals(completion.completedGoals);
+  const recentlyCompletedGoals = completedGoals.slice(-RECENT_COMPLETED_LIMIT);
+  const stagnation = detectGoalStagnation(
+    currentGoal,
+    sessionMemory,
+    normalized.reflection,
+    turnNumber,
+    completedGoals
+  );
+  const mutualUnderstandingScore = typeof state.dynamics?.mutualUnderstandingScore === "number" ? state.dynamics.mutualUnderstandingScore : 0;
+  const recommendation = chooseGoalContinuityRecommendation(
+    currentGoal,
+    { ...completion, completedGoals },
+    stagnation,
+    normalized.safety,
+    mutualUnderstandingScore
+  );
+  const partial = {
+    recommendedGoalTransition: recommendation.recommendedGoalTransition,
+    recommendedNextGoal: recommendation.recommendedNextGoal,
+    currentGoal,
+    completionDetected: completion.completionDetected,
+    goalStagnationDetected: stagnation.goalStagnationDetected,
+    suggestedStayReason: recommendation.suggestedStayReason,
+    suggestedAdvanceReason: recommendation.suggestedAdvanceReason
+  };
+  return {
+    currentGoal,
+    completedGoals,
+    recentlyCompletedGoals,
+    activeGoalTurnCount: stagnation.activeGoalTurnCount,
+    repeatedGoalDetected: stagnation.repeatedGoalDetected,
+    repeatedGoalReason: stagnation.repeatedGoalReason,
+    goalStagnationDetected: stagnation.goalStagnationDetected,
+    goalStagnationReason: stagnation.goalStagnationReason,
+    completionDetected: completion.completionDetected,
+    completionReason: completion.completionReason,
+    recommendedGoalTransition: recommendation.recommendedGoalTransition,
+    recommendedNextGoal: recommendation.recommendedNextGoal,
+    suggestedStayReason: recommendation.suggestedStayReason,
+    suggestedAdvanceReason: recommendation.suggestedAdvanceReason,
+    goalContinuityHint: buildGoalContinuityHint(partial),
+    confidence: computeConfidence2({ ...completion, completedGoals }, stagnation)
   };
 }
 
@@ -2489,14 +2882,14 @@ var collectReadinessSignal = {
       reflection.partnerReadiness?.partner?.readyToAdvance,
       false
     );
-    const movedForward = readConfidenceBoolean(reflection.conversationMovedForward, false);
+    const movedForward2 = readConfidenceBoolean(reflection.conversationMovedForward, false);
     const hostConfidence = readConfidenceScore(reflection.partnerReadiness?.host?.readyToAdvance, 0);
     const partnerConfidence = readConfidenceScore(
       reflection.partnerReadiness?.partner?.readyToAdvance,
       0
     );
     const progressConfidence = Math.max(hostConfidence, partnerConfidence);
-    const ready = hostReady && partnerReady && progressConfidence >= READINESS_CONFIDENCE_THRESHOLD || movedForward && readConfidenceScore(reflection.conversationMovedForward, 0) >= READINESS_CONFIDENCE_THRESHOLD;
+    const ready = hostReady && partnerReady && progressConfidence >= READINESS_CONFIDENCE_THRESHOLD || movedForward2 && readConfidenceScore(reflection.conversationMovedForward, 0) >= READINESS_CONFIDENCE_THRESHOLD;
     if (!ready) return null;
     return {
       type: "readiness",
@@ -2867,10 +3260,10 @@ function buildRiskFlags(ctx, shouldChangeStrategy, conversationMovedForward) {
     )
   };
 }
-function buildReflectionNotes(shouldChangeStrategy, recommendedShift, movedForward, helpful) {
+function buildReflectionNotes(shouldChangeStrategy, recommendedShift, movedForward2, helpful) {
   const parts = [];
   parts.push(`helpful=${helpful}`);
-  parts.push(`moved=${movedForward}`);
+  parts.push(`moved=${movedForward2}`);
   if (shouldChangeStrategy) parts.push(`shift=${recommendedShift}`);
   return parts.join("; ");
 }
@@ -3516,7 +3909,7 @@ function readBool(field, fallback = false) {
   if (!field || typeof field !== "object") return fallback;
   return typeof field.value === "boolean" ? field.value : fallback;
 }
-function normalizeGoal(value) {
+function normalizeGoal2(value) {
   const goals = [
     "SAFE_OPENING",
     "EMOTION_NAMING",
@@ -3539,7 +3932,7 @@ function normalizeSafetyLevel2(safety) {
   if (level === "L1_gentle" || level === "L2_pause" || level === "L3_stop") return level;
   return "none";
 }
-function isSafetyActive2(safety) {
+function isSafetyActive4(safety) {
   const level = normalizeSafetyLevel2(safety);
   if (level !== "none") return true;
   if (safety?.preempted === true) return true;
@@ -3587,12 +3980,12 @@ function safeStrategyInput(input) {
   const exhaustionActive = readBool(load.exhaustionDetected);
   const breakthroughActive = dynamics.breakthrough?.value != null || reflectionShift === "consolidate";
   const recoveryActive = recovery?.active === true || reflectionShift === "recover";
-  const safetyActive = isSafetyActive2(safety);
+  const safetyActive = isSafetyActive4(safety);
   const hostReady = readBool(reflection.partnerReadiness?.host?.readyToAdvance);
   const partnerReady = readBool(reflection.partnerReadiness?.partner?.readyToAdvance);
   return {
     turnNumber: typeof raw.turnNumber === "number" && raw.turnNumber > 0 ? raw.turnNumber : 1,
-    currentGoal: normalizeGoal(state.currentGoal),
+    currentGoal: normalizeGoal2(state.currentGoal),
     pace: state.pace === "slow" || state.pace === "fast" ? state.pace : "normal",
     load,
     dynamics,
@@ -3609,7 +4002,8 @@ function safeStrategyInput(input) {
     reflectionShift,
     pauseRecommended,
     bothReady: hostReady && partnerReady,
-    previousPrimaryStrategy: getPreviousPrimaryStrategy(sessionMemory)
+    previousPrimaryStrategy: getPreviousPrimaryStrategy(sessionMemory),
+    goalContinuityContext: raw.goalContinuityContext && typeof raw.goalContinuityContext === "object" ? raw.goalContinuityContext : null
   };
 }
 function isGoalAdvanceBlocked(ctx) {
@@ -3626,6 +4020,15 @@ function chooseGoalTransition2(ctx, priority) {
   }
   if (ctx.bothReady) {
     return "prepare_advance";
+  }
+  const gc = ctx.goalContinuityContext;
+  if (gc && !ctx.safetyActive && gc.confidence >= 40) {
+    if (gc.recommendedGoalTransition === "advance" || gc.recommendedGoalTransition === "closure") {
+      return "prepare_advance";
+    }
+    if (gc.recommendedGoalTransition === "regress") {
+      return "regress";
+    }
   }
   return "stay";
 }
@@ -4444,11 +4847,19 @@ function orchestrateTurn(input) {
     transcriptDelta: request.transcriptDelta,
     goalChecksDelta: []
   });
+  const goalContinuityContext = buildGoalContinuityContext({
+    state,
+    sessionMemory,
+    reflection: reflectionOutput,
+    safety: safetyOutput,
+    turnNumber: request.turnNumber
+  });
   const strategyOutput = selectStrategy({
     state: buildStrategyStateContext(state, sessionMemory),
     reflection: reflectionOutput,
     safety: safetyOutput,
-    turnNumber: request.turnNumber
+    turnNumber: request.turnNumber,
+    goalContinuityContext
   });
   const priorityOutput = resolvePriority({
     state,
@@ -4469,7 +4880,8 @@ function orchestrateTurn(input) {
     safety: safetyOutput,
     turnNumber: request.turnNumber,
     sessionMemory,
-    continuityContext
+    continuityContext,
+    goalContinuityContext
   });
   const intervention = generateIntervention({
     state,
@@ -4555,6 +4967,10 @@ function buildContextSummary(ctx) {
   const hint = ctx.continuityContext?.continuityHint;
   if (typeof hint === "string" && hint.length > 0) {
     parts.push(`Continuity: ${hint}`);
+  }
+  const goalHint = ctx.goalContinuityContext?.goalContinuityHint;
+  if (typeof goalHint === "string" && goalHint.length > 0) {
+    parts.push(`Goal continuity: ${goalHint}`);
   }
   return parts.join(" ");
 }
@@ -4728,10 +5144,10 @@ var PROMPT_LIMITS = {
 
 // services/mediatorEngine/promptComposer/sections/buildModelHints.ts
 function buildModelHints(safetyLevel) {
-  const isSafetyActive5 = safetyLevel === "L2_pause" || safetyLevel === "L3_stop";
+  const isSafetyActive7 = safetyLevel === "L2_pause" || safetyLevel === "L3_stop";
   return {
-    temperature: isSafetyActive5 ? PROMPT_LIMITS.safetyTemperature : PROMPT_LIMITS.defaultTemperature,
-    maxOutputTokens: isSafetyActive5 ? PROMPT_LIMITS.safetyMaxOutputTokens : PROMPT_LIMITS.defaultMaxOutputTokens,
+    temperature: isSafetyActive7 ? PROMPT_LIMITS.safetyTemperature : PROMPT_LIMITS.defaultTemperature,
+    maxOutputTokens: isSafetyActive7 ? PROMPT_LIMITS.safetyMaxOutputTokens : PROMPT_LIMITS.defaultMaxOutputTokens,
     style: "calm",
     responseFormat: "plain_text"
   };
@@ -4957,7 +5373,8 @@ function safePromptInput(input) {
     intervention: raw.intervention && typeof raw.intervention === "object" ? raw.intervention : {},
     complianceResult: raw.complianceResult && typeof raw.complianceResult === "object" ? raw.complianceResult : { compliant: true, violations: [], attemptNumber: 1, fallbackUsed: false, validatedAt: "", validatorLayer: "deterministic" },
     transcriptWindow: safeArray(raw.transcriptWindow),
-    continuityContext: raw.continuityContext && typeof raw.continuityContext === "object" ? raw.continuityContext : null
+    continuityContext: raw.continuityContext && typeof raw.continuityContext === "object" ? raw.continuityContext : null,
+    goalContinuityContext: raw.goalContinuityContext && typeof raw.goalContinuityContext === "object" ? raw.goalContinuityContext : null
   };
 }
 
@@ -5206,11 +5623,19 @@ function buildPromptComposerInputFromTurn(request, sessionMemory, orchestrated, 
     transcriptDelta: request.transcriptDelta,
     goalChecksDelta: []
   });
+  const goalContinuityContext = buildGoalContinuityContext({
+    state,
+    sessionMemory,
+    reflection: reflectionOutput,
+    safety: safetyOutput,
+    turnNumber
+  });
   const strategyOutput = selectStrategy({
     state: buildStrategyStateContext2(state, sessionMemory),
     reflection: reflectionOutput,
     safety: safetyOutput,
-    turnNumber
+    turnNumber,
+    goalContinuityContext
   });
   const priorityOutput = resolvePriority({
     state,
@@ -5231,7 +5656,8 @@ function buildPromptComposerInputFromTurn(request, sessionMemory, orchestrated, 
     safety: safetyOutput,
     turnNumber,
     sessionMemory,
-    continuityContext
+    continuityContext,
+    goalContinuityContext
   });
   return {
     mediationState: state,
@@ -5246,12 +5672,13 @@ function buildPromptComposerInputFromTurn(request, sessionMemory, orchestrated, 
     transcriptWindow: Array.isArray(request.transcriptDelta) ? request.transcriptDelta : [],
     language,
     turnNumber,
-    continuityContext
+    continuityContext,
+    goalContinuityContext
   };
 }
 
 // services/mediatorEngine/llm/adapters/deterministicStubProvider.ts
-function isSafetyActive3(safetyLevel) {
+function isSafetyActive5(safetyLevel) {
   return safetyLevel === "L2_pause" || safetyLevel === "L3_stop";
 }
 function stubText(language, safety) {
@@ -5263,7 +5690,7 @@ function createDeterministicStubProvider() {
     providerId: "deterministic-stub",
     async generateText(request) {
       const { safetyLevel, language } = request.metadata;
-      const text = stubText(language, isSafetyActive3(safetyLevel));
+      const text = stubText(language, isSafetyActive5(safetyLevel));
       return {
         text,
         provider: "deterministic-stub",
@@ -5855,14 +6282,14 @@ function validateQuestions(ctx) {
 }
 
 // services/mediatorEngine/responseValidator/rules/validateSafetyCompliance.ts
-function isSafetyActive4(level) {
+function isSafetyActive6(level) {
   return level === "L2_pause" || level === "L3_stop";
 }
 function hasSafetyWording2(text, language) {
   return hasSafetyWordingForLanguage(text, language);
 }
 function validateSafetyCompliance(ctx) {
-  if (!isSafetyActive4(ctx.safetyLevel)) {
+  if (!isSafetyActive6(ctx.safetyLevel)) {
     return {
       ruleId: "safety_compliance",
       passed: true,

@@ -2,6 +2,7 @@ import type {
   ComplianceResult,
   ContinuityContext,
   DecisionEngineOutput,
+  GoalContinuityContext,
   Intervention,
   MediationState,
   MediatorLang,
@@ -33,6 +34,7 @@ export interface SafePromptContext {
   complianceResult: ComplianceResult;
   transcriptWindow: TranscriptMessage[];
   continuityContext: ContinuityContext | null;
+  goalContinuityContext: GoalContinuityContext | null;
 }
 
 const SUPPORTED_LANGUAGES: MediatorLang[] = ['pl', 'en', 'it', 'de', 'fr', 'es'];
@@ -121,6 +123,10 @@ export function safePromptInput(input: unknown): SafePromptContext {
     continuityContext:
       raw.continuityContext && typeof raw.continuityContext === 'object'
         ? raw.continuityContext
+        : null,
+    goalContinuityContext:
+      raw.goalContinuityContext && typeof raw.goalContinuityContext === 'object'
+        ? raw.goalContinuityContext
         : null,
   };
 }

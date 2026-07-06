@@ -22,6 +22,7 @@ export * from './safety';
 export * from './reflection';
 export * from './sessionMemory';
 export * from './continuity';
+export * from './goalContinuity';
 export * from './mediationState';
 export * from './explainability';
 export * from './constitution';

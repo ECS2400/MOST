@@ -22,5 +22,15 @@ export function chooseGoalTransition(
     return 'prepare_advance';
   }
 
+  const gc = ctx.goalContinuityContext;
+  if (gc && !ctx.safetyActive && gc.confidence >= 40) {
+    if (gc.recommendedGoalTransition === 'advance' || gc.recommendedGoalTransition === 'closure') {
+      return 'prepare_advance';
+    }
+    if (gc.recommendedGoalTransition === 'regress') {
+      return 'regress';
+    }
+  }
+
   return 'stay';
 }

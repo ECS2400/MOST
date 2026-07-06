@@ -20,5 +20,10 @@ export function buildContextSummary(ctx: SafePromptContext): string {
     parts.push(`Continuity: ${hint}`);
   }
 
+  const goalHint = ctx.goalContinuityContext?.goalContinuityHint;
+  if (typeof goalHint === 'string' && goalHint.length > 0) {
+    parts.push(`Goal continuity: ${goalHint}`);
+  }
+
   return parts.join(' ');
 }

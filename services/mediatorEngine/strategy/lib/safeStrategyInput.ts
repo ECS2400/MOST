@@ -2,6 +2,7 @@ import type {
   ConversationPace,
   DynamicsSignalBundle,
   EmotionalLoadState,
+  GoalContinuityContext,
   RecoveryState,
   ReflectionOutput,
   SafetyLevel,
@@ -38,6 +39,7 @@ export interface SafeStrategyContext {
   pauseRecommended: boolean;
   bothReady: boolean;
   previousPrimaryStrategy: TherapeuticStrategy | null;
+  goalContinuityContext: GoalContinuityContext | null;
 }
 
 function readBool(
@@ -165,6 +167,10 @@ export function safeStrategyInput(input: unknown): SafeStrategyContext {
     pauseRecommended,
     bothReady: hostReady && partnerReady,
     previousPrimaryStrategy: getPreviousPrimaryStrategy(sessionMemory),
+    goalContinuityContext:
+      raw.goalContinuityContext && typeof raw.goalContinuityContext === 'object'
+        ? raw.goalContinuityContext
+        : null,
   };
 }
 

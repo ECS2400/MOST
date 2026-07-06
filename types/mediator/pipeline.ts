@@ -19,6 +19,7 @@ import type { MediationState } from './mediationState';
 import type { PriorityOutput } from './priority';
 import type { ReflectionOutput, TranscriptMessage } from './reflection';
 import type { SafetyOutput } from './safety';
+import type { GoalContinuityContext } from './goalContinuity';
 import type { ContinuityContext } from './continuity';
 import type { SessionMemory } from './sessionMemory';
 import type { InterventionIntent, StrategyEngineOutput } from './strategyEngineIo';
@@ -93,6 +94,8 @@ export interface DecisionEngineInput {
   sessionMemory?: SessionMemory;
   /** Structural continuity hints — no transcript or PII. */
   continuityContext?: ContinuityContext;
+  /** Structural goal-stage hints — no transcript or PII. */
+  goalContinuityContext?: GoalContinuityContext;
 }
 
 /** Output of Decision Engine pipeline step. */

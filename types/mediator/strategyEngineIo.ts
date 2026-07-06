@@ -16,6 +16,7 @@ import type {
   TherapeuticIntent,
   TherapeuticStrategy,
 } from './engineTypes';
+import type { GoalContinuityContext } from './goalContinuity';
 import type { OutcomeCheck, SessionObjectives } from './goals';
 import type { SessionPersonality } from './personality';
 import type { ReflectionOutput } from './reflection';
@@ -48,6 +49,8 @@ export interface StrategyEngineInput {
   reflection: ReflectionOutput;
   safety: SafetyOutput | null;
   turnNumber: TurnNumber;
+  /** Structural goal-stage hints — no transcript or PII. */
+  goalContinuityContext?: GoalContinuityContext;
 }
 
 /** Output contract for Therapeutic Strategy Engine. */

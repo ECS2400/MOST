@@ -26,7 +26,30 @@ export function chooseGoalTransition(input: DecisionEngineInput): Explainability
     return 'stay';
   }
 
-  return mapSuggestedGoalTransition(input.strategy?.suggestedGoalTransition);
+  const fromStrategy = mapSuggestedGoalTransition(input.strategy?.suggestedGoalTransition);
+  const gc = input.goalContinuityContext;
+
+  if (
+    fromStrategy === 'stay' &&
+    gc &&
+    gc.confidence >= 40 &&
+    gc.completionDetected &&
+    (gc.recommendedGoalTransition === 'advance' || gc.recommendedGoalTransition === 'closure')
+  ) {
+    // closure has no ExplainabilityGoalTransition value — map to advance toward next goal
+    return 'advance';
+  }
+
+  if (
+    fromStrategy === 'stay' &&
+    gc &&
+    gc.confidence >= 40 &&
+    gc.recommendedGoalTransition === 'regress'
+  ) {
+    return 'regress';
+  }
+
+  return fromStrategy;
 }
 
 /** Whether safety mode is active for this turn. */

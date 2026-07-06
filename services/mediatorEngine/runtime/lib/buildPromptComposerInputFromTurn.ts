@@ -9,6 +9,7 @@ import type {
 } from '@/types/mediator';
 import { makeDecision } from '@/services/mediatorEngine/decision/makeDecision';
 import { buildContinuityContext } from '@/services/mediatorEngine/memory/continuity';
+import { buildGoalContinuityContext } from '@/services/mediatorEngine/goalContinuity';
 import { runReflection } from '@/services/mediatorEngine/reflection/runReflection';
 import { resolvePriority } from '@/services/mediatorEngine/priority/resolvePriority';
 import { evaluateSafety } from '@/services/mediatorEngine/safety/evaluateSafety';
@@ -88,11 +89,20 @@ export function buildPromptComposerInputFromTurn(
     goalChecksDelta: [],
   });
 
+  const goalContinuityContext = buildGoalContinuityContext({
+    state,
+    sessionMemory,
+    reflection: reflectionOutput,
+    safety: safetyOutput,
+    turnNumber,
+  });
+
   const strategyOutput = selectStrategy({
     state: buildStrategyStateContext(state, sessionMemory),
     reflection: reflectionOutput,
     safety: safetyOutput,
     turnNumber,
+    goalContinuityContext,
   });
 
   const priorityOutput = resolvePriority({
@@ -117,6 +127,7 @@ export function buildPromptComposerInputFromTurn(
     turnNumber,
     sessionMemory,
     continuityContext,
+    goalContinuityContext,
   });
 
   return {
@@ -133,6 +144,7 @@ export function buildPromptComposerInputFromTurn(
     language,
     turnNumber,
     continuityContext,
+    goalContinuityContext,
   };
 }
 
