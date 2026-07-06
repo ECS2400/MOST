@@ -6,7 +6,9 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type { DecisionEngineInput, InterventionType } from '@/types/mediator';
+import type { DecisionEngineInput, InterventionType, TherapeuticStrategy } from '@/types/mediator';
+import { STRATEGY_INTERVENTION_COMPATIBILITY } from '@/services/mediatorEngine/constitution/config/strategyInterventionMap';
+import { SAFE_FALLBACK_INTERVENTION_ORDER } from '@/services/mediatorEngine/decision/config/interventionFallbacks';
 import { isForbiddenIntervention } from '@/services/mediatorEngine/decision/lib/isForbiddenIntervention';
 import { makeDecision } from '@/services/mediatorEngine/decision/makeDecision';
 import {
@@ -339,18 +341,76 @@ describe('makeDecision — safety via conversationMode', () => {
 });
 
 describe('makeDecision — invariant helpers', () => {
-  it('selected type is always one of allowed or default fallback set', () => {
+  function assertStrategyCompatible(
+    selected: InterventionType,
+    strategy: TherapeuticStrategy
+  ): void {
+    const compatible = STRATEGY_INTERVENTION_COMPATIBILITY[strategy] ?? [];
+    assert.ok(
+      compatible.includes(selected),
+      `Expected ${selected} compatible with ${strategy}, allowed: ${compatible.join(', ')}`
+    );
+  }
+
+  it('selected type is strategy-compatible and not forbidden', () => {
     const allowed: InterventionType[] = ['mirror', 'reframe'];
+    const forbidden: InterventionType[] = ['validate'];
+    const strategy = 'build_safety';
+
     const result = makeDecision(
       createDecisionInput({
+        strategy: createBaselineStrategyOutput({ primaryStrategy: strategy }),
         priority: createBaselinePriorityOutput({
           recommendedInterventionType: 'validate',
           allowedInterventionTypes: allowed,
-          forbiddenInterventionTypes: ['validate'],
+          forbiddenInterventionTypes: forbidden,
         }),
       })
     );
 
-    assert.ok(allowed.includes(result.selectedInterventionType));
+    assert.equal(result.strategy, strategy);
+    assert.ok(!isForbiddenIntervention(result.selectedInterventionType, forbidden));
+    assertStrategyCompatible(result.selectedInterventionType, strategy);
+    // mirror/reframe are incompatible with build_safety — safe fallback, not blind allowed pick
+    assert.equal(result.selectedInterventionType, 'reflect');
+  });
+
+  it('prefers allowed type when it is strategy-compatible', () => {
+    const result = makeDecision(
+      createDecisionInput({
+        strategy: createBaselineStrategyOutput({ primaryStrategy: 'build_safety' }),
+        priority: createBaselinePriorityOutput({
+          recommendedInterventionType: 'validate',
+          allowedInterventionTypes: ['validate', 'reflect', 'mirror'],
+          forbiddenInterventionTypes: [],
+        }),
+      })
+    );
+
+    assert.equal(result.selectedInterventionType, 'validate');
+    assertStrategyCompatible(result.selectedInterventionType, 'build_safety');
+  });
+
+  it('when allowed has only strategy-incompatible types, picks compatible safe fallback', () => {
+    const allowed: InterventionType[] = ['mirror', 'open_deepen', 'choice_emotion'];
+    const strategy = 'build_safety';
+
+    const result = makeDecision(
+      createDecisionInput({
+        strategy: createBaselineStrategyOutput({ primaryStrategy: strategy }),
+        priority: createBaselinePriorityOutput({
+          recommendedInterventionType: 'mirror',
+          allowedInterventionTypes: allowed,
+          forbiddenInterventionTypes: [],
+        }),
+      })
+    );
+
+    assertStrategyCompatible(result.selectedInterventionType, strategy);
+    const expectedFallback = SAFE_FALLBACK_INTERVENTION_ORDER.find((type) =>
+      (STRATEGY_INTERVENTION_COMPATIBILITY[strategy] ?? []).includes(type)
+    );
+    assert.equal(result.selectedInterventionType, expectedFallback);
+    assert.ok(!allowed.includes(result.selectedInterventionType));
   });
 });
