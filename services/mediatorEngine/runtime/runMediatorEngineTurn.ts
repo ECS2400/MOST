@@ -27,13 +27,18 @@ export async function runMediatorEngineTurn(
   try {
     const ctx = safeRuntimeInput(input);
 
+    const turnInput = {
+      ...ctx.turnInput,
+      language: ctx.language,
+    };
+
     const orchestratedTurn = orchestrateTurn({
-      request: ctx.turnInput,
+      request: turnInput,
       sessionMemory: ctx.sessionMemory,
     });
 
     const promptInput = buildPromptComposerInputFromTurn(
-      ctx.turnInput,
+      turnInput,
       ctx.sessionMemory,
       orchestratedTurn,
       ctx.language
@@ -50,9 +55,23 @@ export async function runMediatorEngineTurn(
     });
 
     const finalDraft = resolveFinalDraftReply(retryResult.responseValidation);
+    const complianceOk = orchestratedTurn.complianceResult.compliant;
+    const validationAction = complianceOk
+      ? retryResult.responseValidation.action
+      : 'fallback';
+    const replyForFinal =
+      complianceOk
+        ? finalDraft
+        : createFallbackMediatorReply(
+            ctx.language,
+            safetyLevel,
+            ctx.turnInput.turnNumber,
+            orchestratedTurn.complianceResult.violations.map((v) => v.ruleId)
+          );
+
     const finalMediatorMessage = buildFinalMediatorMessage(
-      finalDraft,
-      retryResult.responseValidation.action,
+      replyForFinal,
+      validationAction,
       ctx.language,
       safetyLevel,
       ctx.turnInput.turnNumber

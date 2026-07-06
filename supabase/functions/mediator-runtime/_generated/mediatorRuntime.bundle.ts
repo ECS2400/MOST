@@ -72,11 +72,6 @@ function getInterventionSignature(intervention) {
   const signature = intervention.signature;
   return typeof signature === "string" ? signature : "";
 }
-function getDoNotRepeatBefore(intervention) {
-  if (!intervention || typeof intervention !== "object") return void 0;
-  const value = intervention.doNotRepeatBefore;
-  return typeof value === "number" ? value : void 0;
-}
 function getInterventionCoreFields(intervention) {
   if (!intervention || typeof intervention !== "object") {
     return { strategy: null, type: null, goal: null, intent: null };
@@ -101,13 +96,6 @@ function getObservableSignals(effect) {
 var RULE_ID = "l1.duplicate_intervention";
 function validateDuplicateIntervention(ctx) {
   const signature = getInterventionSignature(ctx.intervention);
-  const doNotRepeatBefore = getDoNotRepeatBefore(ctx.intervention);
-  if (doNotRepeatBefore !== void 0 && ctx.turnNumber < doNotRepeatBefore) {
-    return createViolation(
-      RULE_ID,
-      `turn ${ctx.turnNumber} < doNotRepeatBefore ${doNotRepeatBefore}`
-    );
-  }
   if (signature && ctx.recentInterventionSignatures.includes(signature)) {
     return createViolation(RULE_ID, signature);
   }
@@ -621,11 +609,22 @@ function safetyTypesInPermitted(permitted) {
   const safetySet = new Set(SAFETY_FALLBACK_INTERVENTION_ORDER);
   return permitted.filter((type) => safetySet.has(type));
 }
-function chooseInterventionType(priority, overrideRecommended, safetyMode = false) {
+function filterByStrategyCompatibility(permitted, strategy) {
+  if (!strategy) return permitted;
+  const compatible = STRATEGY_INTERVENTION_COMPATIBILITY[strategy];
+  if (!compatible?.length) return permitted;
+  const compatibleSet = new Set(compatible);
+  const filtered = permitted.filter((type) => compatibleSet.has(type));
+  return filtered.length > 0 ? filtered : [...compatible];
+}
+function chooseInterventionType(priority, overrideRecommended, safetyMode = false, primaryStrategy) {
   const allowedRaw = normalizeInterventionTypes(priority?.allowedInterventionTypes);
   const allowed = allowedRaw.length > 0 ? allowedRaw : safetyMode ? [...DEFAULT_SAFETY_ALLOWED_INTERVENTIONS] : [...DEFAULT_ALLOWED_INTERVENTIONS];
   const forbidden = normalizeInterventionTypes(priority?.forbiddenInterventionTypes);
-  const permitted = permittedTypes(allowed, forbidden);
+  const permitted = filterByStrategyCompatibility(
+    permittedTypes(allowed, forbidden),
+    safetyMode ? "build_safety" : primaryStrategy
+  );
   const fallbackOrder = safetyMode ? SAFETY_FALLBACK_INTERVENTION_ORDER : SAFE_FALLBACK_INTERVENTION_ORDER;
   const recommended = overrideRecommended ?? (typeof priority?.recommendedInterventionType === "string" ? priority.recommendedInterventionType : void 0);
   if (recommended && isAllowedIntervention(recommended, permitted) && !isForbiddenIntervention(recommended, forbidden)) {
@@ -794,7 +793,8 @@ function buildDecisionOutput(input) {
   const interventionChoice = chooseInterventionType(
     input.priority,
     safetyActive ? resolveSafetyRecommendedType(input) : void 0,
-    safetyActive
+    safetyActive,
+    primaryStrategy
   );
   const goalTransition = chooseGoalTransition(input);
   const goalTransitionBlocked = isGoalTransitionBlocked({
@@ -1164,6 +1164,9 @@ function createEmptySessionMemory() {
     reflectionLog: []
   };
 }
+function resolveRequestLanguage(request) {
+  return request.language ?? "en";
+}
 function createEmptyMediationState(request) {
   const evidenceStore = createEmptyEvidenceStore();
   return {
@@ -1171,7 +1174,7 @@ function createEmptyMediationState(request) {
       schemaVersion: "2.3",
       sessionId: request.sessionId,
       mediationId: request.mediationId,
-      language: "pl",
+      language: resolveRequestLanguage(request),
       startedAt: SKELETON_TIMESTAMP,
       lastUpdatedAt: SKELETON_TIMESTAMP,
       currentTurnNumber: request.turnNumber
@@ -3647,7 +3650,7 @@ function createInitialMediationState(input) {
       schemaVersion: "2.3",
       sessionId,
       mediationId,
-      language: input.language ?? "pl",
+      language: input.language ?? "en",
       startedAt,
       lastUpdatedAt: startedAt,
       currentTurnNumber: turnNumber
@@ -4176,7 +4179,13 @@ function orchestrateTurn(input) {
     transcriptDelta: request.transcriptDelta,
     turnNumber: request.turnNumber
   });
-  const state = stateAnalyzerOutput.updatedState;
+  let state = stateAnalyzerOutput.updatedState;
+  if (request.language && state.meta.language !== request.language) {
+    state = {
+      ...state,
+      meta: { ...state.meta, language: request.language }
+    };
+  }
   const safetyOutput = evaluateSafety({
     state,
     transcriptDelta: request.transcriptDelta,
@@ -4227,7 +4236,8 @@ function orchestrateTurn(input) {
     intervention,
     applicableRules: [],
     turnNumber: request.turnNumber,
-    attemptNumber: 1
+    attemptNumber: 1,
+    recentInterventionSignatures: sessionMemory.askedInterventionSignatures ?? []
   });
   const updatedSessionMemory = updateSessionMemory({
     previousMemory: sessionMemory,
@@ -5904,12 +5914,16 @@ async function runMediatorEngineTurn(input) {
   const startedAt = (/* @__PURE__ */ new Date()).toISOString();
   try {
     const ctx = safeRuntimeInput(input);
+    const turnInput = {
+      ...ctx.turnInput,
+      language: ctx.language
+    };
     const orchestratedTurn = orchestrateTurn({
-      request: ctx.turnInput,
+      request: turnInput,
       sessionMemory: ctx.sessionMemory
     });
     const promptInput = buildPromptComposerInputFromTurn(
-      ctx.turnInput,
+      turnInput,
       ctx.sessionMemory,
       orchestratedTurn,
       ctx.language
@@ -5923,9 +5937,17 @@ async function runMediatorEngineTurn(input) {
       turnNumber: ctx.turnInput.turnNumber
     });
     const finalDraft = resolveFinalDraftReply(retryResult.responseValidation);
+    const complianceOk = orchestratedTurn.complianceResult.compliant;
+    const validationAction = complianceOk ? retryResult.responseValidation.action : "fallback";
+    const replyForFinal = complianceOk ? finalDraft : createFallbackMediatorReply(
+      ctx.language,
+      safetyLevel,
+      ctx.turnInput.turnNumber,
+      orchestratedTurn.complianceResult.violations.map((v) => v.ruleId)
+    );
     const finalMediatorMessage = buildFinalMediatorMessage(
-      finalDraft,
-      retryResult.responseValidation.action,
+      replyForFinal,
+      validationAction,
       ctx.language,
       safetyLevel,
       ctx.turnInput.turnNumber
@@ -6297,7 +6319,8 @@ function toOrchestrateTurnRequest(request) {
     turnNumber: request.turnNumber,
     mediationState: request.mediationState,
     transcriptDelta: request.transcriptDelta,
-    engineVersion: "v2.3"
+    engineVersion: "v2.3",
+    language: request.language
   };
 }
 

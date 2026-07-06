@@ -64,6 +64,10 @@ export function createEmptySessionMemory(): SessionMemory {
   };
 }
 
+function resolveRequestLanguage(request: OrchestrateTurnRequest): MediationState['meta']['language'] {
+  return request.language ?? 'en';
+}
+
 /** Placeholder mediation state when none exists yet (session_start). */
 export function createEmptyMediationState(request: OrchestrateTurnRequest): MediationState {
   const evidenceStore = createEmptyEvidenceStore();
@@ -72,7 +76,7 @@ export function createEmptyMediationState(request: OrchestrateTurnRequest): Medi
       schemaVersion: '2.3',
       sessionId: request.sessionId,
       mediationId: request.mediationId,
-      language: 'pl',
+      language: resolveRequestLanguage(request),
       startedAt: SKELETON_TIMESTAMP,
       lastUpdatedAt: SKELETON_TIMESTAMP,
       currentTurnNumber: request.turnNumber,

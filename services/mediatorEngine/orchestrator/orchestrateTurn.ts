@@ -115,7 +115,13 @@ export function orchestrateTurn(input: MediatorEngineTurnInput): OrchestrateTurn
     turnNumber: request.turnNumber,
   });
 
-  const state = stateAnalyzerOutput.updatedState;
+  let state = stateAnalyzerOutput.updatedState;
+  if (request.language && state.meta.language !== request.language) {
+    state = {
+      ...state,
+      meta: { ...state.meta, language: request.language },
+    };
+  }
 
   const safetyOutput = evaluateSafety({
     state,
@@ -174,6 +180,7 @@ export function orchestrateTurn(input: MediatorEngineTurnInput): OrchestrateTurn
     applicableRules: [],
     turnNumber: request.turnNumber,
     attemptNumber: 1,
+    recentInterventionSignatures: sessionMemory.askedInterventionSignatures ?? [],
   });
 
   const updatedSessionMemory = updateSessionMemory({

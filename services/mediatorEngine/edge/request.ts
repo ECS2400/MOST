@@ -154,6 +154,7 @@ export function toOrchestrateTurnRequest(
     mediationState: request.mediationState,
     transcriptDelta: request.transcriptDelta,
     engineVersion: 'v2.3',
+    language: request.language,
   };
 }
 

@@ -183,7 +183,15 @@ describe('validateDuplicateText', () => {
 });
 
 describe('validateDuplicateIntervention', () => {
-  it('passes when repeat window has elapsed', () => {
+  it('passes for freshly generated intervention with doNotRepeatBefore ahead of current turn', () => {
+    const ctx = createL1Context(
+      createValidIntervention({ signature: 'sig-a', doNotRepeatBefore: 5 }),
+      { turnNumber: 1, recentInterventionSignatures: [] }
+    );
+    assert.equal(validateDuplicateIntervention(ctx), null);
+  });
+
+  it('passes when repeat window has elapsed and signature not in recent list', () => {
     const ctx = createL1Context(
       createValidIntervention({ signature: 'sig-a', doNotRepeatBefore: 3 }),
       { turnNumber: 5, recentInterventionSignatures: ['sig-b'] }
@@ -191,12 +199,18 @@ describe('validateDuplicateIntervention', () => {
     assert.equal(validateDuplicateIntervention(ctx), null);
   });
 
-  it('fails when turn is before doNotRepeatBefore', () => {
-    const ctx = createL1Context(
-      createValidIntervention({ doNotRepeatBefore: 8 }),
-      { turnNumber: 5 }
+  it('does not block current intervention solely because doNotRepeatBefore > turnNumber', () => {
+    const result = validateConstitution({
+      intervention: createValidIntervention({ doNotRepeatBefore: 5 }),
+      applicableRules: [],
+      turnNumber: 1,
+      attemptNumber: 1,
+      recentInterventionSignatures: [],
+    });
+    assert.equal(
+      result.violations.some((v) => v.ruleId === 'l1.duplicate_intervention'),
+      false
     );
-    assert.equal(validateDuplicateIntervention(ctx)?.ruleId, 'l1.duplicate_intervention');
   });
 
   it('fails when signature was recently used', () => {

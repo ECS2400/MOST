@@ -201,6 +201,33 @@ describe('mediator-runtime edge — runtime handler', () => {
     }
   });
 
+  it("language=en + mediationState=null propaguje en do mediationState.meta.language", async () => {
+    const result = await handleMediatorRuntimeTurn(
+      validRequestBody({ language: 'en', mediationState: null, turnNumber: 1, trigger: 'session_start' }),
+      { llmProviderOverride: createDeterministicStubProvider() }
+    );
+
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.finalMediatorMessage.language, 'en');
+      assert.equal(result.mediationState.meta.language, 'en');
+      assert.equal(result.complianceResult.compliant, true);
+    }
+  });
+
+  it("language=it + mediationState=null propaguje it do mediationState.meta.language", async () => {
+    const result = await handleMediatorRuntimeTurn(
+      validRequestBody({ language: 'it', mediationState: null, turnNumber: 1, trigger: 'session_start' }),
+      { llmProviderOverride: createDeterministicStubProvider() }
+    );
+
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.finalMediatorMessage.language, 'it');
+      assert.equal(result.mediationState.meta.language, 'it');
+    }
+  });
+
   it('missing OPENAI_API_KEY → controlled error missing_openai_api_key', async () => {
     const result = await handleMediatorRuntimeTurn(validRequestBody(), { env: {} });
 

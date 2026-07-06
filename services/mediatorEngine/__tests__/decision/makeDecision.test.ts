@@ -253,6 +253,25 @@ describe('makeDecision — L1 deterministic rules', () => {
 
     assert.equal(result.goalTransition, 'regress');
   });
+
+  it('hold_space strategy nie wybiera deescalate gdy escalation sygnal rekomenduje deescalate', () => {
+    const result = makeDecision(
+      createDecisionInput({
+        strategy: createBaselineStrategyOutput({ primaryStrategy: 'hold_space' }),
+        priority: createBaselinePriorityOutput({
+          conversationMode: 'DE_ESCALATING',
+          recommendedInterventionType: 'deescalate',
+          allowedInterventionTypes: ['pause_session', 'validate', 'reflect'],
+          forbiddenInterventionTypes: [],
+          preemptsGoalTransition: true,
+        }),
+      })
+    );
+
+    assert.equal(result.strategy, 'hold_space');
+    assert.notEqual(result.selectedInterventionType, 'deescalate');
+    assert.ok(['validate', 'reflect', 'pause_session'].includes(result.selectedInterventionType));
+  });
 });
 
 describe('makeDecision — safety fallback order', () => {

@@ -173,6 +173,63 @@ describe('runMediatorEngineTurn — engine runtime', () => {
     assert.ok(direct.intervention);
     assert.equal(typeof direct.complianceResult.compliant, 'boolean');
   });
+
+  it('propaguje language=en do mediationState gdy mediationState=null', async () => {
+    const result = await runMediatorEngineTurn({
+      turnInput: {
+        mediationId: 'lang-mediation',
+        sessionId: 'lang-session',
+        trigger: 'session_start',
+        turnNumber: 1,
+        mediationState: null,
+        transcriptDelta: [],
+        engineVersion: 'v2.3',
+      },
+      sessionMemory: createEmptySessionMemory(),
+      language: 'en',
+    });
+
+    assert.equal(result.finalMediatorMessage.language, 'en');
+    assert.equal(result.orchestratedTurn.mediationState.meta.language, 'en');
+  });
+
+  it('propaguje language=it do mediationState gdy mediationState=null', async () => {
+    const result = await runMediatorEngineTurn({
+      turnInput: {
+        mediationId: 'lang-mediation-it',
+        sessionId: 'lang-session-it',
+        trigger: 'session_start',
+        turnNumber: 1,
+        mediationState: null,
+        transcriptDelta: [],
+        engineVersion: 'v2.3',
+      },
+      sessionMemory: createEmptySessionMemory(),
+      language: 'it',
+    });
+
+    assert.equal(result.finalMediatorMessage.language, 'it');
+    assert.equal(result.orchestratedTurn.mediationState.meta.language, 'it');
+  });
+
+  it('normal smoke request ma complianceResult.compliant=true', async () => {
+    const result = await runMediatorEngineTurn({
+      turnInput: {
+        mediationId: 'smoke-mediation',
+        sessionId: 'smoke-session',
+        trigger: 'session_start',
+        turnNumber: 1,
+        mediationState: null,
+        transcriptDelta: [],
+        engineVersion: 'v2.3',
+      },
+      sessionMemory: createEmptySessionMemory(),
+      language: 'en',
+    });
+
+    assert.equal(result.orchestratedTurn.complianceResult.compliant, true);
+    assert.equal(result.finalMediatorMessage.accepted, true);
+  });
 });
 
 describe('runMediatorEngineTurn — fallback accepted', () => {

@@ -44,7 +44,8 @@ export function buildDecisionOutput(input: DecisionEngineInput): DecisionEngineO
   const interventionChoice = chooseInterventionType(
     input.priority,
     safetyActive ? resolveSafetyRecommendedType(input) : undefined,
-    safetyActive
+    safetyActive,
+    primaryStrategy
   );
 
   const goalTransition = chooseGoalTransition(input);

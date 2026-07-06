@@ -1,4 +1,5 @@
-import type { InterventionType, PriorityOutput } from '@/types/mediator';
+import type { InterventionType, PriorityOutput, TherapeuticStrategy } from '@/types/mediator';
+import { STRATEGY_INTERVENTION_COMPATIBILITY } from '@/services/mediatorEngine/constitution/config/strategyInterventionMap';
 import {
   DEFAULT_ALLOWED_INTERVENTIONS,
   DEFAULT_SAFETY_ALLOWED_INTERVENTIONS,
@@ -41,11 +42,24 @@ export interface ChooseInterventionTypeResult {
   fallbackUsed: boolean;
 }
 
+function filterByStrategyCompatibility(
+  permitted: InterventionType[],
+  strategy: TherapeuticStrategy | undefined
+): InterventionType[] {
+  if (!strategy) return permitted;
+  const compatible = STRATEGY_INTERVENTION_COMPATIBILITY[strategy];
+  if (!compatible?.length) return permitted;
+  const compatibleSet = new Set<InterventionType>(compatible);
+  const filtered = permitted.filter((type) => compatibleSet.has(type));
+  return filtered.length > 0 ? filtered : [...compatible];
+}
+
 /** Selects an intervention type respecting priority allowed/forbidden constraints. */
 export function chooseInterventionType(
   priority: PriorityOutput | null | undefined,
   overrideRecommended?: InterventionType,
-  safetyMode = false
+  safetyMode = false,
+  primaryStrategy?: TherapeuticStrategy
 ): ChooseInterventionTypeResult {
   const allowedRaw = normalizeInterventionTypes(priority?.allowedInterventionTypes);
   const allowed =
@@ -55,7 +69,10 @@ export function chooseInterventionType(
         ? [...DEFAULT_SAFETY_ALLOWED_INTERVENTIONS]
         : [...DEFAULT_ALLOWED_INTERVENTIONS];
   const forbidden = normalizeInterventionTypes(priority?.forbiddenInterventionTypes);
-  const permitted = permittedTypes(allowed, forbidden);
+  const permitted = filterByStrategyCompatibility(
+    permittedTypes(allowed, forbidden),
+    safetyMode ? 'build_safety' : primaryStrategy
+  );
   const fallbackOrder = safetyMode
     ? SAFETY_FALLBACK_INTERVENTION_ORDER
     : SAFE_FALLBACK_INTERVENTION_ORDER;

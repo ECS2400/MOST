@@ -4,7 +4,7 @@
  * Role: request/response shapes for orchestrate_turn edge function.
  */
 
-import type { MediationId, SessionId, TurnNumber } from './common';
+import type { MediationId, MediatorLang, SessionId, TurnNumber } from './common';
 import type { ComplianceResult } from './constitution';
 import type { EvidenceStore } from './evidence';
 import type {
@@ -45,6 +45,8 @@ export interface OrchestrateTurnRequest {
   mediationState: MediationState | null;
   transcriptDelta: TranscriptMessage[];
   engineVersion: MediatorEngineVersion;
+  /** Session language from edge/runtime input — propagated into MediationState.meta.language. */
+  language?: MediatorLang;
 }
 
 /**

@@ -1,6 +1,7 @@
 import type {
   MediationId,
   MediationState,
+  MediatorLang,
   OrchestrateTurnRequest,
   OrchestrateTurnTrigger,
   SessionId,
@@ -13,7 +14,7 @@ export interface CreateInitialMediationStateInput {
   mediationId?: MediationId;
   sessionId?: SessionId;
   trigger?: OrchestrateTurnTrigger;
-  language?: 'pl' | 'en';
+  language?: MediatorLang;
 }
 
 /** Creates a fresh MediationState for the first turn of a session. */
@@ -30,7 +31,7 @@ export function createInitialMediationState(input: CreateInitialMediationStateIn
       schemaVersion: '2.3',
       sessionId,
       mediationId,
-      language: input.language ?? 'pl',
+      language: input.language ?? 'en',
       startedAt,
       lastUpdatedAt: startedAt,
       currentTurnNumber: turnNumber,
