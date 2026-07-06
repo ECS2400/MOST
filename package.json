@@ -28,6 +28,8 @@
     "test:mediator:integration": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/integration/*.test.ts",
     "test:mediator:edge": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/edge/*.test.ts",
     "test:mediator:production": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test-timeout=180000 --test services/mediatorEngine/__tests__/production/*.test.ts",
+    "test:mediator:smoke-runner": "node --test services/mediatorEngine/__tests__/smoke/*.test.mjs",
+    "smoke:mediator-runtime": "node scripts/smoke-mediator-runtime.mjs",
     "build:mediator:edge": "node scripts/build-mediator-runtime-edge.mjs",
     "test:mediator:edge:bundle": "npm run build:mediator:edge && npm run test:mediator:edge"
   },
