@@ -52,3 +52,19 @@ export {
 export type { MediatorRuntimeRetryOptions } from '@/services/mediatorRuntimeClient/retry';
 
 export type { QuestionTarget } from '@/services/mediatorRuntimeClient/types';
+
+export {
+  chooseLiveMediatorEnginePath,
+  buildLiveRuntimeTurnInput,
+  routeLiveMediatorTurn,
+  toRuntimeLanguage,
+  resolveRuntimeTrigger,
+  logMediatorRuntimeRolloutFailure,
+} from '@/services/mediatorRuntimeClient/liveMediationBridge';
+export type {
+  LiveRuntimeTurnParams,
+  LiveMediatorEnginePath,
+  LiveMediatorRoutingDeps,
+  MediatorRuntimeRolloutFailurePayload,
+  MediatorRuntimeRolloutFailureLogger,
+} from '@/services/mediatorRuntimeClient/liveMediationBridge';

@@ -17,6 +17,13 @@ import {
 } from '@/services/liveMediationI18n';
 import { fmt } from '@/utils/i18nFormat';
 import { looksLikePolishCoachText } from '@/utils/textTruncate';
+import { isMediatorRuntimeEnabled } from '@/services/mediatorRuntimeClient/mediatorRuntimeConfig';
+import { callMediatorRuntimeForLiveFlow } from '@/services/mediatorRuntimeClient/mediatorRuntimeClient';
+import {
+  buildLiveRuntimeTurnInput,
+  logMediatorRuntimeRolloutFailure,
+  routeLiveMediatorTurn,
+} from '@/services/mediatorRuntimeClient/liveMediationBridge';
 
 function liveStrings(lang: Language = 'pl') {
   return getLiveMediationExtras(lang).service;
@@ -4134,55 +4141,78 @@ export async function processMediationTurn(
     .filter((m) => m.message_type === 'message' && m.content.trim())
     .at(-1);
 
-  try {
-    const result = await callEdge<LiveMediatorResponse>(EDGE.liveMediator, {
-      mediationId: triggerMessage.mediation_id,
-      userId: hostUserId,
-      message: triggerMessage.content,
+  const legacyPayload = {
+    mediationId: triggerMessage.mediation_id,
+    userId: hostUserId,
+    message: triggerMessage.content,
+    senderId: triggerMessage.sender_id,
+    lastMessage: lastUserMessage?.content ?? triggerMessage.content,
+    mode,
+    phase: currentPhase,
+    questionNumber,
+    questionIndex: currentQuestionIndex,
+    questionPhase,
+    extensionActive,
+    state: conversationState,
+    combinedDescription,
+    partnerCombinedDescription,
+    analysisSummary,
+    priorAgreements: mediationContext?.priorAgreements || undefined,
+    triggerMessage: {
+      content: triggerMessage.content,
       senderId: triggerMessage.sender_id,
-      lastMessage: lastUserMessage?.content ?? triggerMessage.content,
-      mode,
-      phase: currentPhase,
-      questionNumber,
-      questionIndex: currentQuestionIndex,
-      questionPhase,
-      extensionActive,
-      state: conversationState,
-      combinedDescription,
-      partnerCombinedDescription,
-      analysisSummary,
-      priorAgreements: mediationContext?.priorAgreements || undefined,
-      triggerMessage: {
-        content: triggerMessage.content,
-        senderId: triggerMessage.sender_id,
-        senderRole,
-      },
-      recentMessages: allMessages.slice(-40).map((m) => ({
-        sender_id: m.sender_id,
-        content: m.content,
-        message_type: m.message_type,
-        metadata: m.metadata
-          ? {
-              replyToQuestionId:
-                typeof m.metadata.replyToQuestionId === 'string'
-                  ? m.metadata.replyToQuestionId
-                  : undefined,
-              questionId:
-                typeof m.metadata.questionId === 'string' ? m.metadata.questionId : undefined,
-              summaryKind:
-                typeof m.metadata.summaryKind === 'string' ? m.metadata.summaryKind : undefined,
-            }
-          : undefined,
-      })),
-      language: normalizeAppLanguage(language),
-      hostName: participantNames?.hostName,
-      partnerName: participantNames?.partnerName,
-      hostDescription: combinedDescription,
-      partnerDescription: partnerCombinedDescription,
-      partnerUserId: partnerUserIds[0] ?? undefined,
+      senderRole,
+    },
+    recentMessages: allMessages.slice(-40).map((m) => ({
+      sender_id: m.sender_id,
+      content: m.content,
+      message_type: m.message_type,
+      metadata: m.metadata
+        ? {
+            replyToQuestionId:
+              typeof m.metadata.replyToQuestionId === 'string'
+                ? m.metadata.replyToQuestionId
+                : undefined,
+            questionId:
+              typeof m.metadata.questionId === 'string' ? m.metadata.questionId : undefined,
+            summaryKind:
+              typeof m.metadata.summaryKind === 'string' ? m.metadata.summaryKind : undefined,
+          }
+        : undefined,
+    })),
+    language: normalizeAppLanguage(language),
+    hostName: participantNames?.hostName,
+    partnerName: participantNames?.partnerName,
+    hostDescription: combinedDescription,
+    partnerDescription: partnerCombinedDescription,
+    partnerUserId: partnerUserIds[0] ?? undefined,
+  };
+
+  const runtimeTurnInput = buildLiveRuntimeTurnInput({
+    mediationId: triggerMessage.mediation_id,
+    sessionId: triggerMessage.mediation_id,
+    triggerMessageId: triggerMessage.id,
+    triggerContent: triggerMessage.content,
+    triggerCreatedAt: triggerMessage.created_at,
+    mode,
+    senderRole,
+    language,
+    turnNumber: Math.max(1, questionNumber + 1),
+    isBootstrap: triggerMessage.metadata?.bootstrap === true,
+    mediationState: null,
+    sessionMemory: null,
+  });
+
+  try {
+    const result = await routeLiveMediatorTurn(runtimeTurnInput, {
+      isRuntimeEnabled: isMediatorRuntimeEnabled,
+      callRuntime: callMediatorRuntimeForLiveFlow,
+      callLegacy: () => callEdge<LiveMediatorResponse>(EDGE.liveMediator, legacyPayload),
+      onRuntimeFailure: logMediatorRuntimeRolloutFailure,
     });
 
     if (
+      result &&
       (result.publicMessage ||
         result.aiQuestion ||
         result.privateHint ||
