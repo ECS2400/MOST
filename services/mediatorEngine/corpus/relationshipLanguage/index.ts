@@ -8,8 +8,10 @@ export { HURT_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLangu
 export { ANGER_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/anger';
 export { WITHDRAWAL_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/withdrawal';
 export { DEFENSIVENESS_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/defensiveness';
+export { CRITICISM_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/criticism';
 
 import { ANGER_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/anger';
+import { CRITICISM_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/criticism';
 import { DEFENSIVENESS_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/defensiveness';
 import { HURT_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/hurt';
 import { WITHDRAWAL_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/withdrawal';
@@ -20,4 +22,5 @@ export const RELATIONSHIP_LANGUAGE_CORPUS: readonly RelationshipLanguageEntry[] 
   ...ANGER_ENTRIES,
   ...WITHDRAWAL_ENTRIES,
   ...DEFENSIVENESS_ENTRIES,
+  ...CRITICISM_ENTRIES,
 ] as const;
