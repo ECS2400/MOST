@@ -1,4 +1,4 @@
-export type RelationshipLanguageCategory = 'hurt' | 'anger';
+export type RelationshipLanguageCategory = 'hurt' | 'anger' | 'withdrawal';
 
 export type RelationshipLanguageIntensity = 1 | 2 | 3 | 4 | 5;
 
@@ -8,4 +8,6 @@ export interface RelationshipLanguageEntry {
   intensity: RelationshipLanguageIntensity;
   text: string;
   tags: string[];
+  likelyEmotion?: string;
+  likelyNeed?: string;
 }
