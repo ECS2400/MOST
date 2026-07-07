@@ -3,7 +3,8 @@ export type RelationshipLanguageCategory =
   | 'anger'
   | 'withdrawal'
   | 'defensiveness'
-  | 'criticism';
+  | 'criticism'
+  | 'fear';
 
 export type RelationshipLanguageIntensity = 1 | 2 | 3 | 4 | 5;
 
