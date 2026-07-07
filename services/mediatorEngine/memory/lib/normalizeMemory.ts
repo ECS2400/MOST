@@ -49,6 +49,9 @@ export function normalizeMemory(memory: Partial<SessionMemory> | null | undefine
     recentInterventionTypes: asArray(memory.recentInterventionTypes),
     askedInterventionSignatures: asArray(memory.askedInterventionSignatures),
     regressHistory: asArray(memory.regressHistory),
+    goalTransitionHistory: asArray(memory.goalTransitionHistory),
+    lastGoalTransitionReason:
+      typeof memory.lastGoalTransitionReason === 'string' ? memory.lastGoalTransitionReason : null,
     reflectionLog: asArray(memory.reflectionLog),
   };
 }

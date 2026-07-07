@@ -209,6 +209,8 @@ export function orchestrateTurn(input: MediatorEngineTurnInput): OrchestrateTurn
     reflection: reflectionOutput,
     complianceResult,
     turnNumber: request.turnNumber,
+    goalContinuityContext,
+    goalTransition: decisionOutput.goalTransition,
   });
 
   recordMetrics({

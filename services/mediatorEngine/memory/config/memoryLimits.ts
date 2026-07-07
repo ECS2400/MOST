@@ -8,6 +8,7 @@ export const SESSION_MEMORY_LIMITS = {
   maxClosedTopics: 20,
   maxOpenTopics: 20,
   maxRegressHistory: 20,
+  maxGoalTransitionHistory: 20,
   maxEffectivePatterns: 15,
   maxIneffectivePatterns: 15,
   maxConfirmedEmotions: 20,

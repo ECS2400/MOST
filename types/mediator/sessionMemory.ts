@@ -22,7 +22,9 @@ import type {
   TherapeuticStrategy,
 } from './engineTypes';
 import type { GoalTransition } from './goals';
+import type { ExplainabilityGoalTransition } from './engineTypes';
 import type { ComplianceResult } from './constitution';
+import type { GoalContinuityContext } from './goalContinuity';
 import type { ExpectedEffectEvaluation, Intervention } from './interventions';
 import type { MediationState } from './mediationState';
 import type { ReflectionOutput } from './reflection';
@@ -84,6 +86,10 @@ export interface SessionMemoryUpdateInput {
   reflection: ReflectionOutput;
   complianceResult: ComplianceResult;
   turnNumber: TurnNumber;
+  /** Structural goal continuity snapshot from the current turn. */
+  goalContinuityContext?: GoalContinuityContext | null;
+  /** Applied goal transition from Decision Engine. */
+  goalTransition?: ExplainabilityGoalTransition;
 }
 
 /**
@@ -105,6 +111,8 @@ export interface SessionMemory {
   recentInterventionTypes: InterventionType[];
   askedInterventionSignatures: InterventionSignature[];
   regressHistory: GoalTransition[];
+  goalTransitionHistory: GoalTransition[];
+  lastGoalTransitionReason: string | null;
   reflectionLog: SessionReflectionLogEntry[];
 }
 

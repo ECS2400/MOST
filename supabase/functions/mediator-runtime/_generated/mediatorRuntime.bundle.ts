@@ -942,6 +942,8 @@ function createEmptySessionMemory() {
     recentInterventionTypes: [],
     askedInterventionSignatures: [],
     regressHistory: [],
+    goalTransitionHistory: [],
+    lastGoalTransitionReason: null,
     reflectionLog: []
   };
 }
@@ -2054,6 +2056,7 @@ var SESSION_MEMORY_LIMITS = {
   maxClosedTopics: 20,
   maxOpenTopics: 20,
   maxRegressHistory: 20,
+  maxGoalTransitionHistory: 20,
   maxEffectivePatterns: 15,
   maxIneffectivePatterns: 15,
   maxConfirmedEmotions: 20,
@@ -2136,9 +2139,6 @@ function collectBreakthroughMemory(memory, input) {
 // services/mediatorEngine/memory/collect/collectGoalMemory.ts
 function asGoalStates(state) {
   return Array.isArray(state?.goals) ? state.goals : [];
-}
-function completedGoalsFromState(state) {
-  return asGoalStates(state).filter((goalState) => goalState?.status === "completed" && typeof goalState.goal === "string").map((goalState) => goalState.goal);
 }
 function closedTopicsFromState(state) {
   const closed = /* @__PURE__ */ new Set();
@@ -2262,7 +2262,6 @@ function collectGoalMemory(memory, input) {
   const confirmedNeeds = collectConfirmedNeeds(memory, state);
   return {
     ...memory,
-    completedGoals: completedGoalsFromState(state),
     closedTopics: mergeLimitedTopics(
       memory.closedTopics,
       closedTopicsFromState(state),
@@ -2277,6 +2276,86 @@ function collectGoalMemory(memory, input) {
     confirmedEmotions,
     confirmedNeeds,
     recurringNeeds: deriveRecurringNeeds(confirmedNeeds)
+  };
+}
+
+// services/mediatorEngine/memory/collect/collectGoalProgressMemory.ts
+function asGoalStates2(state) {
+  return Array.isArray(state?.goals) ? state.goals : [];
+}
+function completedGoalsFromState(state) {
+  return asGoalStates2(state).filter((goalState) => goalState?.status === "completed" && typeof goalState.goal === "string").map((goalState) => goalState.goal);
+}
+function priorGoalInFlow(current) {
+  const index = GOAL_FLOW_ORDER.indexOf(current);
+  if (index <= 0) return null;
+  return GOAL_FLOW_ORDER[index - 1] ?? null;
+}
+function resolveGoalTransitionReason(goalContinuityContext) {
+  if (!goalContinuityContext) return null;
+  if (goalContinuityContext.completionReason) return goalContinuityContext.completionReason;
+  if (goalContinuityContext.suggestedAdvanceReason) {
+    return goalContinuityContext.suggestedAdvanceReason;
+  }
+  if (goalContinuityContext.suggestedStayReason) return goalContinuityContext.suggestedStayReason;
+  return null;
+}
+function mergeCompletedGoals(memory, state, goalContinuityContext) {
+  const fromState = completedGoalsFromState(state);
+  const fromContinuity = goalContinuityContext?.completedGoals ?? memory.completedGoals;
+  return dedupeGoals([...fromState, ...fromContinuity]);
+}
+function resolveTransitionTargetGoal(goalContinuityContext, direction) {
+  if (goalContinuityContext.recommendedNextGoal) {
+    return goalContinuityContext.recommendedNextGoal;
+  }
+  if (direction === "advance") {
+    return nextGoalInFlow(goalContinuityContext.currentGoal);
+  }
+  return priorGoalInFlow(goalContinuityContext.currentGoal);
+}
+function buildAppliedGoalTransition(input) {
+  const { goalTransition, goalContinuityContext, state, turnNumber } = input;
+  if (!goalTransition || goalTransition === "stay" || !goalContinuityContext) {
+    return null;
+  }
+  const toGoal = resolveTransitionTargetGoal(goalContinuityContext, goalTransition);
+  if (!toGoal) return null;
+  const reason = resolveGoalTransitionReason(goalContinuityContext) ?? `Goal transition: ${goalTransition}`;
+  return {
+    fromGoal: goalContinuityContext.currentGoal,
+    toGoal,
+    direction: goalTransition,
+    turnNumber,
+    timestamp: state?.meta?.lastUpdatedAt ?? "1970-01-01T00:00:00.000Z",
+    reason,
+    triggeredBy: "decision_engine"
+  };
+}
+function appendGoalTransitionHistory(history, transition) {
+  const duplicate = history.some(
+    (existing) => existing.turnNumber === transition.turnNumber && existing.fromGoal === transition.fromGoal && existing.toGoal === transition.toGoal && existing.direction === transition.direction
+  );
+  if (duplicate) return [...history];
+  return appendLimited(history, transition, SESSION_MEMORY_LIMITS.maxGoalTransitionHistory);
+}
+function collectGoalProgressMemory(memory, input) {
+  const completedGoals = mergeCompletedGoals(memory, input.state, input.goalContinuityContext);
+  const appliedTransition = buildAppliedGoalTransition(input);
+  if (!appliedTransition) {
+    return {
+      ...memory,
+      completedGoals
+    };
+  }
+  return {
+    ...memory,
+    completedGoals,
+    goalTransitionHistory: appendGoalTransitionHistory(
+      memory.goalTransitionHistory,
+      appliedTransition
+    ),
+    lastGoalTransitionReason: resolveGoalTransitionReason(input.goalContinuityContext)
   };
 }
 
@@ -2440,6 +2519,8 @@ function normalizeMemory(memory) {
     recentInterventionTypes: asArray(memory.recentInterventionTypes),
     askedInterventionSignatures: asArray(memory.askedInterventionSignatures),
     regressHistory: asArray(memory.regressHistory),
+    goalTransitionHistory: asArray(memory.goalTransitionHistory),
+    lastGoalTransitionReason: typeof memory.lastGoalTransitionReason === "string" ? memory.lastGoalTransitionReason : null,
     reflectionLog: asArray(memory.reflectionLog)
   };
 }
@@ -2450,6 +2531,7 @@ function buildSessionMemoryUpdate(input) {
   memory = collectInterventionMemory(memory, input);
   memory = collectReflectionMemory(memory, input);
   memory = collectGoalMemory(memory, input);
+  memory = collectGoalProgressMemory(memory, input);
   memory = collectBreakthroughMemory(memory, input);
   return memory;
 }
@@ -4909,7 +4991,9 @@ function orchestrateTurn(input) {
     intervention,
     reflection: reflectionOutput,
     complianceResult,
-    turnNumber: request.turnNumber
+    turnNumber: request.turnNumber,
+    goalContinuityContext,
+    goalTransition: decisionOutput.goalTransition
   });
   recordMetrics({
     turnNumber: request.turnNumber,

@@ -4,7 +4,6 @@ import type {
   NeedLabel,
   SessionMemory,
   SessionMemoryUpdateInput,
-  TherapeuticGoal,
 } from '@/types/mediator';
 import { SESSION_MEMORY_LIMITS } from '@/services/mediatorEngine/memory/config/memoryLimits';
 import {
@@ -14,12 +13,6 @@ import {
 
 function asGoalStates(state: MediationState): GoalState[] {
   return Array.isArray(state?.goals) ? state.goals : [];
-}
-
-function completedGoalsFromState(state: MediationState): TherapeuticGoal[] {
-  return asGoalStates(state)
-    .filter((goalState) => goalState?.status === 'completed' && typeof goalState.goal === 'string')
-    .map((goalState) => goalState.goal);
 }
 
 function closedTopicsFromState(state: MediationState): string[] {
@@ -176,7 +169,6 @@ export function collectGoalMemory(
 
   return {
     ...memory,
-    completedGoals: completedGoalsFromState(state),
     closedTopics: mergeLimitedTopics(
       memory.closedTopics,
       closedTopicsFromState(state),

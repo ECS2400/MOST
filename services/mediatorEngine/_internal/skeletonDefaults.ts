@@ -60,6 +60,8 @@ export function createEmptySessionMemory(): SessionMemory {
     recentInterventionTypes: [],
     askedInterventionSignatures: [],
     regressHistory: [],
+    goalTransitionHistory: [],
+    lastGoalTransitionReason: null,
     reflectionLog: [],
   };
 }
