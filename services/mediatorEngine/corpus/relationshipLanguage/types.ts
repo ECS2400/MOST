@@ -11,7 +11,8 @@ export type RelationshipLanguageCategory =
   | 'validation'
   | 'apology'
   | 'trust'
-  | 'hope';
+  | 'hope'
+  | 'gratitude';
 
 export type RelationshipLanguageIntensity = 1 | 2 | 3 | 4 | 5;
 
