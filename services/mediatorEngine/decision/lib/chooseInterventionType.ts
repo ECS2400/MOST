@@ -1,5 +1,6 @@
 import type { ContinuityContext, InterventionType, PriorityOutput, TherapeuticStrategy } from '@/types/mediator';
 import { STRATEGY_INTERVENTION_COMPATIBILITY } from '@/services/mediatorEngine/constitution/config/strategyInterventionMap';
+import { chooseAdaptiveInterventionType } from '@/services/mediatorEngine/decision/adaptiveInterventionSelection';
 import {
   DEFAULT_ALLOWED_INTERVENTIONS,
   DEFAULT_SAFETY_ALLOWED_INTERVENTIONS,
@@ -165,56 +166,55 @@ export function chooseInterventionType(
       ? priority.recommendedInterventionType
       : undefined);
 
+  let baselineType: InterventionType;
+  let usedRecommended = false;
+  let fallbackUsed = false;
+
   if (
     recommended &&
     isAllowedIntervention(recommended, permitted) &&
     !isForbiddenIntervention(recommended, forbidden) &&
     !shouldAvoidForContinuity(recommended, avoid, safetyMode)
   ) {
-    return {
-      selectedInterventionType: recommended,
-      usedRecommended: true,
-      fallbackUsed: false,
-    };
-  }
-
-  const fromFallback = pickWithContinuityAwareness(
-    fallbackOrder,
-    permitted,
-    avoid,
-    prefer,
-    safetyMode
-  );
-  if (fromFallback) {
-    return {
-      selectedInterventionType: fromFallback,
-      usedRecommended: false,
-      fallbackUsed: true,
-    };
-  }
-
-  if (safetyMode) {
-    const safetyPermitted = safetyTypesInPermitted(permitted);
-    const safetyPick = pickFromFallbackOrder(SAFETY_FALLBACK_INTERVENTION_ORDER, safetyPermitted);
-    if (safetyPick) {
-      return {
-        selectedInterventionType: safetyPick,
-        usedRecommended: false,
-        fallbackUsed: true,
-      };
+    baselineType = recommended;
+    usedRecommended = true;
+  } else {
+    const fromFallback = pickWithContinuityAwareness(
+      fallbackOrder,
+      permitted,
+      avoid,
+      prefer,
+      safetyMode
+    );
+    if (fromFallback) {
+      baselineType = fromFallback;
+      fallbackUsed = true;
+    } else if (safetyMode) {
+      const safetyPermitted = safetyTypesInPermitted(permitted);
+      const safetyPick = pickFromFallbackOrder(SAFETY_FALLBACK_INTERVENTION_ORDER, safetyPermitted);
+      baselineType = safetyPick ?? 'deescalate';
+      fallbackUsed = true;
+    } else {
+      baselineType = pickLastResortNonForbidden(forbidden, allowed, fallbackOrder);
+      fallbackUsed = baselineType !== recommended;
     }
-
-    return {
-      selectedInterventionType: 'deescalate',
-      usedRecommended: false,
-      fallbackUsed: true,
-    };
   }
 
-  const lastResort = pickLastResortNonForbidden(forbidden, allowed, fallbackOrder);
+  const selectedInterventionType =
+    permitted.length > 0
+      ? chooseAdaptiveInterventionType({
+          baselineType,
+          permitted,
+          recommendedInterventionType: recommended,
+          continuityContext: continuity,
+          safetyActive: safetyMode,
+          primaryStrategy: safetyMode ? 'build_safety' : primaryStrategy,
+        })
+      : baselineType;
+
   return {
-    selectedInterventionType: lastResort,
-    usedRecommended: false,
-    fallbackUsed: lastResort !== recommended,
+    selectedInterventionType,
+    usedRecommended,
+    fallbackUsed,
   };
 }

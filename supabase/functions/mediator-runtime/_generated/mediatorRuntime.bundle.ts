@@ -551,6 +551,129 @@ function buildDecisionRationale(context) {
   return parts.join("; ");
 }
 
+// services/mediatorEngine/decision/adaptiveInterventionSelection/buildInterventionCandidateSet.ts
+function buildInterventionCandidateSet(permitted, baselineType) {
+  if (!Array.isArray(permitted) || permitted.length === 0) return [];
+  const seen = /* @__PURE__ */ new Set();
+  const candidates = [];
+  for (const type of permitted) {
+    if (typeof type !== "string" || seen.has(type)) continue;
+    seen.add(type);
+    candidates.push({
+      type,
+      kind: type === baselineType ? "baseline" : "alternative"
+    });
+  }
+  if (!seen.has(baselineType)) {
+    candidates.push({ type: baselineType, kind: "baseline" });
+  }
+  return candidates;
+}
+
+// services/mediatorEngine/decision/adaptiveInterventionSelection/config/adaptiveInterventionRules.ts
+var ADAPTIVE_INTERVENTION_RULES = {
+  MIN_SCORE: 40,
+  MIN_ADAPTIVE_DELTA: 10,
+  BASELINE_BONUS: 15,
+  WEIGHTS: {
+    recommended: 10,
+    prefer: 15,
+    avoid: -25,
+    lastEffective: 15,
+    lastIneffective: -20,
+    recentRepeat: -10,
+    repeatedMove: -20
+  },
+  RECENT_REPEAT_THRESHOLD: 2
+};
+
+// services/mediatorEngine/decision/adaptiveInterventionSelection/scoreInterventionCandidate.ts
+function countRecentType(recent, type) {
+  return recent.filter((entry) => entry === type).length;
+}
+function continuityLists(continuity) {
+  return {
+    prefer: continuity?.suggestedPreferTypes ?? [],
+    avoid: continuity?.suggestedAvoidTypes ?? [],
+    recent: continuity?.recentInterventionTypes ?? [],
+    lastEffective: continuity?.lastEffectiveInterventionType ?? null,
+    lastIneffective: continuity?.lastIneffectiveInterventionType ?? null,
+    repeatedMoveDetected: continuity?.repeatedMoveDetected === true
+  };
+}
+function scoreInterventionCandidate(input, candidate) {
+  if (input.safetyActive) {
+    return { candidate, score: 0 };
+  }
+  const { WEIGHTS, BASELINE_BONUS, RECENT_REPEAT_THRESHOLD } = ADAPTIVE_INTERVENTION_RULES;
+  const { type } = candidate;
+  const continuity = continuityLists(input.continuityContext);
+  let score = 0;
+  if (candidate.kind === "baseline") {
+    score += BASELINE_BONUS;
+  }
+  if (input.recommendedInterventionType === type) {
+    score += WEIGHTS.recommended;
+  }
+  if (continuity.prefer.includes(type)) {
+    score += WEIGHTS.prefer;
+  }
+  if (continuity.avoid.includes(type)) {
+    score += WEIGHTS.avoid;
+  }
+  if (continuity.lastEffective === type) {
+    score += WEIGHTS.lastEffective;
+  }
+  if (continuity.lastIneffective === type) {
+    score += WEIGHTS.lastIneffective;
+  }
+  if (countRecentType(continuity.recent, type) >= RECENT_REPEAT_THRESHOLD) {
+    score += WEIGHTS.recentRepeat;
+  }
+  if (continuity.repeatedMoveDetected && continuity.recent[0] === type) {
+    score += WEIGHTS.repeatedMove;
+  }
+  return { candidate, score: Math.max(0, score) };
+}
+
+// services/mediatorEngine/decision/adaptiveInterventionSelection/chooseAdaptiveInterventionType.ts
+function isPermitted(type, permitted) {
+  return permitted.includes(type);
+}
+function chooseAdaptiveInterventionType(input) {
+  const baselineType = input?.baselineType;
+  if (!input || !baselineType || typeof baselineType !== "string") {
+    return baselineType ?? "deescalate";
+  }
+  if (input.safetyActive) {
+    return baselineType;
+  }
+  const permitted = Array.isArray(input.permitted) ? input.permitted.filter((type) => typeof type === "string") : [];
+  if (permitted.length === 0) {
+    return baselineType;
+  }
+  const candidates = buildInterventionCandidateSet(permitted, baselineType);
+  if (candidates.length === 0) {
+    return baselineType;
+  }
+  const scored = candidates.map((candidate) => scoreInterventionCandidate(input, candidate));
+  const baselineEntry = scored.find((entry) => entry.candidate.type === baselineType);
+  const baselineScore = baselineEntry?.score ?? 0;
+  let best = baselineEntry ?? scored[0];
+  for (const entry of scored) {
+    if (entry.score > best.score) {
+      best = entry;
+    }
+  }
+  const { MIN_SCORE, MIN_ADAPTIVE_DELTA } = ADAPTIVE_INTERVENTION_RULES;
+  const adaptiveWins = best.candidate.type !== baselineType && best.score >= MIN_SCORE && best.score > baselineScore + MIN_ADAPTIVE_DELTA;
+  const selected = adaptiveWins ? best.candidate.type : baselineType;
+  if (!isPermitted(selected, permitted)) {
+    return baselineType;
+  }
+  return selected;
+}
+
 // services/mediatorEngine/decision/config/interventionFallbacks.ts
 var SAFE_FALLBACK_INTERVENTION_ORDER = [
   "reflect",
@@ -672,48 +795,45 @@ function chooseInterventionType(priority, overrideRecommended, safetyMode = fals
   const avoid = continuityAvoidTypes(continuity, safetyMode);
   const prefer = continuityPreferTypes(continuity, safetyMode);
   const recommended = overrideRecommended ?? (typeof priority?.recommendedInterventionType === "string" ? priority.recommendedInterventionType : void 0);
+  let baselineType;
+  let usedRecommended = false;
+  let fallbackUsed = false;
   if (recommended && isAllowedIntervention(recommended, permitted) && !isForbiddenIntervention(recommended, forbidden) && !shouldAvoidForContinuity(recommended, avoid, safetyMode)) {
-    return {
-      selectedInterventionType: recommended,
-      usedRecommended: true,
-      fallbackUsed: false
-    };
-  }
-  const fromFallback = pickWithContinuityAwareness(
-    fallbackOrder,
-    permitted,
-    avoid,
-    prefer,
-    safetyMode
-  );
-  if (fromFallback) {
-    return {
-      selectedInterventionType: fromFallback,
-      usedRecommended: false,
-      fallbackUsed: true
-    };
-  }
-  if (safetyMode) {
-    const safetyPermitted = safetyTypesInPermitted(permitted);
-    const safetyPick = pickFromFallbackOrder(SAFETY_FALLBACK_INTERVENTION_ORDER, safetyPermitted);
-    if (safetyPick) {
-      return {
-        selectedInterventionType: safetyPick,
-        usedRecommended: false,
-        fallbackUsed: true
-      };
+    baselineType = recommended;
+    usedRecommended = true;
+  } else {
+    const fromFallback = pickWithContinuityAwareness(
+      fallbackOrder,
+      permitted,
+      avoid,
+      prefer,
+      safetyMode
+    );
+    if (fromFallback) {
+      baselineType = fromFallback;
+      fallbackUsed = true;
+    } else if (safetyMode) {
+      const safetyPermitted = safetyTypesInPermitted(permitted);
+      const safetyPick = pickFromFallbackOrder(SAFETY_FALLBACK_INTERVENTION_ORDER, safetyPermitted);
+      baselineType = safetyPick ?? "deescalate";
+      fallbackUsed = true;
+    } else {
+      baselineType = pickLastResortNonForbidden(forbidden, allowed, fallbackOrder);
+      fallbackUsed = baselineType !== recommended;
     }
-    return {
-      selectedInterventionType: "deescalate",
-      usedRecommended: false,
-      fallbackUsed: true
-    };
   }
-  const lastResort = pickLastResortNonForbidden(forbidden, allowed, fallbackOrder);
+  const selectedInterventionType = permitted.length > 0 ? chooseAdaptiveInterventionType({
+    baselineType,
+    permitted,
+    recommendedInterventionType: recommended,
+    continuityContext: continuity,
+    safetyActive: safetyMode,
+    primaryStrategy: safetyMode ? "build_safety" : primaryStrategy
+  }) : baselineType;
   return {
-    selectedInterventionType: lastResort,
-    usedRecommended: false,
-    fallbackUsed: lastResort !== recommended
+    selectedInterventionType,
+    usedRecommended,
+    fallbackUsed
   };
 }
 
@@ -1296,7 +1416,7 @@ function dedupeTypes(types) {
   }
   return result;
 }
-function countRecentType(recent, type) {
+function countRecentType2(recent, type) {
   return recent.filter((entry) => entry === type).length;
 }
 function buildSuggestedAvoidTypes(memory, recent, effectiveness, repeated, recommended) {
@@ -1311,11 +1431,11 @@ function buildSuggestedAvoidTypes(memory, recent, effectiveness, repeated, recom
     avoid.push(recent[0]);
   }
   for (const type of recent) {
-    if (countRecentType(recent, type) >= REPEATED_TYPE_THRESHOLD) {
+    if (countRecentType2(recent, type) >= REPEATED_TYPE_THRESHOLD) {
       avoid.push(type);
     }
   }
-  if (recommended && countRecentType(recent, recommended) >= 2) {
+  if (recommended && countRecentType2(recent, recommended) >= 2) {
     const signatures = memory.askedInterventionSignatures ?? [];
     if (signatures.length > 0) {
       avoid.push(recommended);
