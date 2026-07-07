@@ -5,7 +5,9 @@ export type RelationshipLanguageCategory =
   | 'defensiveness'
   | 'criticism'
   | 'fear'
-  | 'shame';
+  | 'shame'
+  | 'loneliness'
+  | 'repair_attempt';
 
 export type RelationshipLanguageIntensity = 1 | 2 | 3 | 4 | 5;
 
