@@ -1,12 +1,23 @@
 import type { GoalContinuityContext } from '@/types/mediator/goalContinuity';
-import type { MediationState, OrchestrateTurnRequest, TherapeuticGoal } from '@/types/mediator';
+import type {
+  MediationState,
+  OrchestrateTurnRequest,
+  ReflectionOutput,
+  SafetyOutput,
+  SessionMemory,
+  TherapeuticGoal,
+  TurnNumber,
+} from '@/types/mediator';
 import { createEmptyMediationState, createEmptySessionMemory } from '@/services/mediatorEngine/_internal/skeletonDefaults';
+import type { AdaptiveGoalSelectionInput } from '@/services/mediatorEngine/goalContinuity/adaptiveGoalSelection/types';
 import { buildGoalContinuityHint } from '@/services/mediatorEngine/goalContinuity/buildGoalContinuityHint';
 import { chooseGoalContinuityRecommendation } from '@/services/mediatorEngine/goalContinuity/chooseGoalContinuityRecommendation';
 import { dedupeGoals } from '@/services/mediatorEngine/goalContinuity/config/goalFlow';
 import { detectGoalCompletion } from '@/services/mediatorEngine/goalContinuity/detectGoalCompletion';
 import { detectGoalStagnation } from '@/services/mediatorEngine/goalContinuity/detectGoalStagnation';
 import type { BuildGoalContinuityContextInput } from '@/services/mediatorEngine/goalContinuity/types';
+import type { GoalCompletionDetection } from '@/services/mediatorEngine/goalContinuity/detectGoalCompletion';
+import type { GoalStagnationDetection } from '@/services/mediatorEngine/goalContinuity/detectGoalStagnation';
 
 const EMPTY_STATE_REQUEST: OrchestrateTurnRequest = {
   mediationId: 'goal-continuity',
@@ -72,6 +83,36 @@ function resolveState(input: BuildGoalContinuityContextInput): MediationState {
   return createEmptyMediationState(EMPTY_STATE_REQUEST);
 }
 
+function buildAdaptiveGoalSelectionInput(
+  state: MediationState,
+  sessionMemory: SessionMemory,
+  reflection: ReflectionOutput | null | undefined,
+  safety: SafetyOutput | null | undefined,
+  currentGoal: TherapeuticGoal,
+  completion: GoalCompletionDetection,
+  stagnation: GoalStagnationDetection,
+  mutualUnderstandingScore: number,
+  turnNumber: TurnNumber
+): AdaptiveGoalSelectionInput {
+  const hostReady = reflection?.partnerReadiness?.host?.readyToAdvance?.value === true;
+  const partnerReady = reflection?.partnerReadiness?.partner?.readyToAdvance?.value === true;
+
+  return {
+    currentGoal,
+    completedGoals: completion.completedGoals,
+    mutualUnderstandingScore,
+    completionDetected: completion.completionDetected,
+    goalStagnationDetected: stagnation.goalStagnationDetected,
+    safety,
+    bothReady: hostReady && partnerReady,
+    acceptedByBoth: state.agreements?.acceptedByBoth === true,
+    goalTransitionHistory: Array.isArray(sessionMemory.goalTransitionHistory)
+      ? sessionMemory.goalTransitionHistory
+      : [],
+    turnNumber,
+  };
+}
+
 /** Builds a privacy-safe goal continuity context from structural session signals. */
 export function buildGoalContinuityContext(
   input: BuildGoalContinuityContextInput | null | undefined
@@ -116,7 +157,18 @@ export function buildGoalContinuityContext(
     { ...completion, completedGoals },
     stagnation,
     normalized.safety,
-    mutualUnderstandingScore
+    mutualUnderstandingScore,
+    buildAdaptiveGoalSelectionInput(
+      state,
+      sessionMemory,
+      normalized.reflection,
+      normalized.safety,
+      currentGoal,
+      { ...completion, completedGoals },
+      stagnation,
+      mutualUnderstandingScore,
+      turnNumber
+    )
   );
 
   const partial = {

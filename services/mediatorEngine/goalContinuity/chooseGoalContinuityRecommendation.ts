@@ -3,6 +3,8 @@ import {
   GOAL_FLOW_ORDER,
   nextGoalInFlow,
 } from '@/services/mediatorEngine/goalContinuity/config/goalFlow';
+import { chooseAdaptiveNextGoal } from '@/services/mediatorEngine/goalContinuity/adaptiveGoalSelection/chooseAdaptiveNextGoal';
+import type { AdaptiveGoalSelectionInput } from '@/services/mediatorEngine/goalContinuity/adaptiveGoalSelection/types';
 import type { GoalCompletionDetection } from '@/services/mediatorEngine/goalContinuity/detectGoalCompletion';
 import type { GoalStagnationDetection } from '@/services/mediatorEngine/goalContinuity/detectGoalStagnation';
 
@@ -29,13 +31,22 @@ function isClosureReady(
   return next === 'CLOSURE' && completion.completedGoals.includes('AGREEMENT');
 }
 
+function resolveRecommendedNextGoal(
+  adaptiveInput: AdaptiveGoalSelectionInput | null | undefined,
+  fallbackGoal: TherapeuticGoal | null
+): TherapeuticGoal | null {
+  if (!fallbackGoal) return null;
+  return chooseAdaptiveNextGoal(adaptiveInput, fallbackGoal);
+}
+
 /** Chooses goal transition recommendation from completion and stagnation signals. */
 export function chooseGoalContinuityRecommendation(
   currentGoal: TherapeuticGoal,
   completion: GoalCompletionDetection,
   stagnation: GoalStagnationDetection,
   safety: SafetyOutput | null | undefined,
-  mutualUnderstandingScore: number
+  mutualUnderstandingScore: number,
+  adaptiveInput?: AdaptiveGoalSelectionInput | null
 ): GoalContinuityRecommendation {
   if (isSafetyActive(safety)) {
     return {
@@ -53,7 +64,7 @@ export function chooseGoalContinuityRecommendation(
     if (nextGoal === 'CLOSURE' && isClosureReady(currentGoal, completion)) {
       return {
         recommendedGoalTransition: 'closure',
-        recommendedNextGoal: 'CLOSURE',
+        recommendedNextGoal: resolveRecommendedNextGoal(adaptiveInput, 'CLOSURE'),
         suggestedStayReason: null,
         suggestedAdvanceReason: 'Agreement reached; prepare closure',
       };
@@ -61,7 +72,7 @@ export function chooseGoalContinuityRecommendation(
     if (nextGoal) {
       return {
         recommendedGoalTransition: 'advance',
-        recommendedNextGoal: nextGoal,
+        recommendedNextGoal: resolveRecommendedNextGoal(adaptiveInput, nextGoal),
         suggestedStayReason: null,
         suggestedAdvanceReason: completion.completionReason ?? `Move toward ${nextGoal}`,
       };
@@ -80,7 +91,7 @@ export function chooseGoalContinuityRecommendation(
     if (stagnation.repeatedGoalDetected && nextGoal) {
       return {
         recommendedGoalTransition: 'advance',
-        recommendedNextGoal: nextGoal,
+        recommendedNextGoal: resolveRecommendedNextGoal(adaptiveInput, nextGoal),
         suggestedStayReason: null,
         suggestedAdvanceReason: 'Goal stagnation detected; try next stage',
       };
@@ -93,7 +104,7 @@ export function chooseGoalContinuityRecommendation(
     if (priorGoal && stagnation.goalStagnationDetected) {
       return {
         recommendedGoalTransition: 'regress',
-        recommendedNextGoal: priorGoal,
+        recommendedNextGoal: resolveRecommendedNextGoal(adaptiveInput, priorGoal),
         suggestedStayReason: null,
         suggestedAdvanceReason: null,
       };

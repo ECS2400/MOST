@@ -1434,6 +1434,181 @@ function dedupeGoals(goals) {
   return result;
 }
 
+// services/mediatorEngine/goalContinuity/adaptiveGoalSelection/config/adaptiveGoalRules.ts
+var ADAPTIVE_GOAL_RULES = {
+  MIN_SCORE: 55,
+  MIN_ADAPTIVE_DELTA: 10,
+  BASELINE_BONUS: 15,
+  MAX_SKIP: 2,
+  REGRESS_COOLDOWN_TURNS: 2,
+  MUTUAL_UNDERSTANDING_HIGH: 70,
+  MUTUAL_UNDERSTANDING_LOW: 50,
+  WEIGHTS: {
+    completion: 25,
+    bothReady: 20,
+    acceptedByBoth: 30,
+    mutualUnderstandingHigh: 15,
+    mutualUnderstandingLow: -20,
+    stagnation: 15,
+    recentRegress: -25,
+    fastTrack: 20
+  }
+};
+
+// services/mediatorEngine/goalContinuity/adaptiveGoalSelection/goalTransitionGuards.ts
+function asTransitionHistory(history) {
+  return Array.isArray(history) ? history : [];
+}
+function isSafetyBlocking(safety) {
+  if (!safety) return false;
+  if (safety.preempted === true) return true;
+  const level = safety.level;
+  return level === "L1_gentle" || level === "L2_pause" || level === "L3_stop";
+}
+function wasRecentRegress(history, turnNumber) {
+  return asTransitionHistory(history).some(
+    (entry) => entry?.direction === "regress" && typeof entry.turnNumber === "number" && turnNumber - entry.turnNumber <= ADAPTIVE_GOAL_RULES.REGRESS_COOLDOWN_TURNS
+  );
+}
+function isCompletedGoal(goal, completedGoals) {
+  return completedGoals.includes(goal);
+}
+function hasPingPongPattern(history) {
+  const transitions = asTransitionHistory(history);
+  if (transitions.length < 2) return false;
+  const last = transitions.at(-1);
+  const previous = transitions.at(-2);
+  if (!last || !previous) return false;
+  return last.direction === "advance" && previous.direction === "regress" || last.direction === "regress" && previous.direction === "advance";
+}
+function skipDistance(currentGoal, targetGoal) {
+  const currentIndex = GOAL_FLOW_ORDER.indexOf(currentGoal);
+  const targetIndex = GOAL_FLOW_ORDER.indexOf(targetGoal);
+  if (currentIndex < 0 || targetIndex < 0) return null;
+  return targetIndex - currentIndex;
+}
+function isCandidateAllowed(candidate, input) {
+  if (candidate.kind === "regress" && isCompletedGoal(candidate.goal, input.completedGoals)) {
+    return false;
+  }
+  if (candidate.kind === "skip") {
+    const distance = skipDistance(input.currentGoal, candidate.goal);
+    if (distance === null || distance <= 0 || distance > ADAPTIVE_GOAL_RULES.MAX_SKIP) {
+      return false;
+    }
+  }
+  if (candidate.kind !== "baseline" && candidate.kind !== "regress" && wasRecentRegress(input.goalTransitionHistory, input.turnNumber)) {
+    return false;
+  }
+  if (candidate.kind !== "baseline" && hasPingPongPattern(input.goalTransitionHistory)) {
+    return false;
+  }
+  return true;
+}
+
+// services/mediatorEngine/goalContinuity/adaptiveGoalSelection/buildGoalCandidateSet.ts
+function goalAtOffset(currentGoal, offset) {
+  const currentIndex = GOAL_FLOW_ORDER.indexOf(currentGoal);
+  if (currentIndex < 0) return null;
+  const targetIndex = currentIndex + offset;
+  if (targetIndex < 0 || targetIndex >= GOAL_FLOW_ORDER.length) return null;
+  return GOAL_FLOW_ORDER[targetIndex] ?? null;
+}
+function appendCandidate(candidates, seen, candidate) {
+  if (!candidate || seen.has(candidate.goal)) return;
+  seen.add(candidate.goal);
+  candidates.push(candidate);
+}
+function buildGoalCandidateSet(input) {
+  const candidates = [];
+  const seen = /* @__PURE__ */ new Set();
+  const guardInput = {
+    currentGoal: input.currentGoal,
+    completedGoals: input.completedGoals,
+    goalTransitionHistory: input.goalTransitionHistory,
+    turnNumber: input.turnNumber
+  };
+  const baselineGoal = nextGoalInFlow(input.currentGoal);
+  if (baselineGoal) {
+    appendCandidate(candidates, seen, { goal: baselineGoal, kind: "baseline" });
+  }
+  const skipGoal = goalAtOffset(input.currentGoal, ADAPTIVE_GOAL_RULES.MAX_SKIP);
+  appendCandidate(candidates, seen, skipGoal ? { goal: skipGoal, kind: "skip" } : null);
+  const regressGoal = goalAtOffset(input.currentGoal, -1);
+  appendCandidate(candidates, seen, regressGoal ? { goal: regressGoal, kind: "regress" } : null);
+  appendCandidate(candidates, seen, { goal: "FUTURE_PLAN", kind: "fast_track" });
+  appendCandidate(candidates, seen, { goal: "CLOSURE", kind: "fast_track" });
+  return candidates.filter((candidate) => isCandidateAllowed(candidate, guardInput));
+}
+
+// services/mediatorEngine/goalContinuity/adaptiveGoalSelection/scoreGoalCandidate.ts
+function isForwardCandidate(currentGoal, candidateGoal) {
+  const currentIndex = GOAL_FLOW_ORDER.indexOf(currentGoal);
+  const candidateIndex = GOAL_FLOW_ORDER.indexOf(candidateGoal);
+  return candidateIndex > currentIndex;
+}
+function scoreGoalCandidate(input, candidate) {
+  if (isSafetyBlocking(input.safety)) {
+    return { candidate, score: 0 };
+  }
+  const { WEIGHTS } = ADAPTIVE_GOAL_RULES;
+  let score = 0;
+  if (candidate.kind === "baseline") {
+    score += ADAPTIVE_GOAL_RULES.BASELINE_BONUS;
+  }
+  if (input.completionDetected && candidate.kind !== "regress") {
+    score += WEIGHTS.completion;
+  }
+  if (input.bothReady && candidate.kind !== "regress") {
+    score += WEIGHTS.bothReady;
+  }
+  if (input.acceptedByBoth && candidate.kind !== "baseline" && (candidate.goal === "FUTURE_PLAN" || candidate.goal === "CLOSURE")) {
+    score += WEIGHTS.acceptedByBoth + WEIGHTS.fastTrack;
+  }
+  if (input.mutualUnderstandingScore >= ADAPTIVE_GOAL_RULES.MUTUAL_UNDERSTANDING_HIGH) {
+    if (isForwardCandidate(input.currentGoal, candidate.goal) || candidate.kind === "fast_track") {
+      score += WEIGHTS.mutualUnderstandingHigh;
+    }
+  }
+  if (input.mutualUnderstandingScore < ADAPTIVE_GOAL_RULES.MUTUAL_UNDERSTANDING_LOW && input.currentGoal === "PERSPECTIVE_SHARING" && candidate.goal === "REFRAME") {
+    score += WEIGHTS.mutualUnderstandingLow;
+  }
+  if (input.goalStagnationDetected && candidate.kind === "skip") {
+    score += WEIGHTS.stagnation;
+  }
+  if (candidate.kind === "regress" && input.goalStagnationDetected) {
+    score += WEIGHTS.stagnation;
+  }
+  if (input.completedGoals.includes("AGREEMENT") && (candidate.goal === "FUTURE_PLAN" || candidate.goal === "CLOSURE")) {
+    score += WEIGHTS.fastTrack;
+  }
+  return { candidate, score: Math.max(0, score) };
+}
+
+// services/mediatorEngine/goalContinuity/adaptiveGoalSelection/chooseAdaptiveNextGoal.ts
+function chooseAdaptiveNextGoal(input, fallbackGoal) {
+  const fallback = fallbackGoal ?? (input ? nextGoalInFlow(input.currentGoal) : null);
+  if (!input || !fallback) return fallback;
+  if (isSafetyBlocking(input.safety)) {
+    return fallback;
+  }
+  const candidates = buildGoalCandidateSet(input);
+  if (candidates.length === 0) return fallback;
+  const scored = candidates.map((candidate) => scoreGoalCandidate(input, candidate));
+  const baseline = scored.find((entry) => entry.candidate.kind === "baseline");
+  const baselineScore = baseline?.score ?? 0;
+  let best = baseline ?? scored[0];
+  for (const entry of scored) {
+    if (entry.score > best.score) {
+      best = entry;
+    }
+  }
+  if (best.candidate.kind !== "baseline" && best.score >= ADAPTIVE_GOAL_RULES.MIN_SCORE && best.score > baselineScore + ADAPTIVE_GOAL_RULES.MIN_ADAPTIVE_DELTA) {
+    return best.candidate.goal;
+  }
+  return fallback;
+}
+
 // services/mediatorEngine/goalContinuity/chooseGoalContinuityRecommendation.ts
 function isSafetyActive2(safety) {
   if (!safety) return false;
@@ -1446,7 +1621,11 @@ function isClosureReady(currentGoal, completion) {
   const next = nextGoalInFlow(currentGoal);
   return next === "CLOSURE" && completion.completedGoals.includes("AGREEMENT");
 }
-function chooseGoalContinuityRecommendation(currentGoal, completion, stagnation, safety, mutualUnderstandingScore) {
+function resolveRecommendedNextGoal(adaptiveInput, fallbackGoal) {
+  if (!fallbackGoal) return null;
+  return chooseAdaptiveNextGoal(adaptiveInput, fallbackGoal);
+}
+function chooseGoalContinuityRecommendation(currentGoal, completion, stagnation, safety, mutualUnderstandingScore, adaptiveInput) {
   if (isSafetyActive2(safety)) {
     return {
       recommendedGoalTransition: "stay",
@@ -1461,7 +1640,7 @@ function chooseGoalContinuityRecommendation(currentGoal, completion, stagnation,
     if (nextGoal === "CLOSURE" && isClosureReady(currentGoal, completion)) {
       return {
         recommendedGoalTransition: "closure",
-        recommendedNextGoal: "CLOSURE",
+        recommendedNextGoal: resolveRecommendedNextGoal(adaptiveInput, "CLOSURE"),
         suggestedStayReason: null,
         suggestedAdvanceReason: "Agreement reached; prepare closure"
       };
@@ -1469,7 +1648,7 @@ function chooseGoalContinuityRecommendation(currentGoal, completion, stagnation,
     if (nextGoal) {
       return {
         recommendedGoalTransition: "advance",
-        recommendedNextGoal: nextGoal,
+        recommendedNextGoal: resolveRecommendedNextGoal(adaptiveInput, nextGoal),
         suggestedStayReason: null,
         suggestedAdvanceReason: completion.completionReason ?? `Move toward ${nextGoal}`
       };
@@ -1487,7 +1666,7 @@ function chooseGoalContinuityRecommendation(currentGoal, completion, stagnation,
     if (stagnation.repeatedGoalDetected && nextGoal) {
       return {
         recommendedGoalTransition: "advance",
-        recommendedNextGoal: nextGoal,
+        recommendedNextGoal: resolveRecommendedNextGoal(adaptiveInput, nextGoal),
         suggestedStayReason: null,
         suggestedAdvanceReason: "Goal stagnation detected; try next stage"
       };
@@ -1499,7 +1678,7 @@ function chooseGoalContinuityRecommendation(currentGoal, completion, stagnation,
     if (priorGoal && stagnation.goalStagnationDetected) {
       return {
         recommendedGoalTransition: "regress",
-        recommendedNextGoal: priorGoal,
+        recommendedNextGoal: resolveRecommendedNextGoal(adaptiveInput, priorGoal),
         suggestedStayReason: null,
         suggestedAdvanceReason: null
       };
@@ -1705,6 +1884,22 @@ function resolveState(input) {
   }
   return createEmptyMediationState(EMPTY_STATE_REQUEST);
 }
+function buildAdaptiveGoalSelectionInput(state, sessionMemory, reflection, safety, currentGoal, completion, stagnation, mutualUnderstandingScore, turnNumber) {
+  const hostReady = reflection?.partnerReadiness?.host?.readyToAdvance?.value === true;
+  const partnerReady = reflection?.partnerReadiness?.partner?.readyToAdvance?.value === true;
+  return {
+    currentGoal,
+    completedGoals: completion.completedGoals,
+    mutualUnderstandingScore,
+    completionDetected: completion.completionDetected,
+    goalStagnationDetected: stagnation.goalStagnationDetected,
+    safety,
+    bothReady: hostReady && partnerReady,
+    acceptedByBoth: state.agreements?.acceptedByBoth === true,
+    goalTransitionHistory: Array.isArray(sessionMemory.goalTransitionHistory) ? sessionMemory.goalTransitionHistory : [],
+    turnNumber
+  };
+}
 function buildGoalContinuityContext(input) {
   const normalized = input ?? {};
   const state = resolveState(normalized);
@@ -1735,7 +1930,18 @@ function buildGoalContinuityContext(input) {
     { ...completion, completedGoals },
     stagnation,
     normalized.safety,
-    mutualUnderstandingScore
+    mutualUnderstandingScore,
+    buildAdaptiveGoalSelectionInput(
+      state,
+      sessionMemory,
+      normalized.reflection,
+      normalized.safety,
+      currentGoal,
+      { ...completion, completedGoals },
+      stagnation,
+      mutualUnderstandingScore,
+      turnNumber
+    )
   );
   const partial = {
     recommendedGoalTransition: recommendation.recommendedGoalTransition,
@@ -2314,8 +2520,23 @@ function resolveTransitionTargetGoal(goalContinuityContext, direction) {
   }
   return priorGoalInFlow(goalContinuityContext.currentGoal);
 }
+function resolveTransitionTimestamp(input) {
+  const lastUpdatedAt = input.state?.meta?.lastUpdatedAt;
+  if (typeof lastUpdatedAt === "string" && lastUpdatedAt.length > 0) {
+    return lastUpdatedAt;
+  }
+  const validatedAt = input.complianceResult?.validatedAt;
+  if (typeof validatedAt === "string" && validatedAt.length > 0) {
+    return validatedAt;
+  }
+  const generatedAt = input.intervention?.generatedAt;
+  if (typeof generatedAt === "string" && generatedAt.length > 0) {
+    return generatedAt;
+  }
+  return (/* @__PURE__ */ new Date()).toISOString();
+}
 function buildAppliedGoalTransition(input) {
-  const { goalTransition, goalContinuityContext, state, turnNumber } = input;
+  const { goalTransition, goalContinuityContext, turnNumber } = input;
   if (!goalTransition || goalTransition === "stay" || !goalContinuityContext) {
     return null;
   }
@@ -2327,7 +2548,7 @@ function buildAppliedGoalTransition(input) {
     toGoal,
     direction: goalTransition,
     turnNumber,
-    timestamp: state?.meta?.lastUpdatedAt ?? "1970-01-01T00:00:00.000Z",
+    timestamp: resolveTransitionTimestamp(input),
     reason,
     triggeredBy: "decision_engine"
   };
