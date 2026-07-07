@@ -16,6 +16,7 @@ export { REPAIR_ATTEMPT_ENTRIES } from '@/services/mediatorEngine/corpus/relatio
 export { VALIDATION_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/validation';
 export { APOLOGY_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/apology';
 export { TRUST_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/trust';
+export { HOPE_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/hope';
 
 import { ANGER_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/anger';
 import { APOLOGY_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/apology';
@@ -23,6 +24,7 @@ import { CRITICISM_ENTRIES } from '@/services/mediatorEngine/corpus/relationship
 import { DEFENSIVENESS_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/defensiveness';
 import { FEAR_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/fear';
 import { HURT_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/hurt';
+import { HOPE_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/hope';
 import { LONELINESS_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/loneliness';
 import { REPAIR_ATTEMPT_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/repairAttempt';
 import { VALIDATION_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/validation';
@@ -44,4 +46,5 @@ export const RELATIONSHIP_LANGUAGE_CORPUS: readonly RelationshipLanguageEntry[] 
   ...VALIDATION_ENTRIES,
   ...APOLOGY_ENTRIES,
   ...TRUST_ENTRIES,
+  ...HOPE_ENTRIES,
 ] as const;
