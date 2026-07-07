@@ -14,8 +14,10 @@ export { SHAME_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLang
 export { LONELINESS_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/loneliness';
 export { REPAIR_ATTEMPT_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/repairAttempt';
 export { VALIDATION_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/validation';
+export { APOLOGY_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/apology';
 
 import { ANGER_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/anger';
+import { APOLOGY_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/apology';
 import { CRITICISM_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/criticism';
 import { DEFENSIVENESS_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/defensiveness';
 import { FEAR_ENTRIES } from '@/services/mediatorEngine/corpus/relationshipLanguage/fear';
@@ -38,4 +40,5 @@ export const RELATIONSHIP_LANGUAGE_CORPUS: readonly RelationshipLanguageEntry[] 
   ...LONELINESS_ENTRIES,
   ...REPAIR_ATTEMPT_ENTRIES,
   ...VALIDATION_ENTRIES,
+  ...APOLOGY_ENTRIES,
 ] as const;
