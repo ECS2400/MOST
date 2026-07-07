@@ -1,4 +1,4 @@
-export type RelationshipLanguageCategory = 'hurt';
+export type RelationshipLanguageCategory = 'hurt' | 'anger';
 
 export type RelationshipLanguageIntensity = 1 | 2 | 3 | 4 | 5;
 
