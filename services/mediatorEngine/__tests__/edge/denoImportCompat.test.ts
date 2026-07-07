@@ -97,6 +97,24 @@ describe('mediator-runtime — deploy bundle audit', () => {
     assert.equal(manifest.deployStrategy, 'esbuild-prebundle');
     assert.equal(manifest.extensionlessAtImportCountInDeployGraph, 0);
   });
+
+  it('generated bundle ma warunkowe FUTURE_PLAN/CLOSURE w buildGoalCandidateSet', () => {
+    assert.ok(existsSync(BUNDLE_PATH), 'bundle missing — run build:mediator:edge');
+    const bundle = readSource(BUNDLE_PATH);
+    const candidateSetStart = bundle.indexOf('function buildGoalCandidateSet');
+    assert.ok(candidateSetStart >= 0, 'buildGoalCandidateSet missing from bundle');
+
+    const candidateSetBlock = bundle.slice(candidateSetStart, candidateSetStart + 2500);
+    assert.ok(
+      !/appendCandidate\([^)]*\{ goal: "FUTURE_PLAN", kind: "fast_track" \}\);\s*appendCandidate\([^)]*\{ goal: "CLOSURE", kind: "fast_track" \}\)/.test(
+        candidateSetBlock
+      ),
+      'bundle must not unconditionally append FUTURE_PLAN and CLOSURE'
+    );
+    assert.match(candidateSetBlock, /acceptedByBoth/);
+    assert.match(candidateSetBlock, /completionDetected/);
+    assert.match(candidateSetBlock, /AGREEMENT/);
+  });
 });
 
 describe('mediator-runtime — static logging guard (source + bundle)', () => {

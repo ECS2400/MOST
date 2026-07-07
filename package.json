@@ -20,6 +20,7 @@
     "test:mediator:state": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/stateAnalyzer/analyzeState.test.ts",
     "test:mediator:reflection": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/reflection/runReflection.test.ts",
     "test:mediator:strategy": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/strategy/*.test.ts services/mediatorEngine/__tests__/goalContinuity/*.test.ts",
+    "test:mediator:goalContinuity": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/goalContinuity/*.test.ts",
     "test:mediator:safety": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/safety/evaluateSafety.test.ts",
     "test:mediator:prompt": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/promptComposer/*.test.ts",
     "test:mediator:llm": "node --import ./services/mediatorEngine/__tests__/path-alias-loader.mjs --experimental-strip-types --test services/mediatorEngine/__tests__/llm/*.test.ts",

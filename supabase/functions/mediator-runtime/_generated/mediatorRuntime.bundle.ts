@@ -1532,12 +1532,19 @@ function buildGoalCandidateSet(input) {
   if (baselineGoal) {
     appendCandidate(candidates, seen, { goal: baselineGoal, kind: "baseline" });
   }
+  const hasAgreementCompleted = input.completedGoals.includes("AGREEMENT");
+  const closureAllowed = hasAgreementCompleted && input.completionDetected;
   const skipGoal = goalAtOffset(input.currentGoal, ADAPTIVE_GOAL_RULES.MAX_SKIP);
-  appendCandidate(candidates, seen, skipGoal ? { goal: skipGoal, kind: "skip" } : null);
+  const skipAllowed = skipGoal && (skipGoal !== "CLOSURE" || closureAllowed);
+  appendCandidate(candidates, seen, skipAllowed ? { goal: skipGoal, kind: "skip" } : null);
   const regressGoal = goalAtOffset(input.currentGoal, -1);
   appendCandidate(candidates, seen, regressGoal ? { goal: regressGoal, kind: "regress" } : null);
-  appendCandidate(candidates, seen, { goal: "FUTURE_PLAN", kind: "fast_track" });
-  appendCandidate(candidates, seen, { goal: "CLOSURE", kind: "fast_track" });
+  if (input.acceptedByBoth || hasAgreementCompleted) {
+    appendCandidate(candidates, seen, { goal: "FUTURE_PLAN", kind: "fast_track" });
+  }
+  if (closureAllowed) {
+    appendCandidate(candidates, seen, { goal: "CLOSURE", kind: "fast_track" });
+  }
   return candidates.filter((candidate) => isCandidateAllowed(candidate, guardInput));
 }
 
