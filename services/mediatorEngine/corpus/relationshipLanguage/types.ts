@@ -9,7 +9,8 @@ export type RelationshipLanguageCategory =
   | 'loneliness'
   | 'repair_attempt'
   | 'validation'
-  | 'apology';
+  | 'apology'
+  | 'trust';
 
 export type RelationshipLanguageIntensity = 1 | 2 | 3 | 4 | 5;
 
