@@ -22,6 +22,8 @@ export const relocationConversation: GoldenConversation = {
     'increase_mutual_understanding',
     'prepare_agreement',
   ],
+  expectedReplayGoalPath: ['SAFE_OPENING', 'EMOTION_NAMING'],
+  expectedReplayStrategies: ['build_safety', 'validate_emotions'],
   safetyExpectation: 'none',
   participants: {
     host: {
@@ -63,5 +65,31 @@ export const relocationConversation: GoldenConversation = {
     'Decyzja nie została wymuszona pod presją terminu.',
     'Para ma poczucie, że to wspólna sprawa, nie jednostronny projekt.',
     'Ustalono kolejny krok (np. lista pytań do obu stron przed decyzją).',
+  ],
+  messages: [
+    {
+      speaker: 'host',
+      text: 'Mam wrażenie, że decyzja o przeprowadzce już właściwie zapadła, tylko ja mam się do niej dopasować. A przecież to zmienia całe nasze życie.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Nie chcę decydować za ciebie. Po prostu widzę w tej przeprowadzce szansę, której możemy drugi raz nie dostać.',
+    },
+    {
+      speaker: 'host',
+      text: 'Dla ciebie to brzmi jak szansa. Dla mnie to też strach przed zostawieniem pracy, rodziny i wszystkiego, co znam.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Rozumiem, że to może być dla ciebie dużo. Ja z kolei boję się, że jeśli zostaniemy, będziemy za kilka lat żałować, że nawet nie spróbowaliśmy.',
+    },
+    {
+      speaker: 'host',
+      text: 'Nie mówię, że nigdy się nie przeprowadzę. Potrzebuję tylko czuć, że moje obawy są traktowane tak samo poważnie jak twoje plany.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Masz rację. Chcę o tym rozmawiać jak o naszej decyzji, nie jak o moim pomyśle, który masz po prostu zaakceptować.',
+    },
   ],
 };

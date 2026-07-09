@@ -19,6 +19,7 @@ import { lackOfClosenessConversation } from '@/services/mediatorEngine/__tests__
 import { parentingDifferencesConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/parenting-differences';
 import { workOverFamilyConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/work-over-family';
 import { relocationConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/relocation';
+import { familyBoundariesConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/family-boundaries';
 import { filterParticipantMessages } from '@/services/mediatorEngine/evaluation/mapGoldenToRuntime';
 import { runGoldenConversation } from '@/services/mediatorEngine/evaluation/runGoldenConversation';
 
@@ -35,6 +36,7 @@ const PILOT_CONVERSATIONS = [
   lackOfClosenessConversation,
   parentingDifferencesConversation,
   workOverFamilyConversation,
+  relocationConversation,
 ] as const;
 
 describe('runGoldenConversation — pilot golden conversations', () => {
@@ -78,8 +80,8 @@ describe('runGoldenConversation — pilot golden conversations', () => {
     });
   }
 
-  it('relocation: SKIPPED when messages_missing', async () => {
-    const result = await runGoldenConversation(relocationConversation);
+  it('family-boundaries: SKIPPED when messages_missing', async () => {
+    const result = await runGoldenConversation(familyBoundariesConversation);
 
     assert.equal(result.status, 'SKIPPED');
     assert.equal(result.skipReason, 'messages_missing');
