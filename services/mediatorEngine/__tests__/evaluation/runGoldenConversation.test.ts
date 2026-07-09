@@ -13,6 +13,8 @@ import { silenceAfterConflictConversation } from '@/services/mediatorEngine/__te
 import { jealousyConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/jealousy';
 import { motherInLawConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/mother-in-law';
 import { socialMediaConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/social-media';
+import { exPartnerConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/ex-partner';
+import { sexIntimacyConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/sex-intimacy';
 import { filterParticipantMessages } from '@/services/mediatorEngine/evaluation/mapGoldenToRuntime';
 import { runGoldenConversation } from '@/services/mediatorEngine/evaluation/runGoldenConversation';
 
@@ -23,6 +25,8 @@ const PILOT_CONVERSATIONS = [
   silenceAfterConflictConversation,
   jealousyConversation,
   motherInLawConversation,
+  socialMediaConversation,
+  exPartnerConversation,
 ] as const;
 
 describe('runGoldenConversation — pilot golden conversations', () => {
@@ -66,8 +70,8 @@ describe('runGoldenConversation — pilot golden conversations', () => {
     });
   }
 
-  it('social-media: SKIPPED when messages_missing', async () => {
-    const result = await runGoldenConversation(socialMediaConversation);
+  it('sex-intimacy: SKIPPED when messages_missing', async () => {
+    const result = await runGoldenConversation(sexIntimacyConversation);
 
     assert.equal(result.status, 'SKIPPED');
     assert.equal(result.skipReason, 'messages_missing');

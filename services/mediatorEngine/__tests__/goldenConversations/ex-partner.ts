@@ -20,6 +20,8 @@ export const exPartnerConversation: GoldenConversation = {
     'build_safety',
     'increase_mutual_understanding',
   ],
+  expectedReplayGoalPath: ['SAFE_OPENING', 'EMOTION_NAMING'],
+  expectedReplayStrategies: ['build_safety', 'validate_emotions'],
   safetyExpectation: 'none',
   participants: {
     host: {
@@ -61,5 +63,31 @@ export const exPartnerConversation: GoldenConversation = {
     'Host opisał realną funkcję kontaktu (logistyka, dziecko).',
     'Para ma język do ustaleń o informowaniu / granicach.',
     'Brak ultimatum ani „wybierz mnie albo dziecko”.',
+  ],
+  messages: [
+    {
+      speaker: 'host',
+      text: 'Za każdym razem, kiedy dowiaduję się, że znowu rozmawiałaś ze swoim byłym, wraca ten sam niepokój. Nie chodzi o sam kontakt, tylko o to, że dowiaduję się o nim przypadkiem.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Nie ukrywam tego specjalnie. Czasami po prostu nie wydaje mi się to na tyle ważne, żeby o każdej wiadomości opowiadać.',
+    },
+    {
+      speaker: 'host',
+      text: 'Ale właśnie przez to zaczynam się zastanawiać, czego jeszcze nie wiem. Wtedy trudno mi zachować spokój.',
+    },
+    {
+      speaker: 'partner',
+      text: 'A ja mam wrażenie, że cokolwiek zrobię, i tak będę podejrzana. To sprawia, że jeszcze mniej mam ochotę o tym rozmawiać.',
+    },
+    {
+      speaker: 'host',
+      text: 'Nie chcę cię przesłuchiwać. Chciałbym po prostu mieć poczucie, że jesteśmy wobec siebie otwarci.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Rozumiem. Mogę mówić o takich kontaktach wcześniej, ale potrzebuję też czuć, że nie zostanę od razu oceniona.',
+    },
   ],
 };
