@@ -24,6 +24,7 @@ import { moneySplitConversation } from '@/services/mediatorEngine/__tests__/gold
 import { hiddenSpendingConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/hidden-spending';
 import { alcoholUseConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/alcohol-use';
 import { recurringArgumentsConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/recurring-arguments';
+import { brokenPromisesConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/broken-promises';
 import { filterParticipantMessages } from '@/services/mediatorEngine/evaluation/mapGoldenToRuntime';
 import { runGoldenConversation } from '@/services/mediatorEngine/evaluation/runGoldenConversation';
 
@@ -45,6 +46,7 @@ const PILOT_CONVERSATIONS = [
   moneySplitConversation,
   hiddenSpendingConversation,
   alcoholUseConversation,
+  recurringArgumentsConversation,
 ] as const;
 
 describe('runGoldenConversation — pilot golden conversations', () => {
@@ -88,8 +90,8 @@ describe('runGoldenConversation — pilot golden conversations', () => {
     });
   }
 
-  it('recurring-arguments: SKIPPED when messages_missing', async () => {
-    const result = await runGoldenConversation(recurringArgumentsConversation);
+  it('broken-promises: SKIPPED when messages_missing', async () => {
+    const result = await runGoldenConversation(brokenPromisesConversation);
 
     assert.equal(result.status, 'SKIPPED');
     assert.equal(result.skipReason, 'messages_missing');

@@ -24,6 +24,7 @@ import { moneySplitConversation } from '@/services/mediatorEngine/__tests__/gold
 import { hiddenSpendingConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/hidden-spending';
 import { alcoholUseConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/alcohol-use';
 import { recurringArgumentsConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/recurring-arguments';
+import { brokenPromisesConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/broken-promises';
 import { evaluateGoalProgression } from '@/services/mediatorEngine/evaluation/goalProgression';
 import { filterParticipantMessages } from '@/services/mediatorEngine/evaluation/mapGoldenToRuntime';
 import { runGoldenConversation } from '@/services/mediatorEngine/evaluation/runGoldenConversation';
@@ -47,6 +48,7 @@ const PILOT_CONVERSATIONS = [
   moneySplitConversation,
   hiddenSpendingConversation,
   alcoholUseConversation,
+  recurringArgumentsConversation,
 ] as const;
 
 const REQUIRED_TRACE_SECTIONS = [
@@ -89,13 +91,13 @@ describe('goldenTraceSnapshot — E2E trace', () => {
     });
   }
 
-  it('recurring-arguments: SKIPPED trace without turn sections', async () => {
-    const run = await runGoldenConversation(recurringArgumentsConversation);
+  it('broken-promises: SKIPPED trace without turn sections', async () => {
+    const run = await runGoldenConversation(brokenPromisesConversation);
 
     assert.equal(run.status, 'SKIPPED');
     assert.equal(run.skipReason, 'messages_missing');
 
-    const output = formatConversationTrace(recurringArgumentsConversation, run);
+    const output = formatConversationTrace(brokenPromisesConversation, run);
 
     assert.match(output, /Status: SKIPPED/);
     assert.match(output, /messages_missing/);

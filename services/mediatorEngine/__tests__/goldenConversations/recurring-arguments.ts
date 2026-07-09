@@ -20,6 +20,8 @@ export const recurringArgumentsConversation: GoldenConversation = {
     'reduce_tension',
     'hold_space',
   ],
+  expectedReplayGoalPath: ['SAFE_OPENING', 'EMOTION_NAMING'],
+  expectedReplayStrategies: ['build_safety', 'validate_emotions'],
   safetyExpectation: 'none',
   participants: {
     host: {
@@ -61,5 +63,31 @@ export const recurringArgumentsConversation: GoldenConversation = {
     'Zmniejszyła się liczba „zawsze/nigdy” w wypowiedziach.',
     'Pojawił się jeden konkretny moment do obserwacji w przyszłości.',
     'Cynizm wobec mediacji nie został ignorowany — para została przy stole.',
+  ],
+  messages: [
+    {
+      speaker: 'host',
+      text: 'Mam wrażenie, że co kilka dni wracamy dokładnie do tej samej kłótni. Zmieniamy tylko temat, ale kończy się tak samo.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Bo ty od razu mówisz, że znowu robię to samo. Wtedy mam poczucie, że nie ma znaczenia, co powiem, bo już jestem winny.',
+    },
+    {
+      speaker: 'host',
+      text: 'Nie chcę cię ustawiać jako winnego. Jestem po prostu zmęczona tym, że po każdej rozmowie niby coś ustalamy, a potem wszystko wraca.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Ja też jestem zmęczony. Czasem już nawet nie słucham do końca, bo mam wrażenie, że znam finał tej rozmowy.',
+    },
+    {
+      speaker: 'host',
+      text: 'Właśnie tego się boję. Że przestaniemy próbować, bo uznamy, że i tak nic się nie zmieni.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Nie chcę, żeby tak było. Może zamiast kolejny raz udowadniać, kto ma rację, spróbujmy zobaczyć, gdzie ta rozmowa zawsze się psuje.',
+    },
   ],
 };
