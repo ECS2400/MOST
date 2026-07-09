@@ -21,6 +21,8 @@ export const parentingDifferencesConversation: GoldenConversation = {
     'prepare_agreement',
     'hold_space',
   ],
+  expectedReplayGoalPath: ['SAFE_OPENING', 'EMOTION_NAMING'],
+  expectedReplayStrategies: ['build_safety', 'validate_emotions'],
   safetyExpectation: 'none',
   participants: {
     host: {
@@ -62,5 +64,31 @@ export const parentingDifferencesConversation: GoldenConversation = {
     'Dziecko nie zostało użyte jako broń w trakcie mediacji.',
     'Para widzi wspólny cel: dobro dziecka i spójność — nawet bez pełej zgody co do metod.',
     'Napięcie spadło — możliwa rozmowa o „minimum zasad”.',
+  ],
+  messages: [
+    {
+      speaker: 'host',
+      text: 'Mam wrażenie, że przy dzieciach często podważasz moje zdanie. Ja coś ustalam, a ty za chwilę mówisz im, że jednak mogą zrobić po swojemu.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Bo czasem jesteś zbyt surowa. Nie chcę, żeby dzieci bały się o wszystko pytać albo czuły, że w domu jest tylko lista zasad.',
+    },
+    {
+      speaker: 'host',
+      text: 'A ja nie chcę być tą złą, która wszystkiego pilnuje. Kiedy mnie podważasz, zostaję sama z odpowiedzialnością i jeszcze wychodzę na najgorszą.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Nie chcę, żebyś była tą złą. Po prostu boję się, że jak będziemy tylko wymagać, to dzieci przestaną z nami rozmawiać.',
+    },
+    {
+      speaker: 'host',
+      text: 'Ja też chcę, żeby z nami rozmawiały. Potrzebuję tylko czuć, że jesteśmy jednym zespołem, a nie dwoma różnymi domami pod jednym dachem.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Rozumiem. Możemy najpierw ustalać między sobą, co jest zasadą, a dopiero potem mówić to dzieciom razem.',
+    },
   ],
 };
