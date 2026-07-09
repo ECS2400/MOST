@@ -21,6 +21,8 @@ export const moneySplitConversation: GoldenConversation = {
     'hold_space',
     'increase_mutual_understanding',
   ],
+  expectedReplayGoalPath: ['SAFE_OPENING', 'EMOTION_NAMING'],
+  expectedReplayStrategies: ['build_safety', 'validate_emotions'],
   safetyExpectation: 'none',
   participants: {
     host: {
@@ -62,5 +64,31 @@ export const moneySplitConversation: GoldenConversation = {
     'Para rozumie, że chodzi o relację, nie tylko o procenty.',
     'Brak moralnego wygrania przez bogatszą stronę.',
     'Możliwa dalsza rozmowa o zasadach — bez wymuszonej decyzji dziś.',
+  ],
+  messages: [
+    {
+      speaker: 'host',
+      text: 'Mam poczucie, że podział pieniędzy jest u nas niby równy, ale w praktyce ja częściej dopłacam do rzeczy, których potem nawet nie liczymy.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Nie robię tego specjalnie. Po prostu nie zawsze widzę te małe wydatki tak jak ty, a potem wychodzi, że znowu coś mi wypominasz.',
+    },
+    {
+      speaker: 'host',
+      text: 'Bo ja nie chcę ciągle być księgowym w naszym związku. Męczy mnie pilnowanie, czy wszystko jest sprawiedliwe.',
+    },
+    {
+      speaker: 'partner',
+      text: 'A mnie męczy poczucie, że każda rozmowa o pieniądzach kończy się tym, że jestem nieodpowiedzialna albo mniej się staram.',
+    },
+    {
+      speaker: 'host',
+      text: 'Nie chodzi mi o oskarżanie. Chcę tylko czuć, że ciężar wspólnego życia naprawdę jest po obu stronach.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Rozumiem. Możemy usiąść i ustalić jasny sposób dzielenia wydatków, żeby to nie wracało przy każdej kłótni.',
+    },
   ],
 };
