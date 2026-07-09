@@ -16,6 +16,7 @@ export const financesBlameConversation: GoldenConversation = {
     'PERSPECTIVE_SHARING',
     'AGREEMENT',
   ],
+  expectedReplayGoalPath: ['SAFE_OPENING'],
   expectedStrategies: [
     'validate_emotions',
     'reduce_tension',

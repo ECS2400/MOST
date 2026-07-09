@@ -15,6 +15,7 @@ export const householdChoresConversation: GoldenConversation = {
     'PERSPECTIVE_SHARING',
     'AGREEMENT',
   ],
+  expectedReplayGoalPath: ['SAFE_OPENING'],
   expectedStrategies: [
     'validate_emotions',
     'increase_mutual_understanding',

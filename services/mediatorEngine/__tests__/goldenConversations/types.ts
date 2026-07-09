@@ -43,6 +43,8 @@ export interface GoldenConversation {
   tags: string[];
   /** Oczekiwana ścieżka celów od SAFE_OPENING do końca mediacji. */
   expectedGoalPath: TherapeuticGoal[];
+  /** Oczekiwana ścieżka celów dla krótkiego replay messages[] (opcjonalnie). */
+  expectedReplayGoalPath?: TherapeuticGoal[];
   /** Strategie, które powinny pojawić się podczas mediacji (kolejność nieważna). */
   expectedStrategies: GoldenConversationStrategy[];
   safetyExpectation: GoldenConversationSafetyExpectation;

@@ -14,6 +14,7 @@ export const silenceAfterConflictConversation: GoldenConversation = {
     'EMOTION_UNDERSTANDING',
     'PERSPECTIVE_SHARING',
   ],
+  expectedReplayGoalPath: ['SAFE_OPENING', 'EMOTION_NAMING'],
   expectedStrategies: [
     'validate_emotions',
     'hold_space',

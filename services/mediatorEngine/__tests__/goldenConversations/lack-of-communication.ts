@@ -15,6 +15,7 @@ export const lackOfCommunicationConversation: GoldenConversation = {
     'NEED_NAMING',
     'PERSPECTIVE_SHARING',
   ],
+  expectedReplayGoalPath: ['SAFE_OPENING'],
   expectedStrategies: ['validate_emotions', 'hold_space', 'deepen_emotions'],
   safetyExpectation: 'none',
   participants: {

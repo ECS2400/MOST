@@ -76,7 +76,9 @@ export function evaluateGoalProgression(
   run: ConversationRunResult,
   conversation: GoldenConversation
 ): GoalProgressionEvaluation {
-  const expectedGoalPath = [...conversation.expectedGoalPath];
+  const expectedGoalPath = [
+    ...(conversation.expectedReplayGoalPath ?? conversation.expectedGoalPath),
+  ];
   const actualGoalPath = extractActualGoalPath(run);
 
   return {

@@ -136,6 +136,30 @@ describe('evaluateGoalProgression', () => {
     assert.deepEqual(evaluation.missingGoals, []);
   });
 
+  it('uses expectedReplayGoalPath when present', () => {
+    const fullExpected: TherapeuticGoal[] = [
+      'SAFE_OPENING',
+      'EMOTION_NAMING',
+      'NEED_NAMING',
+      'AGREEMENT',
+    ];
+    const replayExpected: TherapeuticGoal[] = ['SAFE_OPENING'];
+    const actual: TherapeuticGoal[] = ['SAFE_OPENING'];
+    const run = createRun(actual);
+    const conversation: GoldenConversation = {
+      ...createConversation(fullExpected),
+      expectedReplayGoalPath: replayExpected,
+    };
+    const evaluation = evaluateGoalProgression(run, conversation);
+
+    assert.ok(fullExpected.length > replayExpected.length);
+    assert.equal(evaluation.exactMatch, true);
+    assert.deepEqual(evaluation.expectedGoalPath, replayExpected);
+    assert.deepEqual(evaluation.actualGoalPath, replayExpected);
+    assert.deepEqual(evaluation.missingGoals, []);
+    assert.deepEqual(evaluation.unexpectedGoals, []);
+  });
+
   it('computes partial prefix match', () => {
     const expected: TherapeuticGoal[] = [
       'SAFE_OPENING',
