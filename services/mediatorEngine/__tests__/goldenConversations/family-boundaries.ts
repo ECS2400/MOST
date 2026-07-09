@@ -19,6 +19,8 @@ export const familyBoundariesConversation: GoldenConversation = {
     'increase_mutual_understanding',
     'prepare_agreement',
   ],
+  expectedReplayGoalPath: ['SAFE_OPENING', 'EMOTION_NAMING'],
+  expectedReplayStrategies: ['build_safety', 'validate_emotions'],
   safetyExpectation: 'none',
   participants: {
     host: {
@@ -60,5 +62,31 @@ export const familyBoundariesConversation: GoldenConversation = {
     'Partner usłyszał potrzebę prywatności; host usłyszał lojalność.',
     'Ustalono kierunek rozmowy o zasadach wizyt — bez gotowego regulaminu.',
     'Napięcie nie eskalowało do groźb rozstania.',
+  ],
+  messages: [
+    {
+      speaker: 'host',
+      text: 'Mam wrażenie, że twoja rodzina może wejść w nasze życie w każdej chwili, a ja nie mam prawa powiedzieć, że to dla mnie za dużo.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Oni po prostu chcą być blisko. Nie widzę w tym nic złego, ale rozumiem, że czasem może to być męczące.',
+    },
+    {
+      speaker: 'host',
+      text: 'Problem w tym, że kiedy mówię, że potrzebuję granic, od razu brzmię jak osoba, która odrzuca twoją rodzinę.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Bo czasem tak to odbieram. Mam poczucie, że jeśli postawię im granicę, to ich zranię albo wyjdę na niewdzięcznego.',
+    },
+    {
+      speaker: 'host',
+      text: 'Ja nie chcę cię od nich odcinać. Chcę tylko, żeby nasz dom był miejscem, w którym oboje czujemy się bezpiecznie.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Rozumiem. Możemy ustalić jasne zasady odwiedzin i rozmów z rodziną, żeby to nie było za każdym razem przeciwko komuś.',
+    },
   ],
 };
