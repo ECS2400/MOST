@@ -88,9 +88,22 @@ describe('runGoldenConversation — explainability wiring', () => {
     const turn1 = result.turns[0];
     assert.equal(turn1.goalTransition, 'stay');
     assert.equal(turn1.strategy, 'hold_space');
+    assert.equal(turn1.currentGoal, 'SAFE_OPENING');
+    assert.equal(turn1.mediationState.currentGoal, 'SAFE_OPENING');
 
     const turn2 = result.turns[1];
     assert.equal(turn2.goalTransition, 'advance');
+    assert.equal(turn2.mediationState.currentGoal, 'EMOTION_NAMING');
+    assert.equal(turn2.currentGoal, 'EMOTION_NAMING');
+
+    const turn3 = result.turns[2];
+    assert.notEqual(turn3.mediationState.currentGoal, 'SAFE_OPENING');
+    assert.equal(turn3.mediationState.currentGoal, turn3.currentGoal);
+
+    const allSafeOpening = result.turns.every(
+      (trace) => trace.mediationState.currentGoal === 'SAFE_OPENING'
+    );
+    assert.equal(allSafeOpening, false, 'trace should not stay on SAFE_OPENING for every turn');
 
     const allSkeleton = result.turns.every(
       (trace) =>

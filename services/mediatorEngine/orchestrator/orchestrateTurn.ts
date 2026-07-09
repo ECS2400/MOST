@@ -25,6 +25,7 @@ import { runReflection } from '@/services/mediatorEngine/reflection/runReflectio
 import { evaluateSafety } from '@/services/mediatorEngine/safety/evaluateSafety';
 import { selectStrategy } from '@/services/mediatorEngine/strategy/selectStrategy';
 import { analyzeState } from '@/services/mediatorEngine/stateAnalyzer/analyzeState';
+import { applyGoalTransitionToState } from '@/services/mediatorEngine/orchestrator/applyGoalTransitionToState';
 import { buildExplainability } from '@/services/mediatorEngine/orchestrator/buildExplainability';
 import {
   createEmptyMediationState,
@@ -202,9 +203,15 @@ export function orchestrateTurn(input: MediatorEngineTurnInput): OrchestrateTurn
     recentInterventionSignatures: sessionMemory.askedInterventionSignatures ?? [],
   });
 
+  const stateAfterGoalTransition = applyGoalTransitionToState({
+    state,
+    goalTransition: decisionOutput.goalTransition,
+    goalContinuityContext,
+  });
+
   const updatedSessionMemory = updateSessionMemory({
     previousMemory: sessionMemory,
-    state,
+    state: stateAfterGoalTransition,
     intervention,
     reflection: reflectionOutput,
     complianceResult,
@@ -222,14 +229,14 @@ export function orchestrateTurn(input: MediatorEngineTurnInput): OrchestrateTurn
   });
 
   return {
-    mediationState: state,
+    mediationState: stateAfterGoalTransition,
     intervention,
     sessionMemory: updatedSessionMemory,
     evidenceStore: stateAnalyzerOutput.evidenceStore,
     explainability: buildExplainability({
       turnNumber: request.turnNumber,
       mediationId: request.mediationId,
-      state,
+      state: stateAfterGoalTransition,
       reflectionOutput,
       strategyOutput,
       priorityOutput,
