@@ -16,6 +16,8 @@ export const jealousyConversation: GoldenConversation = {
     'PERSPECTIVE_SHARING',
   ],
   expectedStrategies: ['validate_emotions', 'build_safety', 'hold_space'],
+  expectedReplayGoalPath: ['SAFE_OPENING', 'EMOTION_NAMING'],
+  expectedReplayStrategies: ['build_safety', 'validate_emotions'],
   safetyExpectation: 'none',
   participants: {
     host: {
@@ -57,5 +59,31 @@ export const jealousyConversation: GoldenConversation = {
     'Partner usłyszał wpływ swojego zachowania bez poczucia procesu.',
     'Host usłyszał, że kontrola oddala — bez moralnej lekcji.',
     'Para ma wspólny obraz: bezpieczeństwo vs przestrzeń osobista.',
+  ],
+  messages: [
+    {
+      speaker: 'host',
+      text: 'Nie chodzi o to, że nie możesz mieć znajomych. Po prostu źle się czuję, kiedy widzę, jak piszesz z nim codziennie i odkładasz telefon, gdy wchodzę do pokoju.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Nie ukrywam przed tobą telefonu. Mam tylko dość tego, że każda wiadomość kończy się podejrzeniami. Czuję się, jakbym musiała się cały czas tłumaczyć.',
+    },
+    {
+      speaker: 'host',
+      text: 'Bo kiedy pytam, kto napisał, odpowiadasz wymijająco. Potem zostaję z własnymi domysłami i coraz trudniej mi ci zaufać.',
+    },
+    {
+      speaker: 'partner',
+      text: 'A ja mam wrażenie, że cokolwiek zrobię, i tak uznasz, że robię coś przeciwko tobie. To jest bardzo męczące.',
+    },
+    {
+      speaker: 'host',
+      text: 'Nie chcę cię kontrolować. Chciałbym po prostu znowu czuć się spokojnie i mieć pewność, że jesteśmy po tej samej stronie.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Ja też chcę, żebyśmy znowu sobie ufali. Nie chcę, żeby każda rozmowa kończyła się kłótnią o coś, czego nawet nie zrobiłam.',
+    },
   ],
 };

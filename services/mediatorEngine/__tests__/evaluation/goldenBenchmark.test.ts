@@ -26,8 +26,8 @@ describe('runGoldenBenchmark', () => {
     const benchmark = await runGoldenBenchmark([...BENCHMARK_CONVERSATIONS]);
 
     assert.equal(benchmark.total, 5);
-    assert.equal(benchmark.passed, 4);
-    assert.equal(benchmark.skipped, 1);
+    assert.equal(benchmark.passed, 5);
+    assert.equal(benchmark.skipped, 0);
     assert.equal(benchmark.failed, 0);
     assert.equal(benchmark.results.length, 5);
 
