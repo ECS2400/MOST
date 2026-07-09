@@ -21,6 +21,8 @@ export const alcoholUseConversation: GoldenConversation = {
     'build_safety',
     'reduce_tension',
   ],
+  expectedReplayGoalPath: ['SAFE_OPENING', 'EMOTION_NAMING'],
+  expectedReplayStrategies: ['build_safety', 'validate_emotions'],
   safetyExpectation: 'L1',
   participants: {
     host: {
@@ -62,5 +64,31 @@ export const alcoholUseConversation: GoldenConversation = {
     'Partner nie został zepchnięty w całkowite zaprzeczenie — jest przestrzeń na rozmowę.',
     'Para ma język do opisu wpływu na relację.',
     'Mediator wskazał, że głębsza praca może wymagać wsparcia — bez diagnozy.',
+  ],
+  messages: [
+    {
+      speaker: 'host',
+      text: 'Kiedy mówisz, że to tylko kilka piw, mam wrażenie, że pomijasz to, co dzieje się później. Zmieniasz ton, robisz się opryskliwy i ja zaczynam chodzić po mieszkaniu na palcach.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Nie piję codziennie i nie uważam, że mam problem. Po prostu czasem chcę się rozluźnić, a ty od razu robisz z tego wielką sprawę.',
+    },
+    {
+      speaker: 'host',
+      text: 'Dla mnie to nie jest wielka sprawa z niczego. Ja się wtedy wycofuję, bo nie wiem, czy rozmowa skończy się normalnie, czy kolejną kłótnią.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Rozumiem, że możesz się tak czuć, ale kiedy słyszę, że znowu mam uważać, od razu czuję się oceniany i atakowany.',
+    },
+    {
+      speaker: 'host',
+      text: 'Nie chcę cię zawstydzać. Chcę tylko mieć poczucie, że wieczór w domu nie zależy od tego, ile wypijesz.',
+    },
+    {
+      speaker: 'partner',
+      text: 'To brzmi inaczej, kiedy mówisz o tym w ten sposób. Mogę się przyjrzeć temu, jak się wtedy zachowuję, zamiast od razu się bronić.',
+    },
   ],
 };
