@@ -21,6 +21,8 @@ export const sexIntimacyConversation: GoldenConversation = {
     'deepen_emotions',
     'build_safety',
   ],
+  expectedReplayGoalPath: ['SAFE_OPENING', 'EMOTION_NAMING'],
+  expectedReplayStrategies: ['build_safety', 'validate_emotions'],
   safetyExpectation: 'none',
   participants: {
     host: {
@@ -62,5 +64,31 @@ export const sexIntimacyConversation: GoldenConversation = {
     'Odrzucenie i presja zostały nazwane jako doświadczenia, nie werdykty.',
     'Ustalono, że temat wymaga dalszej pracy — bez wymuszonego „rozwiązania” dziś.',
     'Obie strony czują, że mediator nie ocenia ich ciała ani libido.',
+  ],
+  messages: [
+    {
+      speaker: 'host',
+      text: 'Od dłuższego czasu mam wrażenie, że między nami zniknęła bliskość. Kiedy próbuję zrobić pierwszy krok, często się wycofujesz i zaczynam się zastanawiać, czy jeszcze ci na mnie zależy.',
+    },
+    {
+      speaker: 'partner',
+      text: 'To nie jest tak, że mi nie zależy. Kiedy czuję presję, jeszcze bardziej się zamykam i potem oboje tylko się od siebie oddalamy.',
+    },
+    {
+      speaker: 'host',
+      text: 'Najtrudniejsze jest to, że nie wiem, co się dzieje. W mojej głowie od razu pojawia się myśl, że przestałaś mnie pragnąć.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Ja z kolei mam poczucie, że każda czułość kończy się oczekiwaniem czegoś więcej. Przez to zaczynam unikać nawet zwykłego przytulenia.',
+    },
+    {
+      speaker: 'host',
+      text: 'Nie chciałem, żebyś tak to odbierała. Bardziej niż samego seksu brakuje mi poczucia, że jesteśmy blisko siebie.',
+    },
+    {
+      speaker: 'partner',
+      text: 'To dobrze usłyszeć. Chciałabym, żebyśmy potrafili odbudować tę bliskość bez poczucia presji z którejkolwiek strony.',
+    },
   ],
 };

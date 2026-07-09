@@ -15,6 +15,7 @@ import { motherInLawConversation } from '@/services/mediatorEngine/__tests__/gol
 import { socialMediaConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/social-media';
 import { exPartnerConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/ex-partner';
 import { sexIntimacyConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/sex-intimacy';
+import { lackOfClosenessConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/lack-of-closeness';
 import { evaluateGoalProgression } from '@/services/mediatorEngine/evaluation/goalProgression';
 import { filterParticipantMessages } from '@/services/mediatorEngine/evaluation/mapGoldenToRuntime';
 import { runGoldenConversation } from '@/services/mediatorEngine/evaluation/runGoldenConversation';
@@ -29,6 +30,7 @@ const PILOT_CONVERSATIONS = [
   motherInLawConversation,
   socialMediaConversation,
   exPartnerConversation,
+  sexIntimacyConversation,
 ] as const;
 
 const REQUIRED_TRACE_SECTIONS = [
@@ -71,13 +73,13 @@ describe('goldenTraceSnapshot — E2E trace', () => {
     });
   }
 
-  it('sex-intimacy: SKIPPED trace without turn sections', async () => {
-    const run = await runGoldenConversation(sexIntimacyConversation);
+  it('lack-of-closeness: SKIPPED trace without turn sections', async () => {
+    const run = await runGoldenConversation(lackOfClosenessConversation);
 
     assert.equal(run.status, 'SKIPPED');
     assert.equal(run.skipReason, 'messages_missing');
 
-    const output = formatConversationTrace(sexIntimacyConversation, run);
+    const output = formatConversationTrace(lackOfClosenessConversation, run);
 
     assert.match(output, /Status: SKIPPED/);
     assert.match(output, /messages_missing/);
