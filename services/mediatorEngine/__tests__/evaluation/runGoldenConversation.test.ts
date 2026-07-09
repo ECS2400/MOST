@@ -12,6 +12,7 @@ import { lackOfCommunicationConversation } from '@/services/mediatorEngine/__tes
 import { silenceAfterConflictConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/silence-after-conflict';
 import { jealousyConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/jealousy';
 import { motherInLawConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/mother-in-law';
+import { socialMediaConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/social-media';
 import { filterParticipantMessages } from '@/services/mediatorEngine/evaluation/mapGoldenToRuntime';
 import { runGoldenConversation } from '@/services/mediatorEngine/evaluation/runGoldenConversation';
 
@@ -21,6 +22,7 @@ const PILOT_CONVERSATIONS = [
   lackOfCommunicationConversation,
   silenceAfterConflictConversation,
   jealousyConversation,
+  motherInLawConversation,
 ] as const;
 
 describe('runGoldenConversation — pilot golden conversations', () => {
@@ -64,8 +66,8 @@ describe('runGoldenConversation — pilot golden conversations', () => {
     });
   }
 
-  it('mother-in-law: SKIPPED when messages_missing', async () => {
-    const result = await runGoldenConversation(motherInLawConversation);
+  it('social-media: SKIPPED when messages_missing', async () => {
+    const result = await runGoldenConversation(socialMediaConversation);
 
     assert.equal(result.status, 'SKIPPED');
     assert.equal(result.skipReason, 'messages_missing');

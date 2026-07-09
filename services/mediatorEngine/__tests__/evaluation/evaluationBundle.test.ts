@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { financesBlameConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/finances-blame';
-import { motherInLawConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/mother-in-law';
+import { socialMediaConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/social-media';
 import { buildEvaluationBundle } from '@/services/mediatorEngine/evaluation/bundle';
 import { runGoldenConversation } from '@/services/mediatorEngine/evaluation/runGoldenConversation';
 
@@ -43,11 +43,11 @@ describe('buildEvaluationBundle', () => {
   });
 
   it('builds bundle for SKIPPED conversation', async () => {
-    const run = await runGoldenConversation(motherInLawConversation);
-    const bundle = buildEvaluationBundle(motherInLawConversation, run);
+    const run = await runGoldenConversation(socialMediaConversation);
+    const bundle = buildEvaluationBundle(socialMediaConversation, run);
 
     assert.equal(bundle.status, 'SKIPPED');
-    assert.equal(bundle.conversationId, motherInLawConversation.id);
+    assert.equal(bundle.conversationId, socialMediaConversation.id);
     assert.ok(bundle.goalEvaluation);
     assert.ok(bundle.strategyEvaluation);
     assert.ok(bundle.safetyEvaluation);

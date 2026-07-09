@@ -21,6 +21,8 @@ export const motherInLawConversation: GoldenConversation = {
     'hold_space',
     'reduce_tension',
   ],
+  expectedReplayGoalPath: ['SAFE_OPENING', 'EMOTION_NAMING'],
+  expectedReplayStrategies: ['build_safety', 'validate_emotions'],
   safetyExpectation: 'none',
   participants: {
     host: {
@@ -62,5 +64,31 @@ export const motherInLawConversation: GoldenConversation = {
     'Pojawiło się wspólne zrozumienie, że chodzi o granice w „naszym domu”.',
     'Partner nie musiał zrzec się rodziny — ale usłyszał potrzebę wsparcia.',
     'Para ma język do rozmowy o następnej wizycie (nawet jeśli bez gotowego planu).',
+  ],
+  messages: [
+    {
+      speaker: 'host',
+      text: 'Najbardziej zabolało mnie nie to, co powiedziała twoja mama. Zabolało mnie to, że stałeś obok i ani razu mnie nie obroniłeś.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Nie chciałem wybierać między tobą a moją mamą. Wiedziałem, że jeśli się odezwę, wszystko tylko bardziej się rozkręci.',
+    },
+    {
+      speaker: 'host',
+      text: 'Ale milczenie też było wyborem. W tamtym momencie poczułam, że zostałam z tym sama.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Nie pomyślałem o tym w ten sposób. Byłem bardziej skupiony na tym, żeby zakończyć kłótnię niż na tym, jak ty się czujesz.',
+    },
+    {
+      speaker: 'host',
+      text: 'Nie oczekuję, że przestaniesz kochać swoją rodzinę. Chcę tylko wiedzieć, że kiedy ktoś mnie rani, jesteśmy po tej samej stronie.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Rozumiem. Chciałbym następnym razem najpierw pokazać ci, że jesteś dla mnie ważna, a dopiero później próbować uspokoić całą sytuację.',
+    },
   ],
 };
