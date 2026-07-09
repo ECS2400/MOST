@@ -20,6 +20,8 @@ export const workOverFamilyConversation: GoldenConversation = {
     'hold_space',
     'increase_mutual_understanding',
   ],
+  expectedReplayGoalPath: ['SAFE_OPENING', 'EMOTION_NAMING'],
+  expectedReplayStrategies: ['build_safety', 'validate_emotions'],
   safetyExpectation: 'none',
   participants: {
     host: {
@@ -61,5 +63,31 @@ export const workOverFamilyConversation: GoldenConversation = {
     'Pojęcie „obecność” i „bezpieczeństwo finansowe” zostało rozdzielone.',
     'Brak eskalacji do „ja vs ty” bez końca.',
     'Para widzi potrzebę rozmowy o granicach pracy — nawet bez gotowego planu.',
+  ],
+  messages: [
+    {
+      speaker: 'host',
+      text: 'Mam wrażenie, że twoja praca zawsze wygrywa z nami. Nawet kiedy jesteś w domu, i tak odbierasz telefony albo odpisujesz na wiadomości.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Nie robię tego dlatego, że nie chcę być z wami. Po prostu boję się, że jak odpuszczę, to wszystko zacznie się sypać w pracy.',
+    },
+    {
+      speaker: 'host',
+      text: 'Rozumiem, że masz presję, ale ja też zaczynam czuć, że jesteśmy tylko dodatkiem do twojego grafiku.',
+    },
+    {
+      speaker: 'partner',
+      text: 'To boli, kiedy tak mówisz, bo mam poczucie, że właśnie dla was tyle pracuję. Tylko chyba nie widzę, kiedy przekraczam granicę.',
+    },
+    {
+      speaker: 'host',
+      text: 'Nie potrzebuję, żebyś zarabiał więcej kosztem wszystkiego. Potrzebuję czuć, że czas z nami też jest dla ciebie ważny.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Masz rację, że nie wystarczy mówić, że robię to dla rodziny, jeśli potem tej rodziny przy mnie nie ma. Chcę to poukładać inaczej.',
+    },
   ],
 };
