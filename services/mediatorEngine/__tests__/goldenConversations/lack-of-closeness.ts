@@ -16,6 +16,8 @@ export const lackOfClosenessConversation: GoldenConversation = {
     'PERSPECTIVE_SHARING',
   ],
   expectedStrategies: ['validate_emotions', 'hold_space', 'deepen_emotions'],
+  expectedReplayGoalPath: ['SAFE_OPENING', 'EMOTION_NAMING'],
+  expectedReplayStrategies: ['build_safety', 'validate_emotions'],
   safetyExpectation: 'none',
   participants: {
     host: {
@@ -57,5 +59,31 @@ export const lackOfClosenessConversation: GoldenConversation = {
     'Wypalenie zostało uznane jako czynnik, nie wymówka.',
     'Pojawił się wspólny smutek zamiast wzajemnego oskarżania.',
     'Para widzi możliwość małego kroku (np. 5 minut rozmowy bez telefonu).',
+  ],
+  messages: [
+    {
+      speaker: 'host',
+      text: 'Mam wrażenie, że mieszkamy razem, ale coraz mniej jesteśmy razem. Wracasz, robisz swoje i czasem przez cały wieczór prawie ze sobą nie rozmawiamy.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Nie robię tego specjalnie. Po pracy jestem tak zmęczony, że czasem naprawdę nie mam już siły na rozmowy i tłumaczenie wszystkiego.',
+    },
+    {
+      speaker: 'host',
+      text: 'Ja nie potrzebuję wielkich rozmów codziennie. Chodzi mi o to, że zaczynam się czuć, jakbym była gdzieś na końcu twojej listy.',
+    },
+    {
+      speaker: 'partner',
+      text: 'A ja czuję, że cokolwiek zrobię, to i tak będzie za mało. Nawet kiedy jestem w domu, mam wrażenie, że jestem rozliczany z tego, czy jestem wystarczająco obecny.',
+    },
+    {
+      speaker: 'host',
+      text: 'Nie chcę cię rozliczać. Brakuje mi zwykłego poczucia, że mnie widzisz i że nadal chcesz być blisko.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Rozumiem. Chyba za bardzo założyłem, że sama moja obecność w domu wystarczy. Chciałbym spróbować być bardziej obecny naprawdę, nie tylko fizycznie.',
+    },
   ],
 };
