@@ -25,8 +25,8 @@ import { runReflection } from '@/services/mediatorEngine/reflection/runReflectio
 import { evaluateSafety } from '@/services/mediatorEngine/safety/evaluateSafety';
 import { selectStrategy } from '@/services/mediatorEngine/strategy/selectStrategy';
 import { analyzeState } from '@/services/mediatorEngine/stateAnalyzer/analyzeState';
+import { buildExplainability } from '@/services/mediatorEngine/orchestrator/buildExplainability';
 import {
-  createEmptyExplainability,
   createEmptyMediationState,
   createEmptySessionMemory,
 } from '@/services/mediatorEngine/_internal/skeletonDefaults';
@@ -226,7 +226,16 @@ export function orchestrateTurn(input: MediatorEngineTurnInput): OrchestrateTurn
     intervention,
     sessionMemory: updatedSessionMemory,
     evidenceStore: stateAnalyzerOutput.evidenceStore,
-    explainability: createEmptyExplainability(request.turnNumber),
+    explainability: buildExplainability({
+      turnNumber: request.turnNumber,
+      mediationId: request.mediationId,
+      state,
+      reflectionOutput,
+      strategyOutput,
+      priorityOutput,
+      decisionOutput,
+      complianceResult,
+    }),
     complianceResult,
     engineVersion: request.engineVersion,
   };

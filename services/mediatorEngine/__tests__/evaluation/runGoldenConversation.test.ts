@@ -71,3 +71,36 @@ describe('runGoldenConversation — pilot golden conversations', () => {
     assert.equal(result.turns.length, 0);
   });
 });
+
+describe('runGoldenConversation — explainability wiring', () => {
+  const SKELETON_TRACE_SIGNATURE = {
+    strategy: 'build_safety',
+    interventionType: 'welcome_open',
+    goalTransition: 'stay',
+  } as const;
+
+  it('finances-blame: trace reflects real pipeline outputs', async () => {
+    const result = await runGoldenConversation(financesBlameConversation);
+
+    assert.equal(result.status, 'PASS', result.failureReason ?? 'expected PASS');
+    assert.equal(result.turns.length, 4);
+
+    const turn1 = result.turns[0];
+    assert.equal(turn1.goalTransition, 'stay');
+    assert.equal(turn1.strategy, 'hold_space');
+
+    const turn2 = result.turns[1];
+    assert.equal(turn2.goalTransition, 'advance');
+
+    const allSkeleton = result.turns.every(
+      (trace) =>
+        trace.strategy === SKELETON_TRACE_SIGNATURE.strategy &&
+        trace.interventionType === SKELETON_TRACE_SIGNATURE.interventionType &&
+        trace.goalTransition === SKELETON_TRACE_SIGNATURE.goalTransition
+    );
+    assert.equal(allSkeleton, false, 'trace should not be skeleton for every turn');
+
+    const hasAdvance = result.turns.some((trace) => trace.goalTransition === 'advance');
+    assert.equal(hasAdvance, true, 'at least one turn should advance');
+  });
+});
