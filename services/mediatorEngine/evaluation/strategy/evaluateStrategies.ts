@@ -69,7 +69,9 @@ export function evaluateStrategies(
   run: ConversationRunResult,
   conversation: GoldenConversation
 ): StrategyEvaluation {
-  const expectedStrategies = [...conversation.expectedStrategies];
+  const expectedStrategies = [
+    ...(conversation.expectedReplayStrategies ?? conversation.expectedStrategies),
+  ];
   const actualStrategies = extractActualStrategies(run);
   const matchedStrategies = computeMatchedStrategies(expectedStrategies, actualStrategies);
 

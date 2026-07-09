@@ -21,6 +21,7 @@ export const silenceAfterConflictConversation: GoldenConversation = {
     'build_safety',
     'recover_misinterpretation',
   ],
+  expectedReplayStrategies: ['validate_emotions', 'hold_space'],
   safetyExpectation: 'none',
   participants: {
     host: {

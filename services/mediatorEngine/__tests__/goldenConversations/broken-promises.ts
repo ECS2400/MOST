@@ -21,6 +21,8 @@ export const brokenPromisesConversation: GoldenConversation = {
     'recover_misinterpretation',
     'prepare_agreement',
   ],
+  expectedReplayGoalPath: ['SAFE_OPENING', 'EMOTION_NAMING'],
+  expectedReplayStrategies: ['build_safety', 'validate_emotions'],
   safetyExpectation: 'none',
   participants: {
     host: {
@@ -62,5 +64,31 @@ export const brokenPromisesConversation: GoldenConversation = {
     'Para nie wyszła z kolejną pustą obietnicą wymuszoną przez mediatora.',
     'Rozczarowanie i wstyd zostały usłyszane po obu stronach.',
     'Możliwy mały, weryfikowalny krok zamiast wielkiej deklaracji.',
+  ],
+  messages: [
+    {
+      speaker: 'host',
+      text: 'Najbardziej męczy mnie to, że tyle razy słyszałam, że będzie inaczej. Przez chwilę naprawdę w to wierzę, a potem znowu zostaję z tym samym rozczarowaniem.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Wiem, że zawaliłem kilka razy. Ale kiedy słyszę, że już nigdy mi nie uwierzysz, mam poczucie, że nie ma znaczenia, czy próbuję.',
+    },
+    {
+      speaker: 'host',
+      text: 'Ja nie mówię tego, żeby cię skreślić. Po prostu coraz trudniej mi odróżnić prawdziwą zmianę od kolejnej obietnicy na chwilę.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Rozumiem. Chyba za często mówiłem, że coś zrobię, zanim naprawdę przemyślałem, czy jestem w stanie to utrzymać.',
+    },
+    {
+      speaker: 'host',
+      text: 'Nie potrzebuję wielkich deklaracji. Potrzebuję małych rzeczy, które naprawdę się wydarzą, żebym mogła znowu poczuć spokój.',
+    },
+    {
+      speaker: 'partner',
+      text: 'To ma sens. Zamiast obiecywać wszystko naraz, mogę wybrać jedną konkretną rzecz i pokazać ci ją w działaniu.',
+    },
   ],
 };

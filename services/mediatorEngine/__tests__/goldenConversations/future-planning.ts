@@ -22,6 +22,8 @@ export const futurePlanningConversation: GoldenConversation = {
     'increase_mutual_understanding',
     'prepare_agreement',
   ],
+  expectedReplayGoalPath: ['SAFE_OPENING', 'EMOTION_NAMING'],
+  expectedReplayStrategies: ['build_safety', 'validate_emotions'],
   safetyExpectation: 'none',
   participants: {
     host: {
@@ -63,5 +65,31 @@ export const futurePlanningConversation: GoldenConversation = {
     'Para rozumie różnicę tempa decyzji — nie tylko „chce vs nie chce”.',
     'Brak wymuszonej obietnicy ślubu/dzieci w tej sesji.',
     'Ustalono kierunek dalszej rozmowy o wartościach, nie tylko o deadline.',
+  ],
+  messages: [
+    {
+      speaker: 'host',
+      text: 'Ja już naprawdę nie wiem, na czym stoimy. Raz mówisz, że chcesz budować ze mną przyszłość, a potem jak zaczynam mówić o mieszkaniu, dziecku albo pieniądzach, to od razu się zamykasz.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Bo mam wrażenie, że każda taka rozmowa kończy się tym, że jestem za mało odpowiedzialny. Ja też myślę o przyszłości, tylko nie umiem wszystkiego zaplanować od razu.',
+    },
+    {
+      speaker: 'host',
+      text: 'Tylko że ja przez to czuję, jakbym była sama z całym ciężarem. Nie chodzi mi o tabelkę w Excelu, tylko o to, żebym nie musiała ciągle pytać, czy ty w ogóle jesteś w tym ze mną.',
+    },
+    {
+      speaker: 'partner',
+      text: 'A ja czuję, że cokolwiek powiem, to i tak będzie źle. Jak mówię, że się boję, to brzmię jak dziecko. Jak milczę, to wychodzi, że mam wszystko gdzieś.',
+    },
+    {
+      speaker: 'host',
+      text: 'Nie chcę cię cisnąć, ale kiedy nie rozmawiamy o tym konkretnie, ja zaczynam panikować. Mam w głowie tysiąc scenariuszy i każdy kończy się tym, że zostaję z tym sama.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Ja nie chcę, żebyś była sama. Po prostu boję się obiecać coś, czego potem nie dowiozę. Chciałbym, żebyśmy mogli o tym pogadać bez tego uczucia, że zaraz zapadnie wyrok.',
+    },
   ],
 };

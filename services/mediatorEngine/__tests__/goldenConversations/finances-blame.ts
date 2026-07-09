@@ -23,6 +23,7 @@ export const financesBlameConversation: GoldenConversation = {
     'hold_space',
     'increase_mutual_understanding',
   ],
+  expectedReplayStrategies: ['validate_emotions'],
   safetyExpectation: 'none',
   participants: {
     host: {

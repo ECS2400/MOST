@@ -47,6 +47,8 @@ export interface GoldenConversation {
   expectedReplayGoalPath?: TherapeuticGoal[];
   /** Strategie, które powinny pojawić się podczas mediacji (kolejność nieważna). */
   expectedStrategies: GoldenConversationStrategy[];
+  /** Strategie oczekiwane dla krótkiego replay messages[] (opcjonalnie). */
+  expectedReplayStrategies?: GoldenConversationStrategy[];
   safetyExpectation: GoldenConversationSafetyExpectation;
   participants: {
     host: GoldenConversationParticipant;

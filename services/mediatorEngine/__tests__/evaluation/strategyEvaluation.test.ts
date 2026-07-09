@@ -141,6 +141,32 @@ describe('evaluateStrategies', () => {
     assert.equal(evaluation.coverage, 1 / 3);
   });
 
+  it('uses expectedReplayStrategies when present', () => {
+    const fullExpected: TherapeuticStrategy[] = [
+      'validate_emotions',
+      'hold_space',
+      'reduce_tension',
+      'prepare_agreement',
+    ];
+    const replayExpected: TherapeuticStrategy[] = ['validate_emotions'];
+    const actual: TherapeuticStrategy[] = ['validate_emotions'];
+    const run = createRun(actual);
+    const conversation: GoldenConversation = {
+      ...createConversation(fullExpected),
+      expectedReplayStrategies: replayExpected,
+    };
+    const evaluation = evaluateStrategies(run, conversation);
+
+    assert.ok(fullExpected.length > replayExpected.length);
+    assert.equal(evaluation.exactMatch, true);
+    assert.equal(evaluation.coverage, 1);
+    assert.deepEqual(evaluation.expectedStrategies, replayExpected);
+    assert.deepEqual(evaluation.actualStrategies, replayExpected);
+    assert.deepEqual(evaluation.matchedStrategies, replayExpected);
+    assert.deepEqual(evaluation.missingStrategies, []);
+    assert.deepEqual(evaluation.unexpectedStrategies, []);
+  });
+
   it('detects unexpected strategies', () => {
     const expected: TherapeuticStrategy[] = ['validate_emotions', 'hold_space'];
     const actual: TherapeuticStrategy[] = [

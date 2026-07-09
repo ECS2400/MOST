@@ -21,6 +21,7 @@ export const householdChoresConversation: GoldenConversation = {
     'increase_mutual_understanding',
     'prepare_agreement',
   ],
+  expectedReplayStrategies: ['validate_emotions'],
   safetyExpectation: 'none',
   participants: {
     host: {

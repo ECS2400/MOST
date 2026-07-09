@@ -17,6 +17,7 @@ export const lackOfCommunicationConversation: GoldenConversation = {
   ],
   expectedReplayGoalPath: ['SAFE_OPENING'],
   expectedStrategies: ['validate_emotions', 'hold_space', 'deepen_emotions'],
+  expectedReplayStrategies: ['validate_emotions'],
   safetyExpectation: 'none',
   participants: {
     host: {

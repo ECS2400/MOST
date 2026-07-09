@@ -25,6 +25,8 @@ import { hiddenSpendingConversation } from '@/services/mediatorEngine/__tests__/
 import { alcoholUseConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/alcohol-use';
 import { recurringArgumentsConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/recurring-arguments';
 import { brokenPromisesConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/broken-promises';
+import { futurePlanningConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/future-planning';
+import type { GoldenConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/types';
 import { evaluateGoalProgression } from '@/services/mediatorEngine/evaluation/goalProgression';
 import { filterParticipantMessages } from '@/services/mediatorEngine/evaluation/mapGoldenToRuntime';
 import { runGoldenConversation } from '@/services/mediatorEngine/evaluation/runGoldenConversation';
@@ -49,6 +51,8 @@ const PILOT_CONVERSATIONS = [
   hiddenSpendingConversation,
   alcoholUseConversation,
   recurringArgumentsConversation,
+  brokenPromisesConversation,
+  futurePlanningConversation,
 ] as const;
 
 const REQUIRED_TRACE_SECTIONS = [
@@ -91,13 +95,18 @@ describe('goldenTraceSnapshot — E2E trace', () => {
     });
   }
 
-  it('broken-promises: SKIPPED trace without turn sections', async () => {
-    const run = await runGoldenConversation(brokenPromisesConversation);
+  it('SKIPPED trace without turn sections', async () => {
+    const conversationWithoutMessages: GoldenConversation = {
+      ...financesBlameConversation,
+      id: 'messages-missing-fixture',
+      messages: undefined,
+    };
+    const run = await runGoldenConversation(conversationWithoutMessages);
 
     assert.equal(run.status, 'SKIPPED');
     assert.equal(run.skipReason, 'messages_missing');
 
-    const output = formatConversationTrace(brokenPromisesConversation, run);
+    const output = formatConversationTrace(conversationWithoutMessages, run);
 
     assert.match(output, /Status: SKIPPED/);
     assert.match(output, /messages_missing/);

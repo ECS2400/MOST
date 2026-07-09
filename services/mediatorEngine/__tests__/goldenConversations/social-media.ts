@@ -16,6 +16,8 @@ export const socialMediaConversation: GoldenConversation = {
     'AGREEMENT',
   ],
   expectedStrategies: ['validate_emotions', 'hold_space', 'increase_mutual_understanding'],
+  expectedReplayGoalPath: ['SAFE_OPENING', 'EMOTION_NAMING'],
+  expectedReplayStrategies: ['build_safety', 'validate_emotions'],
   safetyExpectation: 'none',
   participants: {
     host: {
@@ -57,5 +59,31 @@ export const socialMediaConversation: GoldenConversation = {
     'Kwestia publikacji zdjęć została nazwana jako osobny temat zgody.',
     'Brak eskalacji do personalnych ataków o „głupię” social media.',
     'Para widzi możliwość małych ustaleń (np. telefon poza stołem).',
+  ],
+  messages: [
+    {
+      speaker: 'host',
+      text: 'Nie chodzi o samo zdjęcie. Chodzi o to, że wrzucasz nasze prywatne rzeczy do internetu, zanim w ogóle zapytasz mnie, czy ja się z tym dobrze czuję.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Dla mnie to nie były prywatne rzeczy, tylko normalny moment z naszego życia. Nie pomyślałam, że możesz to odebrać jak przekroczenie granicy.',
+    },
+    {
+      speaker: 'host',
+      text: 'Ale kiedy proszę, żebyś coś usunęła, słyszę, że przesadzam. Wtedy mam wrażenie, że bardziej liczy się reakcja ludzi niż to, co ja czuję.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Nie chodzi mi o ludzi bardziej niż o ciebie. Tylko czasem mam poczucie, że kontrolujesz każdy mój post i potem odechciewa mi się w ogóle czymkolwiek dzielić.',
+    },
+    {
+      speaker: 'host',
+      text: 'Ja nie chcę ci mówić, co masz publikować. Chcę tylko mieć wpływ na rzeczy, które dotyczą też mnie.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Rozumiem. Mogę następnym razem zapytać, zanim wrzucę coś wspólnego. Ale chciałabym też, żebyś nie zakładał od razu, że robię to przeciwko tobie.',
+    },
   ],
 };
