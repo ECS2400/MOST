@@ -22,6 +22,7 @@ import { relocationConversation } from '@/services/mediatorEngine/__tests__/gold
 import { familyBoundariesConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/family-boundaries';
 import { moneySplitConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/money-split';
 import { hiddenSpendingConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/hidden-spending';
+import { alcoholUseConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/alcohol-use';
 import { filterParticipantMessages } from '@/services/mediatorEngine/evaluation/mapGoldenToRuntime';
 import { runGoldenConversation } from '@/services/mediatorEngine/evaluation/runGoldenConversation';
 
@@ -41,6 +42,7 @@ const PILOT_CONVERSATIONS = [
   relocationConversation,
   familyBoundariesConversation,
   moneySplitConversation,
+  hiddenSpendingConversation,
 ] as const;
 
 describe('runGoldenConversation — pilot golden conversations', () => {
@@ -84,8 +86,8 @@ describe('runGoldenConversation — pilot golden conversations', () => {
     });
   }
 
-  it('hidden-spending: SKIPPED when messages_missing', async () => {
-    const result = await runGoldenConversation(hiddenSpendingConversation);
+  it('alcohol-use: SKIPPED when messages_missing', async () => {
+    const result = await runGoldenConversation(alcoholUseConversation);
 
     assert.equal(result.status, 'SKIPPED');
     assert.equal(result.skipReason, 'messages_missing');

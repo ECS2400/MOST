@@ -22,6 +22,8 @@ export const hiddenSpendingConversation: GoldenConversation = {
     'hold_space',
     'recover_misinterpretation',
   ],
+  expectedReplayGoalPath: ['SAFE_OPENING', 'EMOTION_NAMING'],
+  expectedReplayStrategies: ['build_safety', 'validate_emotions'],
   safetyExpectation: 'none',
   participants: {
     host: {
@@ -63,5 +65,31 @@ export const hiddenSpendingConversation: GoldenConversation = {
     'Obie strony mogły mówić bez fizycznej eskalacji lub walki o słowa.',
     'Para nie została zmuszona do „przebaczenia” — ale ma ramę dalszej rozmowy.',
     'Mediator nie wziął strony jako „sędzia finansowy”.',
+  ],
+  messages: [
+    {
+      speaker: 'host',
+      text: 'Najbardziej boli mnie nie sama kwota. Boli mnie to, że dowiedziałem się przypadkiem, a nie od ciebie.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Wiedziałam, że jak powiem, od razu będzie awantura. Nie chciałam znowu słyszeć, że jestem nieodpowiedzialna.',
+    },
+    {
+      speaker: 'host',
+      text: 'Ale przez ukrywanie tego mam poczucie, że nie wiem, co jeszcze przede mną chowasz. To podcina mi zaufanie.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Rozumiem, tylko ja też czuję się czasem jak dziecko, które musi prosić o zgodę na każdą rzecz dla siebie.',
+    },
+    {
+      speaker: 'host',
+      text: 'Nie chcę cię kontrolować. Chcę mieć pewność, że decyzje, które wpływają na nasz budżet, podejmujemy uczciwie.',
+    },
+    {
+      speaker: 'partner',
+      text: 'Masz rację. Powinnam była powiedzieć wcześniej. Chciałabym ustalić taki sposób rozmowy o wydatkach, żeby nie kończyło się to ukrywaniem albo oskarżeniami.',
+    },
   ],
 };

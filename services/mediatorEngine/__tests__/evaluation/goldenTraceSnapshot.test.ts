@@ -22,6 +22,7 @@ import { relocationConversation } from '@/services/mediatorEngine/__tests__/gold
 import { familyBoundariesConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/family-boundaries';
 import { moneySplitConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/money-split';
 import { hiddenSpendingConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/hidden-spending';
+import { alcoholUseConversation } from '@/services/mediatorEngine/__tests__/goldenConversations/alcohol-use';
 import { evaluateGoalProgression } from '@/services/mediatorEngine/evaluation/goalProgression';
 import { filterParticipantMessages } from '@/services/mediatorEngine/evaluation/mapGoldenToRuntime';
 import { runGoldenConversation } from '@/services/mediatorEngine/evaluation/runGoldenConversation';
@@ -43,6 +44,7 @@ const PILOT_CONVERSATIONS = [
   relocationConversation,
   familyBoundariesConversation,
   moneySplitConversation,
+  hiddenSpendingConversation,
 ] as const;
 
 const REQUIRED_TRACE_SECTIONS = [
@@ -85,13 +87,13 @@ describe('goldenTraceSnapshot — E2E trace', () => {
     });
   }
 
-  it('hidden-spending: SKIPPED trace without turn sections', async () => {
-    const run = await runGoldenConversation(hiddenSpendingConversation);
+  it('alcohol-use: SKIPPED trace without turn sections', async () => {
+    const run = await runGoldenConversation(alcoholUseConversation);
 
     assert.equal(run.status, 'SKIPPED');
     assert.equal(run.skipReason, 'messages_missing');
 
-    const output = formatConversationTrace(hiddenSpendingConversation, run);
+    const output = formatConversationTrace(alcoholUseConversation, run);
 
     assert.match(output, /Status: SKIPPED/);
     assert.match(output, /messages_missing/);
