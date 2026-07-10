@@ -22,8 +22,8 @@ const checks = [
   ['both accept closure effect', liveTsx.includes('proposalState.bothAccepted')],
   ['reject inserts alternative', liveTsx.includes('ALTERNATIVE_SOLUTION_KIND')],
   ['no second vote after alternative', liveMediation.includes("stage: 'unresolved_but_closed'")],
-  ['truncateSafeSentence in backend', readFileSync(join(__dirname, '../supabase/functions/live-mediator/index.ts'), 'utf8').includes('function truncateSafeSentence')],
-  ['commitment header em dash', readFileSync(join(__dirname, '../supabase/functions/live-mediator/index.ts'), 'utf8').includes('Konkretne zobowiązanie —')],
+  ['buildProposalAcceptedFinalMessage in i18n', readFileSync(join(__dirname, '../services/liveMediationI18n.ts'), 'utf8').includes('export function buildProposalAcceptedFinalMessage')],
+  ['proposal accepted final message PL', readFileSync(join(__dirname, '../services/liveMediationI18n.ts'), 'utf8').includes('Mediacja zakończona')],
 ];
 
 let failed = 0;

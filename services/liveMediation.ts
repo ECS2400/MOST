@@ -1,6 +1,4 @@
 import {
-  callEdge,
-  EDGE,
   getSupabaseRequestHeaders,
   prepareSupabaseRequest,
   supabase,
@@ -18,7 +16,6 @@ import {
 import { fmt } from '@/utils/i18nFormat';
 import { looksLikePolishCoachText } from '@/utils/textTruncate';
 import {
-  isMediatorRuntimeEnabled,
   MEDIATOR_RUNTIME_ENGINE_VERSION,
 } from '@/services/mediatorRuntimeClient/mediatorRuntimeConfig';
 import {
@@ -29,12 +26,7 @@ import {
   buildLiveRuntimeTurnInput,
   logMediatorRuntimeRolloutFailure,
   routeLiveMediatorTurn,
-  toRuntimeLanguage,
 } from '@/services/mediatorRuntimeClient/liveMediationBridge';
-import {
-  scheduleMediatorShadowRun,
-  shouldRunMediatorShadow,
-} from '@/services/mediatorShadow';
 import type { MediatorRuntimeEdgeSuccess } from '@/services/mediatorEngine/edge/types';
 import type { MediationState } from '@/types/mediator/mediationState';
 import type { SafetyLevel } from '@/types/mediator/safety';
@@ -4119,17 +4111,6 @@ export async function processMediationTurn(
   mode: MediatorMode = 'answer_ack',
   participantNames?: ParticipantNames
 ): Promise<LiveMediatorResponse> {
-  const combinedDescription = truncateCombinedDescription(
-    mediationContext?.combinedDescription || ''
-  );
-  const partnerCombinedDescription = truncateCombinedDescription(
-    mediationContext?.partnerCombinedDescription || '',
-    700
-  );
-  const analysisSummary = buildAnalysisSummary(
-    mediationContext?.analysis ?? null,
-    mediationContext?.partnerAnalysis ?? null
-  );
   const senderRole = resolveSenderRole(
     triggerMessage.sender_id,
     hostUserId,
@@ -4137,71 +4118,10 @@ export async function processMediationTurn(
   );
   const askedQuestions = getAskedQuestionTexts(allMessages);
   const extensionActive = isExtensionActive(allMessages);
-  const flow = computeLiveSessionFlow(allMessages, hostUserId, partnerUserIds);
-  const conversationState = getConversationState(allMessages);
   const questionNumber =
     mode === 'generate_question'
       ? currentQuestionIndex
       : countAskedQuestions(allMessages);
-  const questionPhase =
-    mode === 'generate_question'
-      ? getQuestionPhase(
-          extensionActive ? Math.max(questionNumber + 1, LIVE_QUESTIONS_TARGET + 1) : questionNumber + 1,
-          extensionActive,
-          conversationState
-        )
-      : flow.questionPhase;
-
-  const lastUserMessage = allMessages
-    .filter((m) => m.message_type === 'message' && m.content.trim())
-    .at(-1);
-
-  const legacyPayload = {
-    mediationId: triggerMessage.mediation_id,
-    userId: hostUserId,
-    message: triggerMessage.content,
-    senderId: triggerMessage.sender_id,
-    lastMessage: lastUserMessage?.content ?? triggerMessage.content,
-    mode,
-    phase: currentPhase,
-    questionNumber,
-    questionIndex: currentQuestionIndex,
-    questionPhase,
-    extensionActive,
-    state: conversationState,
-    combinedDescription,
-    partnerCombinedDescription,
-    analysisSummary,
-    priorAgreements: mediationContext?.priorAgreements || undefined,
-    triggerMessage: {
-      content: triggerMessage.content,
-      senderId: triggerMessage.sender_id,
-      senderRole,
-    },
-    recentMessages: allMessages.slice(-40).map((m) => ({
-      sender_id: m.sender_id,
-      content: m.content,
-      message_type: m.message_type,
-      metadata: m.metadata
-        ? {
-            replyToQuestionId:
-              typeof m.metadata.replyToQuestionId === 'string'
-                ? m.metadata.replyToQuestionId
-                : undefined,
-            questionId:
-              typeof m.metadata.questionId === 'string' ? m.metadata.questionId : undefined,
-            summaryKind:
-              typeof m.metadata.summaryKind === 'string' ? m.metadata.summaryKind : undefined,
-          }
-        : undefined,
-    })),
-    language: normalizeAppLanguage(language),
-    hostName: participantNames?.hostName,
-    partnerName: participantNames?.partnerName,
-    hostDescription: combinedDescription,
-    partnerDescription: partnerCombinedDescription,
-    partnerUserId: partnerUserIds[0] ?? undefined,
-  };
 
   const persistedRuntime = await loadMediationRuntimeState(triggerMessage.mediation_id);
 
@@ -4220,31 +4140,20 @@ export async function processMediationTurn(
     sessionMemory: persistedRuntime.sessionMemory,
   });
 
-  const legacyPathActive = !isMediatorRuntimeEnabled();
-  const mediatorTurnStartedAt = Date.now();
   let runtimeTurnPersist: MediatorRuntimeParsedSuccess | null = null;
 
   try {
     const result = await routeLiveMediatorTurn(runtimeTurnInput, {
-      isRuntimeEnabled: isMediatorRuntimeEnabled,
       callRuntime: async (input) => {
         const parsed = await callMediatorRuntime(input);
         runtimeTurnPersist = parsed;
         return parsed.response;
       },
-      callLegacy: () => callEdge<LiveMediatorResponse>(EDGE.liveMediator, legacyPayload),
       onRuntimeFailure: logMediatorRuntimeRolloutFailure,
     });
 
     if (runtimeTurnPersist) {
       await persistMediationRuntimeState(triggerMessage.mediation_id, runtimeTurnPersist);
-    }
-
-    if (legacyPathActive && shouldRunMediatorShadow()) {
-      scheduleMediatorShadowRun(runtimeTurnInput, result ?? {}, {
-        language: toRuntimeLanguage(language),
-        legacyLatencyMs: Date.now() - mediatorTurnStartedAt,
-      });
     }
 
     if (
@@ -4603,43 +4512,4 @@ export async function reportMediationIssue(
   } catch {
     // Non-blocking.
   }
-}
-
-/** @deprecated Use processMediationTurn */
-export async function callLiveMediator(
-  mediationId: string,
-  userId: string,
-  message: string,
-  phase: number,
-  recentMessages: LiveMessage[],
-  language: Language = 'pl'
-): Promise<LiveMediatorResponse> {
-  const trigger: LiveMessage = {
-    id: 'trigger',
-    mediation_id: mediationId,
-    sender_id: userId,
-    sender_name: 'Ty',
-    content: message,
-    message_type: 'message',
-    is_private: false,
-    recipient_id: null,
-    phase,
-    metadata: null,
-    created_at: new Date().toISOString(),
-  };
-
-  const partnerIds = recentMessages
-    .filter((m) => m.sender_id !== userId && m.sender_id !== 'ai' && m.message_type === 'message')
-    .map((m) => m.sender_id)
-    .filter((id, i, arr) => arr.indexOf(id) === i);
-
-  return processMediationTurn(
-    trigger,
-    userId,
-    partnerIds,
-    phase,
-    recentMessages,
-    0,
-    language
-  );
 }

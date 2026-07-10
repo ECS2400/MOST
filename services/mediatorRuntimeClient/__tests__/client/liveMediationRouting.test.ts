@@ -8,7 +8,6 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   buildLiveRuntimeTurnInput,
-  chooseLiveMediatorEnginePath,
   logMediatorRuntimeRolloutFailure,
   routeLiveMediatorTurn,
   toRuntimeLanguage,
@@ -27,27 +26,6 @@ const BASE_PARAMS = {
   language: 'it',
   turnNumber: 4,
 };
-
-describe('chooseLiveMediatorEnginePath', () => {
-  it('defaults to legacy without env flag', () => {
-    assert.equal(chooseLiveMediatorEnginePath({}), 'legacy');
-    assert.equal(chooseLiveMediatorEnginePath(), 'legacy');
-  });
-
-  it('selects runtime when EXPO_PUBLIC_MEDIATOR_ENGINE_PATH=runtime', () => {
-    assert.equal(
-      chooseLiveMediatorEnginePath({ EXPO_PUBLIC_MEDIATOR_ENGINE_PATH: 'runtime' }),
-      'runtime'
-    );
-  });
-
-  it('selects legacy when EXPO_PUBLIC_MEDIATOR_ENGINE_PATH=legacy', () => {
-    assert.equal(
-      chooseLiveMediatorEnginePath({ EXPO_PUBLIC_MEDIATOR_ENGINE_PATH: 'legacy' }),
-      'legacy'
-    );
-  });
-});
 
 describe('buildLiveRuntimeTurnInput', () => {
   it('passes language from live flow input', () => {
@@ -97,43 +75,16 @@ describe('buildLiveRuntimeTurnInput', () => {
 });
 
 describe('routeLiveMediatorTurn', () => {
-  it('uses legacy path when runtime flag is off', async () => {
-    let runtimeCalls = 0;
-    let legacyCalls = 0;
-
-    const result = await routeLiveMediatorTurn(
-      buildLiveRuntimeTurnInput(BASE_PARAMS),
-      {
-        isRuntimeEnabled: () => false,
-        callRuntime: async () => {
-          runtimeCalls += 1;
-          return { source: 'runtime' };
-        },
-        callLegacy: async () => {
-          legacyCalls += 1;
-          return { source: 'legacy' };
-        },
-        onRuntimeFailure: () => {},
-      }
-    );
-
-    assert.deepEqual(result, { source: 'legacy' });
-    assert.equal(runtimeCalls, 0);
-    assert.equal(legacyCalls, 1);
-  });
-
-  it('calls runtime when flag is on', async () => {
+  it('calls runtime and returns result', async () => {
     let runtimeCalls = 0;
 
     const result = await routeLiveMediatorTurn(
       buildLiveRuntimeTurnInput(BASE_PARAMS),
       {
-        isRuntimeEnabled: () => true,
         callRuntime: async () => {
           runtimeCalls += 1;
           return { source: 'runtime' };
         },
-        callLegacy: async () => ({ source: 'legacy' }),
         onRuntimeFailure: () => {},
       }
     );
@@ -142,46 +93,21 @@ describe('routeLiveMediatorTurn', () => {
     assert.equal(runtimeCalls, 1);
   });
 
-  it('falls back to legacy when runtime throws', async () => {
-    let legacyCalls = 0;
+  it('returns null and invokes onRuntimeFailure when runtime throws', async () => {
     const failures: unknown[] = [];
 
     const result = await routeLiveMediatorTurn(
       buildLiveRuntimeTurnInput(BASE_PARAMS),
       {
-        isRuntimeEnabled: () => true,
         callRuntime: async () => {
           throw new MediatorRuntimeClientError('network', 'offline', { retryable: true });
-        },
-        callLegacy: async () => {
-          legacyCalls += 1;
-          return { source: 'legacy-fallback' };
         },
         onRuntimeFailure: (error) => failures.push(error),
       }
     );
 
-    assert.deepEqual(result, { source: 'legacy-fallback' });
-    assert.equal(legacyCalls, 1);
-    assert.equal(failures.length, 1);
-  });
-
-  it('returns null when legacy also fails under runtime flag', async () => {
-    const result = await routeLiveMediatorTurn(
-      buildLiveRuntimeTurnInput(BASE_PARAMS),
-      {
-        isRuntimeEnabled: () => true,
-        callRuntime: async () => {
-          throw new MediatorRuntimeClientError('timeout', 'timed out', { retryable: true });
-        },
-        callLegacy: async () => {
-          throw new Error('legacy down');
-        },
-        onRuntimeFailure: () => {},
-      }
-    );
-
     assert.equal(result, null);
+    assert.equal(failures.length, 1);
   });
 });
 

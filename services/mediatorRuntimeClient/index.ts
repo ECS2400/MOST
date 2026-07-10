@@ -20,18 +20,14 @@ export { adaptRuntimeToLiveResponse } from '@/services/mediatorRuntimeClient/ada
 
 export {
   MEDIATOR_RUNTIME_ENGINE_VERSION,
-  DEFAULT_MEDIATOR_ENGINE_PATH,
   MEDIATOR_RUNTIME_DEFAULT_TIMEOUT_MS,
   MEDIATOR_RUNTIME_MAX_RETRIES,
   MEDIATOR_RUNTIME_RETRY_DELAYS_MS,
   MEDIATOR_RUNTIME_FUNCTION_PATH,
-  getMediatorEnginePath,
-  isMediatorRuntimeEnabled,
   getDefaultEnv,
   resolveMediatorRuntimeEndpoint,
 } from '@/services/mediatorRuntimeClient/mediatorRuntimeConfig';
 export { getMediatorRuntimeEndpoint, getMediatorRuntimeRequestHeaders } from '@/services/mediatorRuntimeClient/supabaseBridge';
-export type { MediatorEnginePath } from '@/services/mediatorRuntimeClient/mediatorRuntimeConfig';
 
 export {
   MediatorRuntimeClientError,
@@ -54,7 +50,6 @@ export type { MediatorRuntimeRetryOptions } from '@/services/mediatorRuntimeClie
 export type { QuestionTarget } from '@/services/mediatorRuntimeClient/types';
 
 export {
-  chooseLiveMediatorEnginePath,
   buildLiveRuntimeTurnInput,
   routeLiveMediatorTurn,
   toRuntimeLanguage,
@@ -63,7 +58,6 @@ export {
 } from '@/services/mediatorRuntimeClient/liveMediationBridge';
 export type {
   LiveRuntimeTurnParams,
-  LiveMediatorEnginePath,
   LiveMediatorRoutingDeps,
   MediatorRuntimeRolloutFailurePayload,
   MediatorRuntimeRolloutFailureLogger,

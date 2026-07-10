@@ -7,18 +7,11 @@ import type {
 } from '@/types/mediator';
 import type { MediatorRuntimeClientInput } from '@/services/mediatorRuntimeClient/buildMediatorRuntimeRequest';
 import {
-  getDefaultEnv,
-  getMediatorEnginePath,
-  type MediatorEnginePath,
-} from '@/services/mediatorRuntimeClient/mediatorRuntimeConfig';
-import {
   isMediatorRuntimeClientError,
   type MediatorRuntimeClientErrorKind,
 } from '@/services/mediatorRuntimeClient/errors';
 
 const SUPPORTED_RUNTIME_LANGUAGES: MediatorLang[] = ['pl', 'en', 'es', 'it', 'de', 'fr'];
-
-export type LiveMediatorEnginePath = MediatorEnginePath;
 
 export type LiveMediatorTurnMode =
   | 'opening_summary'
@@ -45,13 +38,6 @@ export interface LiveRuntimeTurnParams {
   isBootstrap?: boolean;
   mediationState?: MediationState | null;
   sessionMemory?: SessionMemory | null;
-}
-
-/** Chooses legacy live-mediator vs mediator-runtime for the current env. */
-export function chooseLiveMediatorEnginePath(
-  env: Record<string, string | undefined> = getDefaultEnv()
-): LiveMediatorEnginePath {
-  return getMediatorEnginePath(env);
 }
 
 /** Maps app language to mediator-runtime language with en fallback (not pl). */
@@ -126,32 +112,19 @@ export function buildLiveRuntimeTurnInput(
 }
 
 export interface LiveMediatorRoutingDeps<T> {
-  isRuntimeEnabled: () => boolean;
   callRuntime: (input: MediatorRuntimeClientInput) => Promise<T>;
-  callLegacy: () => Promise<T>;
   onRuntimeFailure: (error: unknown) => void;
 }
 
-/**
- * Routes a live turn to runtime or legacy edge.
- * runtime failure falls back to legacy during gradual rollout
- */
+/** Routes a live turn to mediator-runtime; failures return null for local fallback. */
 export async function routeLiveMediatorTurn<T>(
   runtimeInput: MediatorRuntimeClientInput,
   deps: LiveMediatorRoutingDeps<T>
 ): Promise<T | null> {
-  if (deps.isRuntimeEnabled()) {
-    try {
-      return await deps.callRuntime(runtimeInput);
-    } catch (error) {
-      deps.onRuntimeFailure(error);
-      // runtime failure falls back to legacy during gradual rollout
-    }
-  }
-
   try {
-    return await deps.callLegacy();
-  } catch {
+    return await deps.callRuntime(runtimeInput);
+  } catch (error) {
+    deps.onRuntimeFailure(error);
     return null;
   }
 }

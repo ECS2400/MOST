@@ -1264,49 +1264,6 @@ function createEmptyStrategyOutput() {
     recoveryStrategy: null
   };
 }
-function createEmptyExplainability(turnNumber) {
-  return {
-    decisionExplanation: {
-      turnNumber,
-      timestamp: SKELETON_TIMESTAMP,
-      decisionId: "skeleton-decision",
-      outcome: {
-        strategy: "build_safety",
-        interventionType: "welcome_open",
-        intent: "increase_emotional_safety",
-        goalTransition: "stay",
-        pace: "normal"
-      },
-      reasoning: [],
-      constitutionArticleRefs: [],
-      evidenceRefs: [],
-      moduleInputs: {
-        reflection: {
-          lastInterventionHelpful: false,
-          shouldChangeStrategy: false,
-          recommendedStrategyShift: "continue",
-          expectedEffectAchieved: null
-        },
-        priority: {
-          conversationMode: "NORMAL",
-          topSignalType: null,
-          preemptsGoalTransition: false,
-          recommendedInterventionType: "welcome_open"
-        },
-        strategy: {
-          primaryStrategy: "build_safety",
-          secondaryStrategy: null,
-          suggestedGoalTransition: "stay",
-          confidence: 0
-        },
-        readiness: { hostReadyToAdvance: false, partnerReadyToAdvance: false }
-      },
-      rejectedAlternatives: []
-    },
-    contributions: [],
-    currentGoal: "SAFE_OPENING"
-  };
-}
 
 // services/mediatorEngine/memory/continuity/detectRepeatedMove.ts
 var REPEATED_MOVE_THRESHOLD = 3;
@@ -5207,6 +5164,85 @@ function analyzeState(input) {
   }
 }
 
+// services/mediatorEngine/orchestrator/applyGoalTransitionToState.ts
+function applyGoalTransitionToState(input) {
+  const { state, goalTransition, goalContinuityContext } = input;
+  if (goalTransition !== "advance" && goalTransition !== "regress") {
+    return state;
+  }
+  const nextGoal = goalContinuityContext.recommendedNextGoal;
+  if (!nextGoal) {
+    return state;
+  }
+  if (state.currentGoal === nextGoal) {
+    return state;
+  }
+  return {
+    ...state,
+    currentGoal: nextGoal
+  };
+}
+
+// services/mediatorEngine/orchestrator/buildExplainability.ts
+function buildExplainability(input) {
+  const {
+    turnNumber,
+    mediationId,
+    state,
+    reflectionOutput,
+    strategyOutput,
+    priorityOutput,
+    decisionOutput,
+    complianceResult
+  } = input;
+  const topSignalType = priorityOutput.activeSignals[0]?.type ?? null;
+  return {
+    currentGoal: state.currentGoal,
+    contributions: [],
+    decisionExplanation: {
+      turnNumber,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      decisionId: `${mediationId}-turn-${turnNumber}`,
+      outcome: {
+        strategy: decisionOutput.strategy,
+        interventionType: decisionOutput.selectedInterventionType,
+        intent: decisionOutput.intent,
+        goalTransition: decisionOutput.goalTransition,
+        pace: state.pace?.current ?? "normal"
+      },
+      reasoning: decisionOutput.rationale ? [{ order: 1, module: "decision", statement: decisionOutput.rationale }] : [],
+      constitutionArticleRefs: [],
+      evidenceRefs: [],
+      moduleInputs: {
+        reflection: {
+          lastInterventionHelpful: reflectionOutput.lastInterventionHelpful.value,
+          shouldChangeStrategy: reflectionOutput.shouldChangeStrategy,
+          recommendedStrategyShift: reflectionOutput.recommendedStrategyShift,
+          expectedEffectAchieved: reflectionOutput.expectedEffectEvaluation?.achieved ?? null
+        },
+        priority: {
+          conversationMode: priorityOutput.conversationMode,
+          topSignalType,
+          preemptsGoalTransition: priorityOutput.preemptsGoalTransition,
+          recommendedInterventionType: priorityOutput.recommendedInterventionType
+        },
+        strategy: {
+          primaryStrategy: strategyOutput.primaryStrategy,
+          secondaryStrategy: strategyOutput.secondaryStrategy,
+          suggestedGoalTransition: strategyOutput.suggestedGoalTransition,
+          confidence: strategyOutput.confidence
+        },
+        readiness: {
+          hostReadyToAdvance: reflectionOutput.partnerReadiness.host.readyToAdvance.value,
+          partnerReadyToAdvance: reflectionOutput.partnerReadiness.partner.readyToAdvance.value
+        }
+      },
+      rejectedAlternatives: [],
+      complianceResult
+    }
+  };
+}
+
 // services/mediatorEngine/orchestrator/orchestrateTurn.ts
 function buildStrategyStateContext(state, sessionMemory) {
   const goalChecks = state.goals.flatMap((goal) => goal.checks);
@@ -5333,9 +5369,14 @@ function orchestrateTurn(input) {
     attemptNumber: 1,
     recentInterventionSignatures: sessionMemory.askedInterventionSignatures ?? []
   });
+  const stateAfterGoalTransition = applyGoalTransitionToState({
+    state,
+    goalTransition: decisionOutput.goalTransition,
+    goalContinuityContext
+  });
   const updatedSessionMemory = updateSessionMemory({
     previousMemory: sessionMemory,
-    state,
+    state: stateAfterGoalTransition,
     intervention,
     reflection: reflectionOutput,
     complianceResult,
@@ -5351,11 +5392,20 @@ function orchestrateTurn(input) {
     complianceResult
   });
   return {
-    mediationState: state,
+    mediationState: stateAfterGoalTransition,
     intervention,
     sessionMemory: updatedSessionMemory,
     evidenceStore: stateAnalyzerOutput.evidenceStore,
-    explainability: createEmptyExplainability(request.turnNumber),
+    explainability: buildExplainability({
+      turnNumber: request.turnNumber,
+      mediationId: request.mediationId,
+      state: stateAfterGoalTransition,
+      reflectionOutput,
+      strategyOutput,
+      priorityOutput,
+      decisionOutput,
+      complianceResult
+    }),
     complianceResult,
     engineVersion: request.engineVersion
   };

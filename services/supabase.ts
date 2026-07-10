@@ -78,7 +78,6 @@ export const EDGE = {
   analyzePerspectives: `${SUPABASE_URL}/functions/v1/analyze-perspectives`,
   realtimeCoach: `${SUPABASE_URL}/functions/v1/realtimecoach`,
   checkLimits: `${SUPABASE_URL}/functions/v1/check-limits`,
-  liveMediator: `${SUPABASE_URL}/functions/v1/live-mediator`,
   mediatorRuntime: `${SUPABASE_URL}/functions/v1/mediator-runtime`,
   soloCoach: `${SUPABASE_URL}/functions/v1/solo-coach`,
   disputeClosure: `${SUPABASE_URL}/functions/v1/dispute-closure`,
