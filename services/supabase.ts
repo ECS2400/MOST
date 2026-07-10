@@ -3,6 +3,8 @@ import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import type { MediationState } from '@/types/mediator/mediationState';
+import type { SessionMemory } from '@/types/mediator/sessionMemory';
 
 export const SUPABASE_URL = 'https://ilqdxdjnabmbmmstvczh.supabase.co';
 export const SUPABASE_ANON_KEY =
@@ -181,6 +183,13 @@ export type Tables = {
     current_question_index: number;
     partner_typing: boolean;
     live_summary: any | null;
+    mediation_state: MediationState | null;
+    session_memory: SessionMemory | null;
+    mediator_engine_version: string | null;
+    mediator_runtime_metadata: Record<string, unknown> | null;
+    mediator_last_goal: string | null;
+    mediator_last_strategy: string | null;
+    mediator_last_safety_level: string | null;
     status:
       | 'pending'
       | 'analyzing'
