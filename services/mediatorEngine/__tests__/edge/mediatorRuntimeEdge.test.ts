@@ -131,6 +131,8 @@ describe('mediator-runtime edge — runtime handler', () => {
       assert.equal(result.engineVersion, 'v2.3');
       assert.ok(result.finalMediatorMessage.text.length > 0);
       assert.equal(result.finalMediatorMessage.accepted, true);
+      assert.ok(result.runtimeSession);
+      assert.equal(result.runtimeSession.session.turnOrdinal, result.runtimeMetadata.turnNumber);
     }
   });
 
@@ -268,6 +270,8 @@ describe('mediator-runtime edge — runtime handler', () => {
     assert.ok(isMediatorRuntimeResponseSafe(edge));
     assert.ok(!('llmOutput' in edge));
     assert.ok(!('promptComposerOutput' in edge));
+    assert.ok(edge.runtimeSession);
+    assert.equal(edge.runtimeSession, runtimeOutput.runtimeSession);
   });
 });
 

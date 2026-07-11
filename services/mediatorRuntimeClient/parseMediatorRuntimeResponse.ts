@@ -4,6 +4,10 @@ import type { MediatorRuntimeEdgeSuccess } from '@/services/mediatorEngine/edge/
 import type { MediatorRuntimeErrorBody } from '@/services/mediatorEngine/edge/errors';
 import { adaptRuntimeToLiveResponse } from '@/services/mediatorRuntimeClient/adaptRuntimeToLiveResponse';
 import { MediatorRuntimeClientError } from '@/services/mediatorRuntimeClient/errors';
+import {
+  isRecord,
+  isRuntimeSessionShape,
+} from '@/services/mediatorRuntimeClient/runtimeSessionShape';
 
 export interface MediatorRuntimeParsedSuccess {
   response: LiveMediatorResponse;
@@ -30,10 +34,6 @@ function edgeError(body: MediatorRuntimeErrorBody, status: number): MediatorRunt
     edgeCode: body.error.code,
     retryable: status >= 500,
   });
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object';
 }
 
 function parseSuccessBody(body: Record<string, unknown>): ParseMediatorRuntimeResponseResult {
@@ -77,6 +77,10 @@ function parseSuccessBody(body: Record<string, unknown>): ParseMediatorRuntimeRe
 
   if (!isRecord(body.runtimeMetadata)) {
     return { ok: false, error: missingFieldsError('runtimeMetadata') };
+  }
+
+  if (!isRuntimeSessionShape(body.runtimeSession)) {
+    return { ok: false, error: missingFieldsError('runtimeSession') };
   }
 
   const success = body as unknown as MediatorRuntimeEdgeSuccess;

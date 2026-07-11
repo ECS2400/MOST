@@ -1,4 +1,5 @@
 import type { LiveMediationBundle } from './types';
+import { RUNTIME_STAGE_LABELS_EN } from './runtimeStageLabels';
 
 export const LIVE_MEDIATION_EN: LiveMediationBundle = {
   service: {
@@ -210,6 +211,8 @@ export const LIVE_MEDIATION_EN: LiveMediationBundle = {
     waitingYourAnswer: 'Partner answered — your turn',
     waitingBothAnswers: 'Both of you — answer the current question',
     questionLabel: 'Question {n} of 15',
+    runtimeProgressLabel: '{percent}% · {stage}',
+    runtimeStageLabels: RUNTIME_STAGE_LABELS_EN,
     disputeResolved: 'Dispute resolved',
     disputeResolvedTitle: 'Dispute resolved?',
     disputeResolvedMessage: 'Did you close this dispute? We will go to the summary.',

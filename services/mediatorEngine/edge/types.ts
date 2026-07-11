@@ -10,6 +10,7 @@ import type {
   SessionMemory,
   TranscriptMessage,
 } from '@/types/mediator';
+import type { RuntimeSession } from '@/types/mediator/runtimeSession';
 
 /** Minimal request body accepted by mediator-runtime Edge Function. */
 export interface MediatorRuntimeEdgeRequest {
@@ -46,6 +47,7 @@ export interface MediatorRuntimeEdgeSuccess {
   runtimeMetadata: RuntimeMetadata;
   fallbackUsed: boolean;
   retryCount: number;
+  runtimeSession: RuntimeSession;
 }
 
 export type MediatorRuntimeEdgeResult = MediatorRuntimeEdgeSuccess | import('./errors').MediatorRuntimeErrorBody;

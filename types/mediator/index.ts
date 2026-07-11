@@ -34,3 +34,4 @@ export * from './promptComposer';
 export * from './llm';
 export * from './responseValidator';
 export * from './runtime';
+export * from './runtimeSession';

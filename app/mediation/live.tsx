@@ -18,6 +18,11 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
 import { useCouple } from '@/hooks/useCouple';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useRuntimeSession } from '@/hooks/useRuntimeSession';
+import {
+  resolveLivePhaseHeaderLabel,
+  resolveLiveProgressPercent,
+} from '@/services/mediatorRuntimeClient/resolveRuntimeSessionProgressDisplay';
 import { getLiveMediationExtras } from '@/constants/i18n/liveMediation';
 import { getClosureBundle } from '@/constants/i18n/closure';
 import type { Language } from '@/constants/i18n';
@@ -418,6 +423,11 @@ export default function LiveMediationScreen() {
 
   const funFactScope = mediationId ? `live-${mediationId}` : 'live-local';
 
+  const runtimeSessionReadonly = useRuntimeSession(mediationId);
+  const { runtimeSession, refreshRuntimeSession } = runtimeSessionReadonly;
+  const runtimeSessionReadonlyRef = useRef(runtimeSessionReadonly);
+  runtimeSessionReadonlyRef.current = runtimeSessionReadonly;
+
   const listRef = useRef<FlatList<ChatItem>>(null);
   const dbHadMessagesRef = useRef(false);
   const isActiveSendRef = useRef(false);
@@ -569,7 +579,14 @@ export default function LiveMediationScreen() {
 
   const questionCount = turnState?.questionNumber ?? countAskedQuestions(messages);
   const phase = questionCount || session?.live_phase || 1;
-  const progress = getPhaseProgress(phase, session?.live_progress, sessionFlow?.maxQuestions);
+  const legacyProgress = getPhaseProgress(phase, session?.live_progress, sessionFlow?.maxQuestions);
+  const legacyPhaseLabel = getPhaseLabel(phase, language, sessionFlow, messages);
+  const progress = resolveLiveProgressPercent(runtimeSession, legacyProgress);
+  const phaseHeaderLabel = resolveLivePhaseHeaderLabel(
+    runtimeSession,
+    legacyPhaseLabel,
+    language
+  );
 
   const awaitingDecision =
     sessionFlow?.stage === 'awaiting_main_decision' ||
@@ -781,6 +798,8 @@ export default function LiveMediationScreen() {
         );
         if (historyErr) setHistoryError(historyErr);
       }
+
+      await refreshRuntimeSession();
     } catch {
       setHistoryError(liveUi.historyError);
       setSessionDebug(createMockLiveSession(mediationId, user.id));
@@ -788,7 +807,7 @@ export default function LiveMediationScreen() {
       logSetState('loading:false');
       setLoading(false);
     }
-  }, [mediationId, user, logSetState, setMessagesDebug, setSessionDebug, language, liveUi.historyError, liveUi.noAiHistory, liveUi.waitingHostStart, couple?.id]);
+  }, [mediationId, user, logSetState, setMessagesDebug, setSessionDebug, language, liveUi.historyError, liveUi.noAiHistory, liveUi.waitingHostStart, couple?.id, refreshRuntimeSession]);
 
   /** Cicha synchronizacja w tle — NIE chowa czatu. */
   const silentSyncFromSupabase = useCallback(async () => {
@@ -816,11 +835,12 @@ export default function LiveMediationScreen() {
         merged[merged.length - 1]?.id !== current[current.length - 1]?.id;
       if (hasNewMessages) {
         setMessagesDebug(merged);
+        void refreshRuntimeSession();
       }
     } finally {
       focusFetchInFlightRef.current = false;
     }
-  }, [mediationId, user, sending, processing, setMessagesDebug]);
+  }, [mediationId, user, sending, processing, setMessagesDebug, refreshRuntimeSession]);
 
   const silentSyncRef = useRef(silentSyncFromSupabase);
   silentSyncRef.current = silentSyncFromSupabase;
@@ -1095,6 +1115,7 @@ export default function LiveMediationScreen() {
         );
         const freshSession = await fetchLiveSession(mediationId, user.id);
         setSessionDebug(freshSession);
+        await refreshRuntimeSession();
 
         if (
           mode === 'opening_summary' &&
@@ -1138,7 +1159,7 @@ export default function LiveMediationScreen() {
         throw error instanceof Error ? error : new Error(String(error ?? 'Unknown mediation error'));
       }
     },
-    [user, mediationId, hostUserId, partnerUserIds, partnerUserId, partner?.name, setMessagesDebug, setSessionDebug, language, couple?.id, questionCount, stableParticipantNames, isCurrentUserHost, logMediatorCall]
+    [user, mediationId, hostUserId, partnerUserIds, partnerUserId, partner?.name, setMessagesDebug, setSessionDebug, language, couple?.id, questionCount, stableParticipantNames, isCurrentUserHost, logMediatorCall, refreshRuntimeSession]
   );
 
   const runGenerateNextQuestion = useCallback(
@@ -1808,9 +1829,7 @@ export default function LiveMediationScreen() {
           </Pressable>
           <View style={styles.headerCenter}>
             <Text style={styles.headerTitle}>{liveUi.title}</Text>
-            <Text style={styles.headerPhase}>
-              {getPhaseLabel(phase, language, sessionFlow, messages)}
-            </Text>
+            <Text style={styles.headerPhase}>{phaseHeaderLabel}</Text>
           </View>
           <Pressable onPress={handlePause} style={styles.headerBtn} disabled={paused}>
             <MaterialIcons

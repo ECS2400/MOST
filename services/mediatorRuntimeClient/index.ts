@@ -62,3 +62,25 @@ export type {
   MediatorRuntimeRolloutFailurePayload,
   MediatorRuntimeRolloutFailureLogger,
 } from '@/services/mediatorRuntimeClient/liveMediationBridge';
+
+export {
+  buildMediationRuntimePersistencePatch,
+  parseLoadedMediationRuntimeRow,
+  parseStoredRuntimeSession,
+} from '@/services/mediatorRuntimeClient/mediationRuntimeSessionPersistence';
+export type { LoadedMediationRuntimeState } from '@/services/mediatorRuntimeClient/mediationRuntimeSessionPersistence';
+
+export {
+  loadMediationRuntimeState,
+  loadMediationRuntimeSession,
+} from '@/services/mediatorRuntimeClient/loadMediationRuntimeSession';
+
+export {
+  resolveLivePhaseHeaderLabel,
+  resolveLiveProgressPercent,
+  resolveRuntimeStageLabel,
+} from '@/services/mediatorRuntimeClient/resolveRuntimeSessionProgressDisplay';
+
+export { hasRuntimeSession } from '@/services/mediatorRuntimeClient/hasRuntimeSession';
+
+export { isRuntimeSessionShape, isRecord } from '@/services/mediatorRuntimeClient/runtimeSessionShape';

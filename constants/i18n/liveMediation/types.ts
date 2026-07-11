@@ -1,3 +1,7 @@
+import type { RuntimeSessionStage } from '@/types/mediator/runtimeSession';
+
+export type LiveMediationRuntimeStageLabels = Record<RuntimeSessionStage, string>;
+
 export interface LiveMediationServiceStrings {
   toughQuestionPool: string[];
   questionFlow: [string, string, string, string];
@@ -178,6 +182,8 @@ export interface LiveMediationBundle {
     waitingYourAnswer: string;
     waitingBothAnswers: string;
     questionLabel: string;
+    runtimeProgressLabel: string;
+    runtimeStageLabels: LiveMediationRuntimeStageLabels;
     phaseLabels: {
       opening: string;
       deepening: string;

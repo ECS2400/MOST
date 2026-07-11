@@ -7,6 +7,7 @@ import type {
   RuntimeMetadata,
   SafeRuntimeContext,
 } from '@/types/mediator';
+import { composeRuntimeSession } from '@/services/mediatorEngine/runtimeSession';
 import { RUNTIME_LIMITS } from '@/services/mediatorEngine/runtime/config/runtimeLimits';
 
 export interface BuildRuntimeOutputParams {
@@ -37,15 +38,27 @@ export function buildRuntimeOutput(params: BuildRuntimeOutputParams): MediatorRu
     retryCount: retryResult.retryCount,
   };
 
+  const fallbackUsed = retryResult.fallbackUsed || retryResult.llmOutput.fallbackUsed;
+
+  const runtimeSession = composeRuntimeSession({
+    mediationState: orchestratedTurn.mediationState,
+    sessionMemory: orchestratedTurn.sessionMemory,
+    intervention: orchestratedTurn.intervention,
+    finalMediatorMessage,
+    runtimeMetadata,
+    fallbackUsed,
+  });
+
   return {
     orchestratedTurn,
     promptComposerOutput,
     llmOutput: retryResult.llmOutput,
     responseValidation: retryResult.responseValidation,
     finalMediatorMessage,
-    fallbackUsed: retryResult.fallbackUsed || retryResult.llmOutput.fallbackUsed,
+    fallbackUsed,
     retryCount: retryResult.retryCount,
     runtimeMetadata,
+    runtimeSession,
   };
 }
 

@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import type { MediationState } from '@/types/mediator/mediationState';
 import type { SessionMemory } from '@/types/mediator/sessionMemory';
+import type { RuntimeSession } from '@/types/mediator/runtimeSession';
 
 export const SUPABASE_URL = 'https://ilqdxdjnabmbmmstvczh.supabase.co';
 export const SUPABASE_ANON_KEY =
@@ -189,6 +190,7 @@ export type Tables = {
     mediator_last_goal: string | null;
     mediator_last_strategy: string | null;
     mediator_last_safety_level: string | null;
+    mediator_runtime_session: RuntimeSession | null;
     status:
       | 'pending'
       | 'analyzing'

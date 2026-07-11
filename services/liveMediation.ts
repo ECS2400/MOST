@@ -16,21 +16,18 @@ import {
 import { fmt } from '@/utils/i18nFormat';
 import { looksLikePolishCoachText } from '@/utils/textTruncate';
 import {
-  MEDIATOR_RUNTIME_ENGINE_VERSION,
-} from '@/services/mediatorRuntimeClient/mediatorRuntimeConfig';
-import {
   callMediatorRuntime,
-  type MediatorRuntimeParsedSuccess,
 } from '@/services/mediatorRuntimeClient/mediatorRuntimeClient';
 import {
   buildLiveRuntimeTurnInput,
   logMediatorRuntimeRolloutFailure,
   routeLiveMediatorTurn,
 } from '@/services/mediatorRuntimeClient/liveMediationBridge';
-import type { MediatorRuntimeEdgeSuccess } from '@/services/mediatorEngine/edge/types';
-import type { MediationState } from '@/types/mediator/mediationState';
-import type { SafetyLevel } from '@/types/mediator/safety';
-import type { SessionMemory } from '@/types/mediator/sessionMemory';
+import {
+  buildMediationRuntimePersistencePatch,
+} from '@/services/mediatorRuntimeClient/mediationRuntimeSessionPersistence';
+import { loadMediationRuntimeState } from '@/services/mediatorRuntimeClient/loadMediationRuntimeSession';
+import type { MediatorRuntimeParsedSuccess } from '@/services/mediatorRuntimeClient/mediatorRuntimeClient';
 
 function liveStrings(lang: Language = 'pl') {
   return getLiveMediationExtras(lang).service;
@@ -4266,91 +4263,6 @@ export async function processMediationTurn(
     extensionActive,
     participantNames
   );
-}
-
-interface LoadedMediationRuntimeState {
-  mediationState: MediationState | null;
-  sessionMemory: SessionMemory | null;
-}
-
-function parseStoredJsonObject<T extends object>(value: unknown): T | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return null;
-  }
-  return value as T;
-}
-
-/** Loads v2.3 runtime state persisted on mediations (Phase UI-B.1b). */
-async function loadMediationRuntimeState(
-  mediationId: string
-): Promise<LoadedMediationRuntimeState> {
-  try {
-    await prepareSupabaseRequest();
-    const { data, error } = await supabase
-      .from('mediations')
-      .select('mediation_state, session_memory')
-      .eq('id', mediationId)
-      .maybeSingle();
-
-    if (error || !data) {
-      return { mediationState: null, sessionMemory: null };
-    }
-
-    return {
-      mediationState: parseStoredJsonObject<MediationState>(data.mediation_state),
-      sessionMemory: parseStoredJsonObject<SessionMemory>(data.session_memory),
-    };
-  } catch {
-    return { mediationState: null, sessionMemory: null };
-  }
-}
-
-function buildMediationRuntimePersistencePatch(runtime: MediatorRuntimeEdgeSuccess) {
-  return {
-    mediation_state: runtime.mediationState,
-    session_memory: runtime.sessionMemory,
-    mediator_engine_version: runtime.engineVersion ?? MEDIATOR_RUNTIME_ENGINE_VERSION,
-    mediator_runtime_metadata: {
-      turnNumber: runtime.runtimeMetadata.turnNumber,
-      providerId: runtime.runtimeMetadata.providerId,
-      fallbackUsed: runtime.fallbackUsed,
-      retryCount: runtime.retryCount,
-      persistedAt: new Date().toISOString(),
-    },
-    mediator_last_goal: runtime.mediationState.currentGoal,
-    mediator_last_strategy: runtime.mediationState.activeStrategy?.primary ?? null,
-    mediator_last_safety_level: resolveMediatorLastSafetyLevel(runtime),
-    updated_at: new Date().toISOString(),
-  };
-}
-
-const SAFETY_LEVEL_VALUES: readonly SafetyLevel[] = [
-  'none',
-  'L1_gentle',
-  'L2_pause',
-  'L3_stop',
-];
-
-function isSafetyLevel(value: unknown): value is SafetyLevel {
-  return typeof value === 'string' && SAFETY_LEVEL_VALUES.includes(value as SafetyLevel);
-}
-
-/** MediatorRuntimeEdgeSuccess: safety on finalMediatorMessage; ComplianceResult has no safety field in v2.3. */
-function resolveMediatorLastSafetyLevel(runtime: MediatorRuntimeEdgeSuccess): SafetyLevel | null {
-  const messageSafety = runtime.finalMediatorMessage?.safetyLevel;
-  if (isSafetyLevel(messageSafety)) {
-    return messageSafety;
-  }
-
-  const compliance = runtime.complianceResult;
-  if (compliance && typeof compliance === 'object' && 'safetyLevel' in compliance) {
-    const complianceSafety = (compliance as { safetyLevel?: unknown }).safetyLevel;
-    if (isSafetyLevel(complianceSafety)) {
-      return complianceSafety;
-    }
-  }
-
-  return null;
 }
 
 /** Persists v2.3 runtime state after a successful mediator-runtime turn (Phase UI-B.1b). */

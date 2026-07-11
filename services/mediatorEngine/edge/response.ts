@@ -35,6 +35,7 @@ export function buildMediatorRuntimeEdgeSuccess(
     runtimeMetadata: output.runtimeMetadata,
     fallbackUsed: output.fallbackUsed,
     retryCount: output.retryCount,
+    runtimeSession: output.runtimeSession,
   };
 }
 

@@ -27,6 +27,9 @@ describe('runMediatorEngineTurn — engine runtime', () => {
     assert.ok(result.orchestratedTurn);
     assert.ok(result.promptComposerOutput);
     assert.ok(result.responseValidation);
+    assert.ok(result.runtimeSession);
+    assert.ok(result.runtimeSession.decision);
+    assert.ok(result.runtimeSession.session);
   });
 
   it('Default provider daje source=stub', async () => {

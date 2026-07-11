@@ -1264,6 +1264,32 @@ function createEmptyStrategyOutput() {
     recoveryStrategy: null
   };
 }
+function createEmptyIntervention(turnNumber) {
+  return {
+    id: "skeleton-intervention",
+    type: "welcome_open",
+    target: "both",
+    visibility: "public",
+    content: { primaryMessage: "" },
+    goal: "SAFE_OPENING",
+    intent: "increase_emotional_safety",
+    strategy: "build_safety",
+    rationale: "",
+    expectedEffect: {
+      id: "skeleton-effect",
+      description: "",
+      observableSignals: [],
+      targetParticipant: "both",
+      verificationMethod: "next_message",
+      successCriteria: { type: "check_confirmed", threshold: 0, confidenceRequired: 0 },
+      timeHorizon: 1
+    },
+    libraryPatternId: null,
+    signature: "skeleton",
+    generatedAt: SKELETON_TIMESTAMP,
+    doNotRepeatBefore: turnNumber
+  };
+}
 
 // services/mediatorEngine/memory/continuity/detectRepeatedMove.ts
 var REPEATED_MOVE_THRESHOLD = 3;
@@ -7067,6 +7093,472 @@ function resolveFinalDraftReply(validation) {
   return null;
 }
 
+// services/mediatorEngine/runtimeSession/composeRuntimeSession.ts
+var THERAPEUTIC_GOAL_ORDER = [
+  "SAFE_OPENING",
+  "EMOTION_NAMING",
+  "EMOTION_UNDERSTANDING",
+  "EMOTION_ACKNOWLEDGMENT",
+  "NEED_NAMING",
+  "PERSPECTIVE_SHARING",
+  "REFRAME",
+  "AGREEMENT",
+  "FUTURE_PLAN",
+  "CLOSURE"
+];
+var QUESTION_INTERVENTION_TYPES = /* @__PURE__ */ new Set([
+  "welcome_open",
+  "choice_emotion",
+  "choice_need",
+  "open_deepen",
+  "invite_reflection",
+  "gentle_redirect_evasion",
+  "remind_goal",
+  "recover_acknowledge",
+  "validate",
+  "reflect",
+  "mirror",
+  "reframe",
+  "redirect_blame",
+  "propose_rule",
+  "propose_future_plan"
+]);
+var SUMMARY_INTERVENTION_TYPES = /* @__PURE__ */ new Set([
+  "summarize_close",
+  "confirm_agreement",
+  "celebrate_breakthrough"
+]);
+var SAFETY_INTERVENTION_TYPES = /* @__PURE__ */ new Set([
+  "safety_response",
+  "deescalate",
+  "pause_session"
+]);
+function composeRuntimeSession(input) {
+  const stage = resolveSessionStage(input.mediationState);
+  const outcome = resolveRuntimeOutcome(input.mediationState);
+  return {
+    decision: composeDecision(input, outcome),
+    session: composeLifecycle(input, stage, outcome),
+    progress: composeProgress(input, stage),
+    presentation: composePresentation(input),
+    proposal: composeProposal(input),
+    closure: composeClosure(input, outcome),
+    pending: composePending(input),
+    diagnostics: composeDiagnostics(input)
+  };
+}
+function composeLifecycle(input, stage, outcome) {
+  const { mediationState, sessionMemory, intervention, runtimeMetadata } = input;
+  const partnerUserId = mediationState.participants.partner.profile.userId;
+  return {
+    stage,
+    outcome,
+    currentGoal: mediationState.currentGoal,
+    activeStrategy: mediationState.activeStrategy?.primary ?? intervention.strategy ?? null,
+    turnOrdinal: runtimeMetadata.turnNumber,
+    isExtensionActive: false,
+    participantPresence: {
+      hostActive: true,
+      partnerActive: partnerUserId.trim().length > 0,
+      partnerRequired: true
+    }
+  };
+}
+function composeDecision(input, outcome) {
+  const { mediationState, intervention, finalMediatorMessage } = input;
+  const pending = mediationState.pendingAction;
+  const safetyHold = isSafetyHold(finalMediatorMessage.safetyLevel, intervention.type);
+  if (safetyHold) {
+    return {
+      nextBeat: "safety_intervention",
+      mayAutoAdvance: false,
+      blockedReason: "safety_hold",
+      triggerHint: null
+    };
+  }
+  if (outcome !== "ongoing" && outcome !== "extension_active" && outcome !== "needs_extension_offer") {
+    return {
+      nextBeat: "deliver_closure",
+      mayAutoAdvance: false,
+      blockedReason: "session_finished",
+      triggerHint: null
+    };
+  }
+  if (pending && pending.awaitingResponseFrom.length > 0) {
+    return {
+      nextBeat: "await_user_action",
+      mayAutoAdvance: false,
+      blockedReason: resolvePendingBlockReason(pending.awaitingResponseFrom),
+      triggerHint: null
+    };
+  }
+  const nextBeat = resolveNextBeatAfterIntervention(intervention.type, mediationState.currentGoal);
+  if (nextBeat === "await_user_action") {
+    return {
+      nextBeat,
+      mayAutoAdvance: false,
+      blockedReason: "awaiting_both_replies",
+      triggerHint: null
+    };
+  }
+  if (nextBeat === "deliver_question" || nextBeat === "deliver_opening") {
+    return {
+      nextBeat,
+      mayAutoAdvance: true,
+      blockedReason: null,
+      triggerHint: "host_generate"
+    };
+  }
+  return {
+    nextBeat,
+    mayAutoAdvance: false,
+    blockedReason: null,
+    triggerHint: nextBeat === "present_proposal" ? "host_generate" : null
+  };
+}
+function composeProgress(input, stage) {
+  const { mediationState, sessionMemory, runtimeMetadata } = input;
+  const currentGoalState = mediationState.goals.find(
+    (goal) => goal.goal === mediationState.currentGoal
+  );
+  const completedGoals = uniqueGoals([
+    ...sessionMemory.completedGoals,
+    ...mediationState.goals.filter((goal) => goal.status === "completed").map((goal) => goal.goal)
+  ]);
+  const completionEstimate = estimateCompletion(
+    completedGoals,
+    mediationState.currentGoal,
+    currentGoalState?.progressPercent ?? 0
+  );
+  const latestCompleted = completedGoals.at(-1) ?? null;
+  return {
+    completionEstimate,
+    milestone: latestCompleted ? {
+      id: latestCompleted.toLowerCase(),
+      achievedAtTurn: runtimeMetadata.turnNumber
+    } : null,
+    goalProgress: {
+      completedGoals,
+      currentGoal: mediationState.currentGoal,
+      currentGoalCompletion: clampPercent(currentGoalState?.progressPercent ?? 0),
+      estimatedRemainingGoals: Math.max(
+        0,
+        THERAPEUTIC_GOAL_ORDER.length - completedGoals.length - 1
+      )
+    },
+    labelKey: `runtime.stage.${stage}`
+  };
+}
+function composePresentation(input) {
+  const deliverables = buildDeliverables(input);
+  const primaryDeliverable = deliverables[0]?.kind ?? "public_message";
+  const hideInput = isSafetyHold(input.finalMediatorMessage.safetyLevel, input.intervention.type) || input.mediationState.sessionOutcome !== "in_progress";
+  return {
+    deliverables,
+    primaryDeliverable,
+    hideInput,
+    showDecisionPanel: null,
+    hostOnlyGeneration: true
+  };
+}
+function composeProposal(input) {
+  const { mediationState, intervention, finalMediatorMessage } = input;
+  const phase = resolveProposalPhase(mediationState, intervention.type);
+  const agreements = mediationState.agreements;
+  const hasAgreementContent = Boolean(agreements.sharedRule?.trim()) || Boolean(agreements.hostCommitment?.trim()) || Boolean(agreements.partnerCommitment?.trim()) || Boolean(agreements.futurePlan?.trim());
+  const content = phase === "none" || phase === "preparing" || !hasAgreementContent ? null : {
+    proposalId: intervention.id,
+    body: finalMediatorMessage.text.trim(),
+    hostCommitment: agreements.hostCommitment,
+    partnerCommitment: agreements.partnerCommitment,
+    sharedRule: agreements.sharedRule
+  };
+  return {
+    phase,
+    content,
+    votes: {
+      host: agreements.acceptedByBoth ? "accepted" : null,
+      partner: agreements.acceptedByBoth ? "accepted" : null
+    },
+    requiresBothAcceptance: true
+  };
+}
+function composeClosure(input, outcome) {
+  const { mediationState, finalMediatorMessage } = input;
+  const directive = resolveClosureDirective(outcome, finalMediatorMessage.safetyLevel);
+  const suggestedDbStatus = resolveSuggestedDbStatus(outcome, mediationState.sessionOutcome);
+  const terminal = directive !== "none";
+  return {
+    directive,
+    suggestedDbStatus,
+    closureMessage: terminal ? finalMediatorMessage.text.trim() || null : null,
+    navigateToClosure: terminal && directive !== "offer_manual_close"
+  };
+}
+function composePending(input) {
+  const { mediationState, intervention } = input;
+  const pendingAction = mediationState.pendingAction;
+  if (pendingAction && pendingAction.awaitingResponseFrom.length > 0) {
+    return {
+      awaiting: mapAwaitingParticipants(pendingAction.awaitingResponseFrom),
+      awaitingFrom: [...pendingAction.awaitingResponseFrom],
+      satisfiedBy: mapSatisfiedByRoles(pendingAction.awaitingResponseFrom)
+    };
+  }
+  if (QUESTION_INTERVENTION_TYPES.has(intervention.type)) {
+    return {
+      awaiting: "both_replies",
+      awaitingFrom: ["host", "partner"],
+      satisfiedBy: ["host_message", "partner_message"]
+    };
+  }
+  return {
+    awaiting: "nothing",
+    awaitingFrom: [],
+    satisfiedBy: []
+  };
+}
+function composeDiagnostics(input) {
+  return {
+    explainabilityId: null,
+    safetyLevel: input.finalMediatorMessage.safetyLevel,
+    fallbackUsed: input.fallbackUsed,
+    validationWarnings: []
+  };
+}
+function resolveSessionStage(state) {
+  if (state.dynamics.mode === "SAFETY" || state.sessionOutcome === "safety_stopped") {
+    return "safety_hold";
+  }
+  switch (state.currentGoal) {
+    case "SAFE_OPENING":
+      return "intake";
+    case "EMOTION_NAMING":
+    case "PERSPECTIVE_SHARING":
+      return "story_collection";
+    case "EMOTION_UNDERSTANDING":
+    case "REFRAME":
+      return "understanding";
+    case "EMOTION_ACKNOWLEDGMENT":
+    case "NEED_NAMING":
+      return "needs_and_impact";
+    case "AGREEMENT":
+      return "agreement_building";
+    case "FUTURE_PLAN":
+      return "proposal";
+    case "CLOSURE":
+      return "closing";
+    default:
+      return "understanding";
+  }
+}
+function resolveRuntimeOutcome(state) {
+  switch (state.sessionOutcome) {
+    case "resolved":
+      return "resolved";
+    case "unresolved_closed":
+      return "closed_without_agreement";
+    case "safety_stopped":
+      return "safety_stopped";
+    case "paused":
+      return "paused";
+    case "in_progress":
+      if (state.agreements.acceptedByBoth) {
+        return "resolved";
+      }
+      if (state.currentGoal === "FUTURE_PLAN" || state.currentGoal === "AGREEMENT") {
+        return "proposal_pending";
+      }
+      if (state.currentGoal === "CLOSURE") {
+        return "needs_extension_offer";
+      }
+      return "ongoing";
+    default:
+      return "ongoing";
+  }
+}
+function resolveNextBeatAfterIntervention(interventionType, currentGoal) {
+  if (SAFETY_INTERVENTION_TYPES.has(interventionType)) {
+    return "safety_intervention";
+  }
+  if (interventionType === "welcome_open") {
+    return "deliver_question";
+  }
+  if (SUMMARY_INTERVENTION_TYPES.has(interventionType)) {
+    if (interventionType === "confirm_agreement" || interventionType === "celebrate_breakthrough") {
+      return currentGoal === "CLOSURE" ? "deliver_closure" : "present_proposal";
+    }
+    return currentGoal === "CLOSURE" ? "deliver_final_summary" : "deliver_mid_summary";
+  }
+  if (interventionType === "propose_rule" || interventionType === "propose_future_plan") {
+    return "present_proposal";
+  }
+  if (QUESTION_INTERVENTION_TYPES.has(interventionType)) {
+    return "await_user_action";
+  }
+  if (currentGoal === "CLOSURE") {
+    return "deliver_closure";
+  }
+  return "deliver_question";
+}
+function resolveProposalPhase(state, interventionType) {
+  if (state.agreements.acceptedByBoth) {
+    return "accepted";
+  }
+  if (interventionType === "propose_rule" || interventionType === "propose_future_plan" || interventionType === "confirm_agreement") {
+    return "presented";
+  }
+  if (state.currentGoal === "AGREEMENT" || state.currentGoal === "FUTURE_PLAN") {
+    return "preparing";
+  }
+  return "none";
+}
+function resolveClosureDirective(outcome, safetyLevel) {
+  if (outcome === "safety_stopped" || safetyLevel === "L3_stop") {
+    return "safety_close";
+  }
+  if (outcome === "resolved") {
+    return "close_on_accept";
+  }
+  if (outcome === "closed_without_agreement") {
+    return "close_without_agreement";
+  }
+  if (outcome === "paused") {
+    return "offer_manual_close";
+  }
+  return "none";
+}
+function resolveSuggestedDbStatus(outcome, engineOutcome) {
+  if (outcome === "resolved" || engineOutcome === "resolved") {
+    return "resolved";
+  }
+  if (outcome === "closed_without_agreement" || engineOutcome === "unresolved_closed") {
+    return "pending_agreements";
+  }
+  if (outcome === "ongoing" || outcome === "extension_active" || outcome === "proposal_pending") {
+    return "live";
+  }
+  return null;
+}
+function buildDeliverables(input) {
+  const { intervention, finalMediatorMessage } = input;
+  const text = finalMediatorMessage.text.trim();
+  if (!text) {
+    return [];
+  }
+  const target = intervention.target;
+  if (SAFETY_INTERVENTION_TYPES.has(intervention.type)) {
+    return [
+      {
+        kind: "escalation_notice",
+        text,
+        target
+      }
+    ];
+  }
+  if (SUMMARY_INTERVENTION_TYPES.has(intervention.type)) {
+    return [
+      {
+        kind: "summary",
+        text,
+        target,
+        summaryVariant: mapSummaryVariant(intervention.type, intervention.goal)
+      }
+    ];
+  }
+  if (intervention.visibility === "private") {
+    const kind = target === "host" ? "private_hint_host" : "private_hint_partner";
+    return [{ kind, text, target }];
+  }
+  if (QUESTION_INTERVENTION_TYPES.has(intervention.type)) {
+    return [
+      {
+        kind: "question",
+        text,
+        target,
+        questionTarget: mapQuestionTarget(target)
+      }
+    ];
+  }
+  return [
+    {
+      kind: "public_message",
+      text,
+      target
+    }
+  ];
+}
+function mapSummaryVariant(interventionType, goal) {
+  if (interventionType === "confirm_agreement" || interventionType === "celebrate_breakthrough") {
+    return goal === "CLOSURE" ? "closure" : "final";
+  }
+  if (goal === "SAFE_OPENING") {
+    return "opening";
+  }
+  if (goal === "CLOSURE") {
+    return "closure";
+  }
+  return "mid";
+}
+function mapQuestionTarget(target) {
+  if (target === "host") return "ty";
+  if (target === "partner") return "partner";
+  return "oboje";
+}
+function mapAwaitingParticipants(roles) {
+  if (roles.includes("host") && roles.includes("partner")) {
+    return "both_replies";
+  }
+  if (roles.includes("host")) {
+    return "host_reply";
+  }
+  if (roles.includes("partner")) {
+    return "partner_reply";
+  }
+  return "nothing";
+}
+function mapSatisfiedByRoles(roles) {
+  const events = [];
+  if (roles.includes("host")) {
+    events.push("host_message");
+  }
+  if (roles.includes("partner")) {
+    events.push("partner_message");
+  }
+  return events;
+}
+function resolvePendingBlockReason(roles) {
+  if (roles.includes("host") && roles.includes("partner")) {
+    return "awaiting_both_replies";
+  }
+  if (roles.includes("host")) {
+    return "awaiting_host_reply";
+  }
+  return "awaiting_partner_reply";
+}
+function isSafetyHold(safetyLevel, interventionType) {
+  return safetyLevel === "L3_stop" || SAFETY_INTERVENTION_TYPES.has(interventionType);
+}
+function estimateCompletion(completedGoals, currentGoal, currentGoalProgressPercent) {
+  const total = THERAPEUTIC_GOAL_ORDER.length;
+  const completedWeight = completedGoals.length / total;
+  const currentWeight = Math.max(0, currentGoalProgressPercent) / 100 * (1 / total);
+  return clampPercent(Math.round((completedWeight + currentWeight) * 100));
+}
+function uniqueGoals(goals) {
+  const seen = /* @__PURE__ */ new Set();
+  const result = [];
+  for (const goal of goals) {
+    if (seen.has(goal)) continue;
+    seen.add(goal);
+    result.push(goal);
+  }
+  return result;
+}
+function clampPercent(value) {
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
 // services/mediatorEngine/runtime/resolve/buildRuntimeOutput.ts
 function buildRuntimeOutput(params) {
   const { ctx, orchestratedTurn, promptComposerOutput, retryResult, finalMediatorMessage, startedAt, completedAt } = params;
@@ -7081,15 +7573,25 @@ function buildRuntimeOutput(params) {
     providerId,
     retryCount: retryResult.retryCount
   };
+  const fallbackUsed = retryResult.fallbackUsed || retryResult.llmOutput.fallbackUsed;
+  const runtimeSession = composeRuntimeSession({
+    mediationState: orchestratedTurn.mediationState,
+    sessionMemory: orchestratedTurn.sessionMemory,
+    intervention: orchestratedTurn.intervention,
+    finalMediatorMessage,
+    runtimeMetadata,
+    fallbackUsed
+  });
   return {
     orchestratedTurn,
     promptComposerOutput,
     llmOutput: retryResult.llmOutput,
     responseValidation: retryResult.responseValidation,
     finalMediatorMessage,
-    fallbackUsed: retryResult.fallbackUsed || retryResult.llmOutput.fallbackUsed,
+    fallbackUsed,
     retryCount: retryResult.retryCount,
-    runtimeMetadata
+    runtimeMetadata,
+    runtimeSession
   };
 }
 
@@ -7162,8 +7664,8 @@ function buildEmergencyRuntimeOutput(input, startedAt) {
     });
   } catch {
     orchestratedTurn = {
-      mediationState: {},
-      intervention: {},
+      mediationState: createEmptyMediationState(ctx.turnInput),
+      intervention: createEmptyIntervention(ctx.turnInput.turnNumber),
       sessionMemory: ctx.sessionMemory,
       evidenceStore: {},
       explainability: {},
@@ -7531,7 +8033,8 @@ function buildMediatorRuntimeEdgeSuccess(output) {
     responseValidation: sanitizeResponseValidation(output.responseValidation),
     runtimeMetadata: output.runtimeMetadata,
     fallbackUsed: output.fallbackUsed,
-    retryCount: output.retryCount
+    retryCount: output.retryCount,
+    runtimeSession: output.runtimeSession
   };
 }
 

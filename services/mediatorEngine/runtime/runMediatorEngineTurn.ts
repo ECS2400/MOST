@@ -11,6 +11,10 @@ import {
 } from '@/services/mediatorEngine/runtime/final/buildFinalMediatorMessage';
 import { buildRuntimeOutput } from '@/services/mediatorEngine/runtime/resolve/buildRuntimeOutput';
 import { RUNTIME_LIMITS } from '@/services/mediatorEngine/runtime/config/runtimeLimits';
+import {
+  createEmptyMediationState,
+  createEmptyIntervention,
+} from '@/services/mediatorEngine/_internal/skeletonDefaults';
 
 /**
  * Executes the full Mediator Engine runtime flow for one turn.
@@ -109,8 +113,8 @@ function buildEmergencyRuntimeOutput(
     });
   } catch {
     orchestratedTurn = {
-      mediationState: {} as never,
-      intervention: {} as never,
+      mediationState: createEmptyMediationState(ctx.turnInput),
+      intervention: createEmptyIntervention(ctx.turnInput.turnNumber),
       sessionMemory: ctx.sessionMemory,
       evidenceStore: {} as never,
       explainability: {} as never,

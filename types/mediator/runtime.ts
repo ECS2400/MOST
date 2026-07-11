@@ -12,6 +12,7 @@ import type { ResponseValidationAction, ResponseValidationResult } from './respo
 import type { LlmProviderPort } from './llm';
 import type { SafetyLevel } from './safety';
 import type { SessionMemory } from './sessionMemory';
+import type { RuntimeSession } from './runtimeSession';
 
 /** Input to the engine runtime turn runner. */
 export interface MediatorRuntimeInput {
@@ -54,6 +55,7 @@ export interface MediatorRuntimeOutput {
   fallbackUsed: boolean;
   retryCount: number;
   runtimeMetadata: RuntimeMetadata;
+  runtimeSession: RuntimeSession;
 }
 
 /** Normalized runtime context used internally. */

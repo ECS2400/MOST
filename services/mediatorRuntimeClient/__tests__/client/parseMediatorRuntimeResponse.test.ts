@@ -14,6 +14,11 @@ describe('parseMediatorRuntimeResponse', () => {
       assert.equal(parsed.value.response.questionTarget, 'oboje');
       assert.equal(parsed.value.response.source, 'stub');
       assert.equal(parsed.value.runtime.engineVersion, 'v2.3');
+      assert.ok(parsed.value.runtime.runtimeSession);
+      assert.equal(
+        parsed.value.runtime.runtimeSession.session.turnOrdinal,
+        success.runtimeMetadata.turnNumber
+      );
     }
   });
 
@@ -65,6 +70,16 @@ describe('parseMediatorRuntimeResponse', () => {
     assert.equal(parsed.ok, false);
     if (!parsed.ok) {
       assert.equal(parsed.error.kind, 'malformed_response');
+    }
+  });
+
+  it('returns missing_fields when runtimeSession is absent', () => {
+    const success = createMinimalRuntimeSuccess();
+    const { runtimeSession: _removed, ...withoutRuntimeSession } = success;
+    const parsed = parseMediatorRuntimeResponse(withoutRuntimeSession);
+    assert.equal(parsed.ok, false);
+    if (!parsed.ok) {
+      assert.equal(parsed.error.kind, 'missing_fields');
     }
   });
 
