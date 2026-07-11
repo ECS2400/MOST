@@ -5,6 +5,7 @@ export const MEDIATOR_RUNTIME_ERROR_CODES = {
   MISSING_SESSION_ID: 'missing_session_id',
   UNSUPPORTED_ENGINE_VERSION: 'unsupported_engine_version',
   MISSING_OPENAI_API_KEY: 'missing_openai_api_key',
+  INVALID_CLIENT_EVENTS: 'invalid_client_events',
   INTERNAL_ERROR: 'internal_error',
 } as const;
 
@@ -36,6 +37,7 @@ export function mediatorRuntimeErrorStatus(code: MediatorRuntimeErrorCode): numb
     case MEDIATOR_RUNTIME_ERROR_CODES.MISSING_MEDIATION_ID:
     case MEDIATOR_RUNTIME_ERROR_CODES.MISSING_SESSION_ID:
     case MEDIATOR_RUNTIME_ERROR_CODES.UNSUPPORTED_ENGINE_VERSION:
+    case MEDIATOR_RUNTIME_ERROR_CODES.INVALID_CLIENT_EVENTS:
       return 400;
     case MEDIATOR_RUNTIME_ERROR_CODES.MISSING_OPENAI_API_KEY:
       return 503;

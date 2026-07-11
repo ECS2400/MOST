@@ -2,6 +2,7 @@ import type {
   MediationState,
   MediatorLang,
   OrchestrateTurnTrigger,
+  RuntimeClientEvent,
   SessionMemory,
   TranscriptMessage,
 } from '@/types/mediator';
@@ -19,6 +20,7 @@ export interface MediatorRuntimeClientInput {
   sessionId: string;
   mediationId: string;
   engineVersion?: typeof MEDIATOR_RUNTIME_ENGINE_VERSION;
+  clientEvents?: RuntimeClientEvent[];
 }
 
 /** Builds the JSON body accepted by mediator-runtime Edge Function. */
@@ -35,5 +37,6 @@ export function buildMediatorRuntimeRequest(
     transcriptDelta: input.transcriptDelta,
     language: input.language,
     engineVersion: input.engineVersion ?? MEDIATOR_RUNTIME_ENGINE_VERSION,
+    clientEvents: input.clientEvents ?? [],
   };
 }

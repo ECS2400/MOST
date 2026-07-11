@@ -23,6 +23,31 @@ import {
   resolveLivePhaseHeaderLabel,
   resolveLiveProgressPercent,
 } from '@/services/mediatorRuntimeClient/resolveRuntimeSessionProgressDisplay';
+import {
+  resolveLiveContinueWaitingDisplay,
+  resolveLiveProposalWaitingDisplay,
+  resolveLiveWaitingAnswerDisplay,
+} from '@/services/mediatorRuntimeClient/resolveRuntimeSessionWaitingDisplay';
+import {
+  canSubmitLiveMessage,
+  resolveRuntimeInputState,
+} from '@/services/mediatorRuntimeClient/resolveRuntimeSessionInputState';
+import {
+  compareLiveDecisionPanels,
+  logLiveDecisionPanelComparison,
+} from '@/services/mediatorRuntimeClient/compareLiveDecisionPanels';
+import {
+  compareRuntimeNextBeat,
+  logLiveGenerationIntentComparison,
+} from '@/services/mediatorRuntimeClient/compareRuntimeNextBeat';
+import {
+  logRuntimeGenerationModeResolution,
+  resolveRuntimeGenerationMode,
+} from '@/services/mediatorRuntimeClient/resolveRuntimeGenerationMode';
+import { resolveLegacyLiveDecisionPanelState } from '@/services/mediatorRuntimeClient/resolveLegacyLiveDecisionPanel';
+import { resolveRuntimeDecisionPanelVisibility } from '@/services/mediatorRuntimeClient/resolveRuntimeDecisionPanelVisibility';
+import { buildRuntimeClientEvents } from '@/services/mediatorRuntimeClient/buildRuntimeClientEvents';
+import type { RuntimeClientEvent } from '@/types/mediator';
 import { getLiveMediationExtras } from '@/constants/i18n/liveMediation';
 import { getClosureBundle } from '@/constants/i18n/closure';
 import type { Language } from '@/constants/i18n';
@@ -450,6 +475,21 @@ export default function LiveMediationScreen() {
   const proposalAcceptedFinalLockRef = useRef(false);
   const proposalRejectLockRef = useRef(false);
   const generationInProgressRef = useRef(false);
+  const pendingClientEventsRef = useRef<RuntimeClientEvent[]>([]);
+
+  const enqueueRuntimeClientEvents = useCallback((events: RuntimeClientEvent[]) => {
+    if (events.length === 0) return;
+    pendingClientEventsRef.current.push(...events);
+  }, []);
+
+  const consumeRuntimeClientEvents = useCallback(
+    (inlineClientEvents?: RuntimeClientEvent[]): RuntimeClientEvent[] | undefined => {
+      const merged = [...pendingClientEventsRef.current, ...(inlineClientEvents ?? [])];
+      pendingClientEventsRef.current = [];
+      return merged.length > 0 ? merged : undefined;
+    },
+    []
+  );
 
   const logMediatorCall = useCallback(
     (
@@ -534,6 +574,7 @@ export default function LiveMediationScreen() {
   }, [session?.partner_id, partner?.id, messages, hostUserId]);
 
   const isCurrentUserHost = Boolean(user?.id && user.id === hostUserId);
+  const currentUserActor = isCurrentUserHost ? ('host' as const) : ('partner' as const);
 
   const stableParticipantNames = useMemo(
     () =>
@@ -620,7 +661,7 @@ export default function LiveMediationScreen() {
     return liveUi.disputeContinueConfirm;
   }, [decisionState, isCurrentUserHost, liveUi]);
 
-  const showDecisionPanel = Boolean(
+  const legacyShowDecisionPanel = Boolean(
     awaitingDecision && decisionState && !decisionState.bothContinue && !processing
   );
 
@@ -635,9 +676,75 @@ export default function LiveMediationScreen() {
       : proposalDecisionState.partnerDecided
     : false;
 
-  const showProposalPanel = Boolean(
+  const legacyShowProposalPanel = Boolean(
     awaitingProposalDecision && proposalDecisionState && !userProposalDecided && !processing
   );
+
+  const legacyDecisionPanelState = useMemo(
+    () =>
+      resolveLegacyLiveDecisionPanelState({
+        sessionFlowStage: sessionFlow?.stage,
+        showDecisionPanel: legacyShowDecisionPanel,
+        showProposalPanel: legacyShowProposalPanel,
+        sessionUnresolvedClosed,
+        sessionFinished,
+      }),
+    [
+      sessionFlow?.stage,
+      legacyShowDecisionPanel,
+      legacyShowProposalPanel,
+      sessionUnresolvedClosed,
+      sessionFinished,
+    ]
+  );
+
+  const decisionPanelVisibility = useMemo(
+    () =>
+      resolveRuntimeDecisionPanelVisibility({
+        runtimeSession,
+        legacy: legacyDecisionPanelState,
+        legacyVisibility: {
+          showDecisionPanel: legacyShowDecisionPanel,
+          showProposalPanel: legacyShowProposalPanel,
+          sessionUnresolvedClosed,
+        },
+        sessionFlowStage: sessionFlow?.stage,
+      }),
+    [
+      runtimeSession,
+      legacyDecisionPanelState,
+      legacyShowDecisionPanel,
+      legacyShowProposalPanel,
+      sessionUnresolvedClosed,
+      sessionFlow?.stage,
+    ]
+  );
+
+  const showContinueDecisionPanel =
+    decisionPanelVisibility.showMainDecisionPanel ||
+    decisionPanelVisibility.showExtensionDecisionPanel;
+  const showProposalPanel = decisionPanelVisibility.showProposalPanel;
+  const showResolvedConfirmationPanel =
+    decisionPanelVisibility.showResolvedConfirmationPanel;
+
+  useEffect(() => {
+    if (!__DEV__) return;
+    logLiveDecisionPanelComparison(
+      compareLiveDecisionPanels(runtimeSession, legacyDecisionPanelState)
+    );
+  }, [runtimeSession, legacyDecisionPanelState]);
+
+  useEffect(() => {
+    if (!__DEV__ || !hostUserId) return;
+    const turn = computeLiveTurnState(messages, hostUserId, partnerUserIds);
+    const legacyMode = resolveGenerateMode(turn, messages, hostUserId, partnerUserIds);
+    logLiveGenerationIntentComparison(
+      compareRuntimeNextBeat({ runtimeSession, legacyMode })
+    );
+    logRuntimeGenerationModeResolution(
+      resolveRuntimeGenerationMode({ runtimeSession, legacyMode })
+    );
+  }, [runtimeSession, messages, hostUserId, partnerUserIds]);
 
   const proposalWaitingHint = useMemo(() => {
     if (!awaitingProposalDecision || !proposalDecisionState) return '';
@@ -652,7 +759,7 @@ export default function LiveMediationScreen() {
     return '';
   }, [awaitingProposalDecision, proposalDecisionState, isCurrentUserHost, liveUi]);
 
-  const waitingAnswerHint = useMemo(() => {
+  const legacyWaitingAnswerHint = useMemo(() => {
     if (!turnState?.lastQuestion || turnState.bothAnswered) return '';
     const userAnswered = isCurrentUserHost
       ? turnState.hostAnswered
@@ -668,6 +775,73 @@ export default function LiveMediationScreen() {
     }
     return liveUi.waitingBothAnswers;
   }, [turnState, isCurrentUserHost, liveUi]);
+
+  const waitingAnswerDisplay = useMemo(
+    () =>
+      resolveLiveWaitingAnswerDisplay(
+        runtimeSession,
+        legacyWaitingAnswerHint,
+        language,
+        isCurrentUserHost
+      ),
+    [runtimeSession, legacyWaitingAnswerHint, language, isCurrentUserHost]
+  );
+
+  const proposalWaitingDisplay = useMemo(
+    () =>
+      resolveLiveProposalWaitingDisplay(
+        runtimeSession,
+        proposalWaitingHint,
+        language,
+        isCurrentUserHost
+      ),
+    [runtimeSession, proposalWaitingHint, language, isCurrentUserHost]
+  );
+
+  const continueWaitingDisplay = useMemo(
+    () => resolveLiveContinueWaitingDisplay(runtimeSession, continueHint, language),
+    [runtimeSession, continueHint, language]
+  );
+
+  const runtimeInputState = useMemo(
+    () =>
+      resolveRuntimeInputState({
+        runtimeSession,
+        legacy: {
+          showDecisionPanel: showContinueDecisionPanel,
+          showProposalPanel,
+          sessionFinished,
+          awaitingProposalDecision,
+          sessionUnresolvedClosed: showResolvedConfirmationPanel,
+          paused,
+        },
+        technical: { sending, processing },
+        defaultPlaceholder: liveUi.inputPlaceholder,
+        placeholders: {
+          safety_hold: liveUi.paused,
+          session_finished: liveUi.finishMediation,
+          awaiting_decision: liveUi.disputeContinueConfirm,
+          proposal_pending: liveUi.proposalPanelTitle,
+        },
+      }),
+    [
+      runtimeSession,
+      showContinueDecisionPanel,
+      showProposalPanel,
+      sessionFinished,
+      awaitingProposalDecision,
+      showResolvedConfirmationPanel,
+      paused,
+      sending,
+      processing,
+      liveUi.inputPlaceholder,
+      liveUi.paused,
+      liveUi.finishMediation,
+      liveUi.disputeContinueConfirm,
+      liveUi.proposalPanelTitle,
+    ]
+  );
+
   const briefing = useMemo(
     () => buildBriefingFromContext(mediationContext),
     [mediationContext]
@@ -974,7 +1148,8 @@ export default function LiveMediationScreen() {
       triggerMessage: LiveMessage,
       currentMessages: LiveMessage[],
       mode: MediatorMode = 'answer_ack',
-      force = false
+      force = false,
+      clientEvents?: RuntimeClientEvent[]
     ): Promise<LiveMessage[]> => {
       if (!user || !mediationId || !hostUserId) return currentMessages;
 
@@ -1044,6 +1219,8 @@ export default function LiveMediationScreen() {
         isCurrentUserHost ? 'host' : 'partner'
       );
 
+      const runtimeClientEvents = consumeRuntimeClientEvents(clientEvents);
+
       const aiResponse = useDirect
         ? await processMediationTurn(
             triggerMessage,
@@ -1055,7 +1232,8 @@ export default function LiveMediationScreen() {
             language,
             mediationContextRef.current,
             mode,
-            participantNames
+            participantNames,
+            runtimeClientEvents
           )
         : mode === 'answer_ack'
           ? await processMediationTurn(
@@ -1068,7 +1246,8 @@ export default function LiveMediationScreen() {
               language,
               mediationContextRef.current,
               'answer_ack',
-              participantNames
+              participantNames,
+              runtimeClientEvents
             )
           : await processGenerateNextTurn(
               mediationId,
@@ -1077,7 +1256,8 @@ export default function LiveMediationScreen() {
               currentMessages,
               language,
               mediationContextRef.current,
-              participantNames
+              participantNames,
+              runtimeClientEvents
             );
 
       if (mode === 'opening_summary') {
@@ -1159,7 +1339,7 @@ export default function LiveMediationScreen() {
         throw error instanceof Error ? error : new Error(String(error ?? 'Unknown mediation error'));
       }
     },
-    [user, mediationId, hostUserId, partnerUserIds, partnerUserId, partner?.name, setMessagesDebug, setSessionDebug, language, couple?.id, questionCount, stableParticipantNames, isCurrentUserHost, logMediatorCall, refreshRuntimeSession]
+    [user, mediationId, hostUserId, partnerUserIds, partnerUserId, partner?.name, setMessagesDebug, setSessionDebug, language, couple?.id, questionCount, stableParticipantNames, isCurrentUserHost, logMediatorCall, refreshRuntimeSession, consumeRuntimeClientEvents]
   );
 
   const runGenerateNextQuestion = useCallback(
@@ -1232,7 +1412,11 @@ export default function LiveMediationScreen() {
         setProcessing(true);
         setError('');
 
-        const mode = resolveGenerateMode(turn, withLock, hostUserId, partnerUserIds);
+        const legacyMode = resolveGenerateMode(turn, withLock, hostUserId, partnerUserIds);
+        const { mode } = resolveRuntimeGenerationMode({
+          runtimeSession,
+          legacyMode,
+        });
         if (!mode) {
           generateLockRef.current = null;
           return;
@@ -1275,6 +1459,7 @@ export default function LiveMediationScreen() {
       applyAiTurn,
       liveUi.sendError,
       setMessagesDebug,
+      runtimeSession,
     ]
   );
 
@@ -1428,6 +1613,9 @@ export default function LiveMediationScreen() {
         decisionSummaryKind,
         phase
       );
+      enqueueRuntimeClientEvents(
+        buildRuntimeClientEvents('continue_session', currentUserActor)
+      );
       setMessagesDebug((prev) => dedupeLiveMessages([...prev, msg]));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : liveUi.sendError);
@@ -1446,6 +1634,8 @@ export default function LiveMediationScreen() {
     liveUi.you,
     liveUi.sendError,
     setMessagesDebug,
+    enqueueRuntimeClientEvents,
+    currentUserActor,
   ]);
 
   // Oboje potwierdzili kontynuację po podsumowaniu → start 5 dodatkowych pytań.
@@ -1488,7 +1678,8 @@ export default function LiveMediationScreen() {
           },
           withExt,
           'generate_question',
-          true
+          true,
+          buildRuntimeClientEvents('start_extension', 'host')
         );
       } catch (e: unknown) {
         extensionStartLockRef.current = false;
@@ -1584,6 +1775,9 @@ export default function LiveMediationScreen() {
         'accepted',
         phase
       );
+      enqueueRuntimeClientEvents(
+        buildRuntimeClientEvents('proposal_accepted', currentUserActor)
+      );
       setMessagesDebug((prev) => dedupeLiveMessages([...prev, msg]));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : liveUi.sendError);
@@ -1601,6 +1795,8 @@ export default function LiveMediationScreen() {
     liveUi.you,
     liveUi.sendError,
     setMessagesDebug,
+    enqueueRuntimeClientEvents,
+    currentUserActor,
   ]);
 
   const handleProposalReject = useCallback(async () => {
@@ -1619,6 +1815,9 @@ export default function LiveMediationScreen() {
         user.name || liveUi.you,
         'rejected',
         phase
+      );
+      enqueueRuntimeClientEvents(
+        buildRuntimeClientEvents('proposal_rejected', currentUserActor)
       );
       const altMsg = await insertProposalClosureSummary(
         mediationId,
@@ -1647,6 +1846,8 @@ export default function LiveMediationScreen() {
     liveUi.sendError,
     setMessagesDebug,
     goToClosure,
+    enqueueRuntimeClientEvents,
+    currentUserActor,
   ]);
 
   // Oboje zaakceptowali propozycję → final summary i zamknięcie.
@@ -1697,7 +1898,7 @@ export default function LiveMediationScreen() {
   ]);
 
   const handleSend = useCallback(async () => {
-    if (!user || !mediationId || !input.trim() || sending || paused || processing) return;
+    if (!user || !mediationId || !canSubmitLiveMessage(runtimeInputState, input)) return;
 
     const text = input.trim();
     logSetState('input:clear');
@@ -1750,9 +1951,7 @@ export default function LiveMediationScreen() {
     user,
     mediationId,
     input,
-    sending,
-    paused,
-    processing,
+    runtimeInputState,
     hostUserId,
     partnerUserIds,
     applyAiTurn,
@@ -1774,6 +1973,9 @@ export default function LiveMediationScreen() {
 
   function confirmDisputeResolved() {
     if (!mediationId) return;
+    enqueueRuntimeClientEvents(
+      buildRuntimeClientEvents('resolve_session', currentUserActor)
+    );
     setShowDisputeResolvedConfirm(false);
     goToClosure();
   }
@@ -1840,7 +2042,7 @@ export default function LiveMediationScreen() {
           </Pressable>
         </View>
 
-        {!showDecisionPanel && !awaitingProposalDecision && !sessionUnresolvedClosed ? (
+        {!showContinueDecisionPanel && !showProposalPanel && !showResolvedConfirmationPanel ? (
         <Pressable onPress={handleDisputeResolved} style={styles.disputeResolvedBtn}>
           <MaterialIcons name="gavel" size={20} color="#fff" />
           <Text style={styles.disputeResolvedText}>{liveUi.disputeResolved}</Text>
@@ -1904,25 +2106,25 @@ export default function LiveMediationScreen() {
           </View>
         ) : null}
 
-        {waitingAnswerHint ? (
+        {legacyWaitingAnswerHint ? (
           <View style={styles.waitingBar}>
             <MaterialIcons name="hourglass-empty" size={16} color={Colors.textMuted} />
-            <Text style={styles.waitingText}>{waitingAnswerHint}</Text>
+            <Text style={styles.waitingText}>{waitingAnswerDisplay.label}</Text>
           </View>
         ) : null}
 
         {proposalWaitingHint && awaitingProposalDecision ? (
           <View style={styles.waitingBar}>
             <MaterialIcons name="hourglass-empty" size={16} color={Colors.textMuted} />
-            <Text style={styles.waitingText}>{proposalWaitingHint}</Text>
+            <Text style={styles.waitingText}>{proposalWaitingDisplay.label}</Text>
           </View>
         ) : null}
 
-        {showDecisionPanel ? (
+        {showContinueDecisionPanel ? (
           <View style={styles.generateNextWrap}>
             <Text style={styles.decisionPanelTitle}>{liveUi.decisionPanelTitle}</Text>
             {continueHint ? (
-              <Text style={styles.generateNextHint}>{continueHint}</Text>
+              <Text style={styles.generateNextHint}>{continueWaitingDisplay.label}</Text>
             ) : null}
             <Pressable
               onPress={handleContinueDispute}
@@ -1950,7 +2152,7 @@ export default function LiveMediationScreen() {
           <View style={styles.generateNextWrap}>
             <Text style={styles.decisionPanelTitle}>{liveUi.proposalPanelTitle}</Text>
             {proposalWaitingHint ? (
-              <Text style={styles.generateNextHint}>{proposalWaitingHint}</Text>
+              <Text style={styles.generateNextHint}>{proposalWaitingDisplay.label}</Text>
             ) : null}
             <Pressable
               onPress={handleProposalAccept}
@@ -1995,24 +2197,24 @@ export default function LiveMediationScreen() {
           </View>
         ) : null}
 
-        {!showDecisionPanel && !showProposalPanel && !sessionFinished && !awaitingProposalDecision && !sessionUnresolvedClosed ? (
+        {runtimeInputState.visible ? (
         <View style={[styles.inputArea, { paddingBottom: insets.bottom + Spacing.sm }]}>
           <View style={styles.inputRow}>
             <TextInput
               value={input}
               onChangeText={setInput}
-              placeholder={liveUi.inputPlaceholder}
+              placeholder={runtimeInputState.placeholder ?? liveUi.inputPlaceholder}
               placeholderTextColor={Colors.textMuted}
               multiline
               style={styles.input}
-              editable={!sending && !paused && !processing}
+              editable={runtimeInputState.enabled}
             />
             <Pressable
               onPress={handleSend}
-              disabled={!input.trim() || sending || paused || processing}
+              disabled={!canSubmitLiveMessage(runtimeInputState, input)}
               style={({ pressed }) => [
                 styles.sendBtn,
-                (!input.trim() || sending || paused || processing) && styles.sendBtnDisabled,
+                !canSubmitLiveMessage(runtimeInputState, input) && styles.sendBtnDisabled,
                 { opacity: pressed ? 0.88 : 1 },
               ]}
             >
@@ -2031,7 +2233,7 @@ export default function LiveMediationScreen() {
         </View>
         ) : null}
 
-        {sessionUnresolvedClosed ? (
+        {showResolvedConfirmationPanel ? (
           <View style={[styles.generateNextWrap, { paddingBottom: insets.bottom + Spacing.sm }]}>
             <Pressable onPress={goToClosure} style={styles.generateNextBtn}>
               <MaterialIcons name="check-circle-outline" size={20} color="#fff" />

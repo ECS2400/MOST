@@ -7,6 +7,7 @@ import type {
   OrchestrateTurnTrigger,
   ResponseValidationAction,
   RuntimeMetadata,
+  RuntimeClientEvent,
   SessionMemory,
   TranscriptMessage,
 } from '@/types/mediator';
@@ -23,6 +24,7 @@ export interface MediatorRuntimeEdgeRequest {
   transcriptDelta: TranscriptMessage[];
   language: MediatorLang;
   engineVersion: 'v2.3';
+  clientEvents: RuntimeClientEvent[];
 }
 
 /** Sanitized post-LLM validation summary — no prompts or draft replies. */

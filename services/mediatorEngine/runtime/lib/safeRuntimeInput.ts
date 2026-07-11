@@ -6,6 +6,7 @@ import type {
   SessionMemory,
 } from '@/types/mediator';
 import { createEmptySessionMemory } from '@/services/mediatorEngine/_internal/skeletonDefaults';
+import { normalizeClientEvents } from '@/services/mediatorEngine/edge/normalizeClientEvents';
 import { createDefaultRuntimeProvider } from '@/services/mediatorEngine/runtime/adapters/defaultRuntimeProvider';
 import { RUNTIME_LIMITS } from '@/services/mediatorEngine/runtime/config/runtimeLimits';
 
@@ -27,6 +28,7 @@ function createFallbackTurnInput(): OrchestrateTurnRequest {
     mediationState: null,
     transcriptDelta: [],
     engineVersion: 'v2.3',
+    clientEvents: [],
   };
 }
 
@@ -34,10 +36,17 @@ function createFallbackTurnInput(): OrchestrateTurnRequest {
 export function safeRuntimeInput(input: unknown): SafeRuntimeContext {
   const raw = (input && typeof input === 'object' ? input : {}) as Partial<MediatorRuntimeInput>;
 
-  const turnInput =
+  const turnInputRaw =
     raw.turnInput && typeof raw.turnInput === 'object'
       ? raw.turnInput
       : createFallbackTurnInput();
+
+  const clientEvents = normalizeClientEvents(turnInputRaw.clientEvents);
+
+  const turnInput: OrchestrateTurnRequest = {
+    ...turnInputRaw,
+    clientEvents: clientEvents === 'invalid' ? [] : clientEvents,
+  };
 
   const stateLanguage =
     turnInput.mediationState && typeof turnInput.mediationState === 'object'

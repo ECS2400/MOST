@@ -8,6 +8,7 @@ var MEDIATOR_RUNTIME_ERROR_CODES = {
   MISSING_SESSION_ID: "missing_session_id",
   UNSUPPORTED_ENGINE_VERSION: "unsupported_engine_version",
   MISSING_OPENAI_API_KEY: "missing_openai_api_key",
+  INVALID_CLIENT_EVENTS: "invalid_client_events",
   INTERNAL_ERROR: "internal_error"
 };
 function createMediatorRuntimeError(code, message) {
@@ -22,6 +23,7 @@ function mediatorRuntimeErrorStatus(code) {
     case MEDIATOR_RUNTIME_ERROR_CODES.MISSING_MEDIATION_ID:
     case MEDIATOR_RUNTIME_ERROR_CODES.MISSING_SESSION_ID:
     case MEDIATOR_RUNTIME_ERROR_CODES.UNSUPPORTED_ENGINE_VERSION:
+    case MEDIATOR_RUNTIME_ERROR_CODES.INVALID_CLIENT_EVENTS:
       return 400;
     case MEDIATOR_RUNTIME_ERROR_CODES.MISSING_OPENAI_API_KEY:
       return 503;
@@ -6185,6 +6187,75 @@ function buildPromptComposerInputFromTurn(request, sessionMemory, orchestrated, 
   };
 }
 
+// services/mediatorEngine/edge/normalizeClientEvents.ts
+var CLIENT_EVENT_KINDS = /* @__PURE__ */ new Set([
+  "host_message",
+  "partner_message",
+  "continue_session",
+  "resolve_session",
+  "start_extension",
+  "proposal_accepted",
+  "proposal_rejected"
+]);
+var MAX_CLIENT_EVENTS = 20;
+function isValidRuntimeClientEvent(value) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const raw = value;
+  if (typeof raw.kind !== "string" || !CLIENT_EVENT_KINDS.has(raw.kind)) {
+    return false;
+  }
+  if (raw.actor !== "host" && raw.actor !== "partner") {
+    return false;
+  }
+  if (typeof raw.at !== "string" || raw.at.trim().length === 0) {
+    return false;
+  }
+  if (raw.metadata !== void 0 && (raw.metadata === null || typeof raw.metadata !== "object" || Array.isArray(raw.metadata))) {
+    return false;
+  }
+  return true;
+}
+function toRuntimeClientEvent(value) {
+  if (!isValidRuntimeClientEvent(value)) {
+    return null;
+  }
+  const raw = value;
+  return {
+    kind: raw.kind,
+    actor: raw.actor,
+    at: raw.at.trim(),
+    ...raw.metadata !== void 0 ? { metadata: raw.metadata } : {}
+  };
+}
+function validateClientEventsArray(value) {
+  if (value === void 0 || value === null) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    return "invalid";
+  }
+  if (value.length > MAX_CLIENT_EVENTS) {
+    return "invalid";
+  }
+  const result = [];
+  for (const entry of value) {
+    const parsed = toRuntimeClientEvent(entry);
+    if (!parsed) {
+      return "invalid";
+    }
+    result.push(parsed);
+  }
+  return result;
+}
+function normalizeClientEvents(value) {
+  return validateClientEventsArray(value);
+}
+function parseClientEventsFromRequest(value) {
+  return normalizeClientEvents(value);
+}
+
 // services/mediatorEngine/llm/adapters/deterministicStubProvider.ts
 function isSafetyActive5(safetyLevel) {
   return safetyLevel === "L2_pause" || safetyLevel === "L3_stop";
@@ -6237,12 +6308,18 @@ function createFallbackTurnInput() {
     turnNumber: 1,
     mediationState: null,
     transcriptDelta: [],
-    engineVersion: "v2.3"
+    engineVersion: "v2.3",
+    clientEvents: []
   };
 }
 function safeRuntimeInput(input) {
   const raw = input && typeof input === "object" ? input : {};
-  const turnInput = raw.turnInput && typeof raw.turnInput === "object" ? raw.turnInput : createFallbackTurnInput();
+  const turnInputRaw = raw.turnInput && typeof raw.turnInput === "object" ? raw.turnInput : createFallbackTurnInput();
+  const clientEvents = normalizeClientEvents(turnInputRaw.clientEvents);
+  const turnInput = {
+    ...turnInputRaw,
+    clientEvents: clientEvents === "invalid" ? [] : clientEvents
+  };
   const stateLanguage = turnInput.mediationState && typeof turnInput.mediationState === "object" ? turnInput.mediationState.meta?.language : void 0;
   const language = normalizeLanguage2(raw.language ?? stateLanguage);
   return {
@@ -7093,6 +7170,98 @@ function resolveFinalDraftReply(validation) {
   return null;
 }
 
+// services/mediatorEngine/runtimeSession/resolveRuntimeDecisionPanel.ts
+var PROPOSAL_INTERVENTION_TYPES = /* @__PURE__ */ new Set([
+  "propose_rule",
+  "propose_future_plan",
+  "confirm_agreement"
+]);
+var SAFETY_INTERVENTION_TYPES = /* @__PURE__ */ new Set([
+  "safety_response",
+  "deescalate",
+  "pause_session"
+]);
+function inferExtensionActive(sessionMemory, mediationState, intervention) {
+  if (mediationState.currentGoal !== "CLOSURE") {
+    return false;
+  }
+  return countClosureSummaries(sessionMemory, intervention) >= 1;
+}
+function countClosureSummaries(sessionMemory, intervention) {
+  let count = sessionMemory.interventionHistory.filter(
+    (entry) => entry.type === "summarize_close" && entry.goal === "CLOSURE"
+  ).length;
+  if (intervention.type === "summarize_close" && intervention.goal === "CLOSURE") {
+    count += 1;
+  }
+  return count;
+}
+function hasAgreementContent(agreements) {
+  return Boolean(agreements.sharedRule?.trim()) || Boolean(agreements.hostCommitment?.trim()) || Boolean(agreements.partnerCommitment?.trim()) || Boolean(agreements.futurePlan?.trim());
+}
+function isSafetyHold(safetyLevel, interventionType) {
+  return safetyLevel === "L3_stop" || SAFETY_INTERVENTION_TYPES.has(interventionType);
+}
+function resolveProposalDecisionPanel(input) {
+  const { mediationState, intervention, proposalPhase, turnOrdinal } = input;
+  if (proposalPhase !== "presented") {
+    return null;
+  }
+  if (mediationState.agreements.acceptedByBoth) {
+    return null;
+  }
+  if (!hasAgreementContent(mediationState.agreements)) {
+    return null;
+  }
+  const proposalIntervention = PROPOSAL_INTERVENTION_TYPES.has(intervention.type) || mediationState.currentGoal === "AGREEMENT" || mediationState.currentGoal === "FUTURE_PLAN";
+  if (!proposalIntervention) {
+    return null;
+  }
+  return {
+    kind: "proposal_accept_reject",
+    summaryAnchorTurn: turnOrdinal,
+    options: ["accept", "reject"],
+    copyKey: "runtime.decision.proposal_accept_reject"
+  };
+}
+function resolveSummaryDecisionPanel(input) {
+  const { mediationState, sessionMemory, intervention, turnOrdinal } = input;
+  if (intervention.type !== "summarize_close" || mediationState.currentGoal !== "CLOSURE") {
+    return null;
+  }
+  const closureSummaryCount = countClosureSummaries(sessionMemory, intervention);
+  if (closureSummaryCount >= 2) {
+    return {
+      kind: "continue_after_extension",
+      summaryAnchorTurn: turnOrdinal,
+      options: ["continue", "resolve"],
+      copyKey: "runtime.decision.continue_after_extension"
+    };
+  }
+  if (closureSummaryCount === 1 && input.runtimeOutcome === "needs_extension_offer") {
+    return {
+      kind: "continue_after_summary",
+      summaryAnchorTurn: turnOrdinal,
+      options: ["continue", "resolve"],
+      copyKey: "runtime.decision.continue_after_summary"
+    };
+  }
+  return null;
+}
+function resolveRuntimeDecisionPanel(input) {
+  const { mediationState, finalMediatorMessage, intervention } = input;
+  if (mediationState.sessionOutcome !== "in_progress") {
+    return null;
+  }
+  if (isSafetyHold(finalMediatorMessage.safetyLevel, intervention.type)) {
+    return null;
+  }
+  if (mediationState.dynamics.mode === "SAFETY") {
+    return null;
+  }
+  return resolveProposalDecisionPanel(input) ?? resolveSummaryDecisionPanel(input);
+}
+
 // services/mediatorEngine/runtimeSession/composeRuntimeSession.ts
 var THERAPEUTIC_GOAL_ORDER = [
   "SAFE_OPENING",
@@ -7128,7 +7297,7 @@ var SUMMARY_INTERVENTION_TYPES = /* @__PURE__ */ new Set([
   "confirm_agreement",
   "celebrate_breakthrough"
 ]);
-var SAFETY_INTERVENTION_TYPES = /* @__PURE__ */ new Set([
+var SAFETY_INTERVENTION_TYPES2 = /* @__PURE__ */ new Set([
   "safety_response",
   "deescalate",
   "pause_session"
@@ -7136,14 +7305,27 @@ var SAFETY_INTERVENTION_TYPES = /* @__PURE__ */ new Set([
 function composeRuntimeSession(input) {
   const stage = resolveSessionStage(input.mediationState);
   const outcome = resolveRuntimeOutcome(input.mediationState);
+  const proposalPhase = resolveProposalPhase(
+    input.mediationState,
+    input.intervention.type
+  );
+  const decisionPanel = resolveRuntimeDecisionPanel({
+    mediationState: input.mediationState,
+    sessionMemory: input.sessionMemory,
+    intervention: input.intervention,
+    finalMediatorMessage: input.finalMediatorMessage,
+    runtimeOutcome: outcome,
+    proposalPhase,
+    turnOrdinal: input.runtimeMetadata.turnNumber
+  });
   return {
-    decision: composeDecision(input, outcome),
+    decision: composeDecision(input, outcome, decisionPanel),
     session: composeLifecycle(input, stage, outcome),
     progress: composeProgress(input, stage),
-    presentation: composePresentation(input),
-    proposal: composeProposal(input),
+    presentation: composePresentation(input, decisionPanel),
+    proposal: composeProposal(input, proposalPhase),
     closure: composeClosure(input, outcome),
-    pending: composePending(input),
+    pending: composePending(input, decisionPanel),
     diagnostics: composeDiagnostics(input)
   };
 }
@@ -7156,7 +7338,7 @@ function composeLifecycle(input, stage, outcome) {
     currentGoal: mediationState.currentGoal,
     activeStrategy: mediationState.activeStrategy?.primary ?? intervention.strategy ?? null,
     turnOrdinal: runtimeMetadata.turnNumber,
-    isExtensionActive: false,
+    isExtensionActive: inferExtensionActive(sessionMemory, mediationState, intervention),
     participantPresence: {
       hostActive: true,
       partnerActive: partnerUserId.trim().length > 0,
@@ -7164,15 +7346,24 @@ function composeLifecycle(input, stage, outcome) {
     }
   };
 }
-function composeDecision(input, outcome) {
+function composeDecision(input, outcome, decisionPanel) {
   const { mediationState, intervention, finalMediatorMessage } = input;
   const pending = mediationState.pendingAction;
-  const safetyHold = isSafetyHold(finalMediatorMessage.safetyLevel, intervention.type);
+  const safetyHold = isSafetyHold2(finalMediatorMessage.safetyLevel, intervention.type);
   if (safetyHold) {
     return {
       nextBeat: "safety_intervention",
       mayAutoAdvance: false,
       blockedReason: "safety_hold",
+      triggerHint: null
+    };
+  }
+  const decisionBlockReason = mapDecisionPanelBlockReason(decisionPanel);
+  if (decisionBlockReason) {
+    return {
+      nextBeat: "await_user_action",
+      mayAutoAdvance: false,
+      blockedReason: decisionBlockReason,
       triggerHint: null
     };
   }
@@ -7249,24 +7440,23 @@ function composeProgress(input, stage) {
     labelKey: `runtime.stage.${stage}`
   };
 }
-function composePresentation(input) {
+function composePresentation(input, decisionPanel) {
   const deliverables = buildDeliverables(input);
   const primaryDeliverable = deliverables[0]?.kind ?? "public_message";
-  const hideInput = isSafetyHold(input.finalMediatorMessage.safetyLevel, input.intervention.type) || input.mediationState.sessionOutcome !== "in_progress";
+  const hideInput = isSafetyHold2(input.finalMediatorMessage.safetyLevel, input.intervention.type) || input.mediationState.sessionOutcome !== "in_progress" || decisionPanel !== null;
   return {
     deliverables,
     primaryDeliverable,
     hideInput,
-    showDecisionPanel: null,
+    showDecisionPanel: decisionPanel,
     hostOnlyGeneration: true
   };
 }
-function composeProposal(input) {
+function composeProposal(input, phase) {
   const { mediationState, intervention, finalMediatorMessage } = input;
-  const phase = resolveProposalPhase(mediationState, intervention.type);
   const agreements = mediationState.agreements;
-  const hasAgreementContent = Boolean(agreements.sharedRule?.trim()) || Boolean(agreements.hostCommitment?.trim()) || Boolean(agreements.partnerCommitment?.trim()) || Boolean(agreements.futurePlan?.trim());
-  const content = phase === "none" || phase === "preparing" || !hasAgreementContent ? null : {
+  const hasAgreementContent2 = Boolean(agreements.sharedRule?.trim()) || Boolean(agreements.hostCommitment?.trim()) || Boolean(agreements.partnerCommitment?.trim()) || Boolean(agreements.futurePlan?.trim());
+  const content = phase === "none" || phase === "preparing" || !hasAgreementContent2 ? null : {
     proposalId: intervention.id,
     body: finalMediatorMessage.text.trim(),
     hostCommitment: agreements.hostCommitment,
@@ -7295,7 +7485,7 @@ function composeClosure(input, outcome) {
     navigateToClosure: terminal && directive !== "offer_manual_close"
   };
 }
-function composePending(input) {
+function composePending(input, decisionPanel) {
   const { mediationState, intervention } = input;
   const pendingAction = mediationState.pendingAction;
   if (pendingAction && pendingAction.awaitingResponseFrom.length > 0) {
@@ -7303,6 +7493,14 @@ function composePending(input) {
       awaiting: mapAwaitingParticipants(pendingAction.awaitingResponseFrom),
       awaitingFrom: [...pendingAction.awaitingResponseFrom],
       satisfiedBy: mapSatisfiedByRoles(pendingAction.awaitingResponseFrom)
+    };
+  }
+  const decisionAwaiting = mapDecisionPanelPendingAction(decisionPanel);
+  if (decisionAwaiting) {
+    return {
+      awaiting: decisionAwaiting,
+      awaitingFrom: ["host", "partner"],
+      satisfiedBy: mapDecisionPanelSatisfiedBy(decisionPanel)
     };
   }
   if (QUESTION_INTERVENTION_TYPES.has(intervention.type)) {
@@ -7378,7 +7576,7 @@ function resolveRuntimeOutcome(state) {
   }
 }
 function resolveNextBeatAfterIntervention(interventionType, currentGoal) {
-  if (SAFETY_INTERVENTION_TYPES.has(interventionType)) {
+  if (SAFETY_INTERVENTION_TYPES2.has(interventionType)) {
     return "safety_intervention";
   }
   if (interventionType === "welcome_open") {
@@ -7447,7 +7645,7 @@ function buildDeliverables(input) {
     return [];
   }
   const target = intervention.target;
-  if (SAFETY_INTERVENTION_TYPES.has(intervention.type)) {
+  if (SAFETY_INTERVENTION_TYPES2.has(intervention.type)) {
     return [
       {
         kind: "escalation_notice",
@@ -7505,6 +7703,47 @@ function mapQuestionTarget(target) {
   if (target === "partner") return "partner";
   return "oboje";
 }
+function mapDecisionPanelBlockReason(panel) {
+  if (!panel) return null;
+  switch (panel.kind) {
+    case "proposal_accept_reject":
+      return "awaiting_proposal_decision";
+    case "continue_after_extension":
+      return "awaiting_extension_decision";
+    case "continue_after_summary":
+    case "dispute_resolved_confirm":
+      return "awaiting_continue_decision";
+    default:
+      return null;
+  }
+}
+function mapDecisionPanelPendingAction(panel) {
+  if (!panel) return null;
+  switch (panel.kind) {
+    case "proposal_accept_reject":
+      return "proposal_decision";
+    case "continue_after_extension":
+      return "extension_decision";
+    case "continue_after_summary":
+    case "dispute_resolved_confirm":
+      return "continue_decision";
+    default:
+      return null;
+  }
+}
+function mapDecisionPanelSatisfiedBy(panel) {
+  if (!panel) return [];
+  switch (panel.kind) {
+    case "proposal_accept_reject":
+      return ["proposal_accepted", "proposal_rejected"];
+    case "continue_after_extension":
+    case "continue_after_summary":
+    case "dispute_resolved_confirm":
+      return ["continue_session", "resolve_session"];
+    default:
+      return [];
+  }
+}
 function mapAwaitingParticipants(roles) {
   if (roles.includes("host") && roles.includes("partner")) {
     return "both_replies";
@@ -7536,8 +7775,8 @@ function resolvePendingBlockReason(roles) {
   }
   return "awaiting_partner_reply";
 }
-function isSafetyHold(safetyLevel, interventionType) {
-  return safetyLevel === "L3_stop" || SAFETY_INTERVENTION_TYPES.has(interventionType);
+function isSafetyHold2(safetyLevel, interventionType) {
+  return safetyLevel === "L3_stop" || SAFETY_INTERVENTION_TYPES2.has(interventionType);
 }
 function estimateCompletion(completedGoals, currentGoal, currentGoalProgressPercent) {
   const total = THERAPEUTIC_GOAL_ORDER.length;
@@ -7984,6 +8223,17 @@ function parseMediatorRuntimeRequest(body) {
       status: 400
     };
   }
+  const clientEvents = parseClientEventsFromRequest(raw.clientEvents);
+  if (clientEvents === "invalid") {
+    return {
+      ok: false,
+      error: createMediatorRuntimeError(
+        MEDIATOR_RUNTIME_ERROR_CODES.INVALID_CLIENT_EVENTS,
+        "clientEvents must be an array when provided"
+      ).error,
+      status: 400
+    };
+  }
   const request = {
     mediationId: raw.mediationId.trim(),
     sessionId: raw.sessionId.trim(),
@@ -7993,7 +8243,8 @@ function parseMediatorRuntimeRequest(body) {
     sessionMemory: normalizeSessionMemory(raw.sessionMemory),
     transcriptDelta: normalizeTranscriptDelta(raw.transcriptDelta),
     language: normalizeLanguage5(raw.language),
-    engineVersion: "v2.3"
+    engineVersion: "v2.3",
+    clientEvents
   };
   return { ok: true, value: request };
 }
@@ -8006,7 +8257,8 @@ function toOrchestrateTurnRequest(request) {
     mediationState: request.mediationState,
     transcriptDelta: request.transcriptDelta,
     engineVersion: "v2.3",
-    language: request.language
+    language: request.language,
+    clientEvents: request.clientEvents
   };
 }
 

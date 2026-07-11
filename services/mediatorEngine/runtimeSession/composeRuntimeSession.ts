@@ -20,6 +20,7 @@ import type {
   MediatorBlockReason,
   RuntimeClientEventKind,
   RuntimeClosureDirective,
+  RuntimeDecisionPanelSpec,
   RuntimeMediationDbStatus,
   RuntimePendingUserAction,
   RuntimeProposalPhase,
@@ -31,6 +32,10 @@ import type {
   RuntimeUiDeliverable,
   RuntimeUiDeliverableKind,
 } from '@/types/mediator/runtimeSession';
+import {
+  inferExtensionActive,
+  resolveRuntimeDecisionPanel,
+} from '@/services/mediatorEngine/runtimeSession/resolveRuntimeDecisionPanel';
 
 export interface ComposeRuntimeSessionInput {
   mediationState: MediationState;
@@ -88,15 +93,28 @@ const SAFETY_INTERVENTION_TYPES: ReadonlySet<InterventionType> = new Set([
 export function composeRuntimeSession(input: ComposeRuntimeSessionInput): RuntimeSession {
   const stage = resolveSessionStage(input.mediationState);
   const outcome = resolveRuntimeOutcome(input.mediationState);
+  const proposalPhase = resolveProposalPhase(
+    input.mediationState,
+    input.intervention.type
+  );
+  const decisionPanel = resolveRuntimeDecisionPanel({
+    mediationState: input.mediationState,
+    sessionMemory: input.sessionMemory,
+    intervention: input.intervention,
+    finalMediatorMessage: input.finalMediatorMessage,
+    runtimeOutcome: outcome,
+    proposalPhase,
+    turnOrdinal: input.runtimeMetadata.turnNumber,
+  });
 
   return {
-    decision: composeDecision(input, outcome),
+    decision: composeDecision(input, outcome, decisionPanel),
     session: composeLifecycle(input, stage, outcome),
     progress: composeProgress(input, stage),
-    presentation: composePresentation(input),
-    proposal: composeProposal(input),
+    presentation: composePresentation(input, decisionPanel),
+    proposal: composeProposal(input, proposalPhase),
     closure: composeClosure(input, outcome),
-    pending: composePending(input),
+    pending: composePending(input, decisionPanel),
     diagnostics: composeDiagnostics(input),
   };
 }
@@ -116,7 +134,7 @@ function composeLifecycle(
     activeStrategy:
       mediationState.activeStrategy?.primary ?? intervention.strategy ?? null,
     turnOrdinal: runtimeMetadata.turnNumber,
-    isExtensionActive: false,
+    isExtensionActive: inferExtensionActive(sessionMemory, mediationState, intervention),
     participantPresence: {
       hostActive: true,
       partnerActive: partnerUserId.trim().length > 0,
@@ -127,7 +145,8 @@ function composeLifecycle(
 
 function composeDecision(
   input: ComposeRuntimeSessionInput,
-  outcome: RuntimeSessionOutcome
+  outcome: RuntimeSessionOutcome,
+  decisionPanel: RuntimeDecisionPanelSpec | null
 ): RuntimeSession['decision'] {
   const { mediationState, intervention, finalMediatorMessage } = input;
   const pending = mediationState.pendingAction;
@@ -138,6 +157,16 @@ function composeDecision(
       nextBeat: 'safety_intervention',
       mayAutoAdvance: false,
       blockedReason: 'safety_hold',
+      triggerHint: null,
+    };
+  }
+
+  const decisionBlockReason = mapDecisionPanelBlockReason(decisionPanel);
+  if (decisionBlockReason) {
+    return {
+      nextBeat: 'await_user_action',
+      mayAutoAdvance: false,
+      blockedReason: decisionBlockReason,
       triggerHint: null,
     };
   }
@@ -232,25 +261,31 @@ function composeProgress(
   };
 }
 
-function composePresentation(input: ComposeRuntimeSessionInput): RuntimeSession['presentation'] {
+function composePresentation(
+  input: ComposeRuntimeSessionInput,
+  decisionPanel: RuntimeDecisionPanelSpec | null
+): RuntimeSession['presentation'] {
   const deliverables = buildDeliverables(input);
   const primaryDeliverable = deliverables[0]?.kind ?? 'public_message';
   const hideInput =
     isSafetyHold(input.finalMediatorMessage.safetyLevel, input.intervention.type) ||
-    input.mediationState.sessionOutcome !== 'in_progress';
+    input.mediationState.sessionOutcome !== 'in_progress' ||
+    decisionPanel !== null;
 
   return {
     deliverables,
     primaryDeliverable,
     hideInput,
-    showDecisionPanel: null,
+    showDecisionPanel: decisionPanel,
     hostOnlyGeneration: true,
   };
 }
 
-function composeProposal(input: ComposeRuntimeSessionInput): RuntimeSession['proposal'] {
+function composeProposal(
+  input: ComposeRuntimeSessionInput,
+  phase: RuntimeProposalPhase
+): RuntimeSession['proposal'] {
   const { mediationState, intervention, finalMediatorMessage } = input;
-  const phase = resolveProposalPhase(mediationState, intervention.type);
   const agreements = mediationState.agreements;
 
   const hasAgreementContent =
@@ -298,7 +333,10 @@ function composeClosure(
   };
 }
 
-function composePending(input: ComposeRuntimeSessionInput): RuntimeSession['pending'] {
+function composePending(
+  input: ComposeRuntimeSessionInput,
+  decisionPanel: RuntimeDecisionPanelSpec | null
+): RuntimeSession['pending'] {
   const { mediationState, intervention } = input;
   const pendingAction = mediationState.pendingAction;
 
@@ -307,6 +345,15 @@ function composePending(input: ComposeRuntimeSessionInput): RuntimeSession['pend
       awaiting: mapAwaitingParticipants(pendingAction.awaitingResponseFrom),
       awaitingFrom: [...pendingAction.awaitingResponseFrom],
       satisfiedBy: mapSatisfiedByRoles(pendingAction.awaitingResponseFrom),
+    };
+  }
+
+  const decisionAwaiting = mapDecisionPanelPendingAction(decisionPanel);
+  if (decisionAwaiting) {
+    return {
+      awaiting: decisionAwaiting,
+      awaitingFrom: ['host', 'partner'],
+      satisfiedBy: mapDecisionPanelSatisfiedBy(decisionPanel),
     };
   }
 
@@ -559,6 +606,59 @@ function mapQuestionTarget(target: Intervention['target']): RuntimeQuestionTarge
   if (target === 'host') return 'ty';
   if (target === 'partner') return 'partner';
   return 'oboje';
+}
+
+function mapDecisionPanelBlockReason(
+  panel: RuntimeDecisionPanelSpec | null
+): MediatorBlockReason | null {
+  if (!panel) return null;
+
+  switch (panel.kind) {
+    case 'proposal_accept_reject':
+      return 'awaiting_proposal_decision';
+    case 'continue_after_extension':
+      return 'awaiting_extension_decision';
+    case 'continue_after_summary':
+    case 'dispute_resolved_confirm':
+      return 'awaiting_continue_decision';
+    default:
+      return null;
+  }
+}
+
+function mapDecisionPanelPendingAction(
+  panel: RuntimeDecisionPanelSpec | null
+): RuntimePendingUserAction | null {
+  if (!panel) return null;
+
+  switch (panel.kind) {
+    case 'proposal_accept_reject':
+      return 'proposal_decision';
+    case 'continue_after_extension':
+      return 'extension_decision';
+    case 'continue_after_summary':
+    case 'dispute_resolved_confirm':
+      return 'continue_decision';
+    default:
+      return null;
+  }
+}
+
+function mapDecisionPanelSatisfiedBy(
+  panel: RuntimeDecisionPanelSpec | null
+): RuntimeClientEventKind[] {
+  if (!panel) return [];
+
+  switch (panel.kind) {
+    case 'proposal_accept_reject':
+      return ['proposal_accepted', 'proposal_rejected'];
+    case 'continue_after_extension':
+    case 'continue_after_summary':
+    case 'dispute_resolved_confirm':
+      return ['continue_session', 'resolve_session'];
+    default:
+      return [];
+  }
 }
 
 function mapAwaitingParticipants(

@@ -11,6 +11,7 @@ import {
   MEDIATOR_RUNTIME_ERROR_CODES,
 } from '@/services/mediatorEngine/edge/errors';
 import type { MediatorRuntimeErrorBody } from '@/services/mediatorEngine/edge/errors';
+import { parseClientEventsFromRequest } from '@/services/mediatorEngine/edge/normalizeClientEvents';
 import type { MediatorRuntimeEdgeRequest } from '@/services/mediatorEngine/edge/types';
 
 const SUPPORTED_LANGUAGES: MediatorLang[] = ['pl', 'en', 'es', 'it', 'de', 'fr'];
@@ -124,6 +125,18 @@ export function parseMediatorRuntimeRequest(body: unknown): ParseMediatorRuntime
     };
   }
 
+  const clientEvents = parseClientEventsFromRequest(raw.clientEvents);
+  if (clientEvents === 'invalid') {
+    return {
+      ok: false,
+      error: createMediatorRuntimeError(
+        MEDIATOR_RUNTIME_ERROR_CODES.INVALID_CLIENT_EVENTS,
+        'clientEvents must be an array when provided'
+      ).error,
+      status: 400,
+    };
+  }
+
   const request: MediatorRuntimeEdgeRequest = {
     mediationId: raw.mediationId.trim(),
     sessionId: raw.sessionId.trim(),
@@ -137,6 +150,7 @@ export function parseMediatorRuntimeRequest(body: unknown): ParseMediatorRuntime
     transcriptDelta: normalizeTranscriptDelta(raw.transcriptDelta),
     language: normalizeLanguage(raw.language),
     engineVersion: 'v2.3',
+    clientEvents,
   };
 
   return { ok: true, value: request };
@@ -155,6 +169,7 @@ export function toOrchestrateTurnRequest(
     transcriptDelta: request.transcriptDelta,
     engineVersion: 'v2.3',
     language: request.language,
+    clientEvents: request.clientEvents,
   };
 }
 

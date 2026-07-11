@@ -22,6 +22,7 @@ import type { SafetyOutput } from './safety';
 import type { GoalContinuityContext } from './goalContinuity';
 import type { ContinuityContext } from './continuity';
 import type { SessionMemory } from './sessionMemory';
+import type { RuntimeClientEvent } from './runtimeSession';
 import type { InterventionIntent, StrategyEngineOutput } from './strategyEngineIo';
 
 /** Feature flag values controlling engine version rollout. */
@@ -49,6 +50,8 @@ export interface OrchestrateTurnRequest {
   engineVersion: MediatorEngineVersion;
   /** Session language from edge/runtime input — propagated into MediationState.meta.language. */
   language?: MediatorLang;
+  /** Client-originated flow events (transport only until UI-B.3d.2+). */
+  clientEvents?: RuntimeClientEvent[];
 }
 
 /**

@@ -25,6 +25,23 @@ describe('buildMediatorRuntimeRequest', () => {
     assert.equal(body.sessionMemory, null);
     assert.equal(body.transcriptDelta.length, 1);
     assert.equal(body.transcriptDelta[0]?.content, 'I feel unheard.');
+    assert.deepEqual(body.clientEvents, []);
+  });
+
+  it('passes clientEvents through when provided', () => {
+    const events = [
+      {
+        kind: 'proposal_rejected' as const,
+        actor: 'partner' as const,
+        at: '2026-07-11T12:00:00.000Z',
+      },
+    ];
+    const body = buildMediatorRuntimeRequest({
+      ...createClientInputFixture(),
+      clientEvents: events,
+    });
+
+    assert.deepEqual(body.clientEvents, events);
   });
 
   it('defaults engineVersion to v2.3', () => {

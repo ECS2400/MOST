@@ -2,6 +2,7 @@ import type {
   MediationState,
   MediatorLang,
   OrchestrateTurnTrigger,
+  RuntimeClientEvent,
   SessionMemory,
   TranscriptMessage,
 } from '@/types/mediator';
@@ -38,6 +39,7 @@ export interface LiveRuntimeTurnParams {
   isBootstrap?: boolean;
   mediationState?: MediationState | null;
   sessionMemory?: SessionMemory | null;
+  clientEvents?: RuntimeClientEvent[];
 }
 
 /** Maps app language to mediator-runtime language with en fallback (not pl). */
@@ -108,6 +110,7 @@ export function buildLiveRuntimeTurnInput(
     sessionMemory: params.sessionMemory ?? null,
     transcriptDelta: buildTranscriptDelta(params),
     language: toRuntimeLanguage(params.language),
+    clientEvents: params.clientEvents,
   };
 }
 

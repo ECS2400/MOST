@@ -28,6 +28,7 @@ import {
 } from '@/services/mediatorRuntimeClient/mediationRuntimeSessionPersistence';
 import { loadMediationRuntimeState } from '@/services/mediatorRuntimeClient/loadMediationRuntimeSession';
 import type { MediatorRuntimeParsedSuccess } from '@/services/mediatorRuntimeClient/mediatorRuntimeClient';
+import type { RuntimeClientEvent } from '@/types/mediator';
 
 function liveStrings(lang: Language = 'pl') {
   return getLiveMediationExtras(lang).service;
@@ -3803,7 +3804,8 @@ export async function processGenerateNextTurn(
   allMessages: LiveMessage[],
   language: Language = 'pl',
   mediationContext?: MediationContext | null,
-  participantNames?: ParticipantNames
+  participantNames?: ParticipantNames,
+  clientEvents?: RuntimeClientEvent[]
 ): Promise<LiveMediatorResponse> {
   const turn = computeLiveTurnState(allMessages, hostUserId, partnerUserIds);
 
@@ -3836,7 +3838,8 @@ export async function processGenerateNextTurn(
       language,
       mediationContext,
       mode,
-      participantNames
+      participantNames,
+      clientEvents
     );
   }
 
@@ -3877,7 +3880,8 @@ export async function processGenerateNextTurn(
     language,
     mediationContext,
     mode,
-    participantNames
+    participantNames,
+    clientEvents
   );
 }
 
@@ -4106,7 +4110,8 @@ export async function processMediationTurn(
   language: Language = 'pl',
   mediationContext?: MediationContext | null,
   mode: MediatorMode = 'answer_ack',
-  participantNames?: ParticipantNames
+  participantNames?: ParticipantNames,
+  clientEvents?: RuntimeClientEvent[]
 ): Promise<LiveMediatorResponse> {
   const senderRole = resolveSenderRole(
     triggerMessage.sender_id,
@@ -4135,6 +4140,7 @@ export async function processMediationTurn(
     isBootstrap: triggerMessage.metadata?.bootstrap === true,
     mediationState: persistedRuntime.mediationState,
     sessionMemory: persistedRuntime.sessionMemory,
+    clientEvents,
   });
 
   let runtimeTurnPersist: MediatorRuntimeParsedSuccess | null = null;
