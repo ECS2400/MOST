@@ -20,6 +20,7 @@ import type {
   SessionMemory,
   StrategyEngineOutput,
 } from '@/types/mediator';
+import { createDefaultRuntimeFlowControl } from '@/services/mediatorEngine/clientEvents/applyRuntimeClientEvents';
 
 const SKELETON_TIMESTAMP = '1970-01-01T00:00:00.000Z';
 
@@ -63,6 +64,7 @@ export function createEmptySessionMemory(): SessionMemory {
     goalTransitionHistory: [],
     lastGoalTransitionReason: null,
     reflectionLog: [],
+    runtimeFlowControl: createDefaultRuntimeFlowControl(),
   };
 }
 

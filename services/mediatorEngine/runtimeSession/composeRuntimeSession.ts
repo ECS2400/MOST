@@ -91,10 +91,11 @@ const SAFETY_INTERVENTION_TYPES: ReadonlySet<InterventionType> = new Set([
 
 /** Builds the full runtime-driven session contract for one completed turn. */
 export function composeRuntimeSession(input: ComposeRuntimeSessionInput): RuntimeSession {
-  const stage = resolveSessionStage(input.mediationState);
-  const outcome = resolveRuntimeOutcome(input.mediationState);
+  const stage = resolveSessionStage(input.mediationState, input.sessionMemory);
+  const outcome = resolveRuntimeOutcome(input.mediationState, input.sessionMemory);
   const proposalPhase = resolveProposalPhase(
     input.mediationState,
+    input.sessionMemory,
     input.intervention.type
   );
   const decisionPanel = resolveRuntimeDecisionPanel({
@@ -169,6 +170,23 @@ function composeDecision(
       blockedReason: decisionBlockReason,
       triggerHint: null,
     };
+  }
+
+  const extensionActive = inferExtensionActive(
+    input.sessionMemory,
+    mediationState,
+    intervention
+  );
+
+  if (extensionActive && outcome === 'extension_active' && mediationState.currentGoal === 'CLOSURE') {
+    if (SUMMARY_INTERVENTION_TYPES.has(intervention.type)) {
+      return {
+        nextBeat: 'deliver_extension_questions',
+        mayAutoAdvance: true,
+        blockedReason: null,
+        triggerHint: 'host_generate',
+      };
+    }
   }
 
   if (outcome !== 'ongoing' && outcome !== 'extension_active' && outcome !== 'needs_extension_offer') {
@@ -287,6 +305,7 @@ function composeProposal(
 ): RuntimeSession['proposal'] {
   const { mediationState, intervention, finalMediatorMessage } = input;
   const agreements = mediationState.agreements;
+  const flowControl = input.sessionMemory.runtimeFlowControl;
 
   const hasAgreementContent =
     Boolean(agreements.sharedRule?.trim()) ||
@@ -305,13 +324,27 @@ function composeProposal(
           sharedRule: agreements.sharedRule,
         };
 
+  const votes =
+    flowControl != null
+      ? {
+          host:
+            flowControl.proposalVotes.host === 'pending'
+              ? null
+              : flowControl.proposalVotes.host,
+          partner:
+            flowControl.proposalVotes.partner === 'pending'
+              ? null
+              : flowControl.proposalVotes.partner,
+        }
+      : {
+          host: agreements.acceptedByBoth ? 'accepted' : null,
+          partner: agreements.acceptedByBoth ? 'accepted' : null,
+        };
+
   return {
     phase,
     content,
-    votes: {
-      host: agreements.acceptedByBoth ? 'accepted' : null,
-      partner: agreements.acceptedByBoth ? 'accepted' : null,
-    },
+    votes,
     requiresBothAcceptance: true,
   };
 }
@@ -338,6 +371,15 @@ function composePending(
   decisionPanel: RuntimeDecisionPanelSpec | null
 ): RuntimeSession['pending'] {
   const { mediationState, intervention } = input;
+
+  if (mediationState.sessionOutcome !== 'in_progress') {
+    return {
+      awaiting: 'nothing',
+      awaitingFrom: [],
+      satisfiedBy: [],
+    };
+  }
+
   const pendingAction = mediationState.pendingAction;
 
   if (pendingAction && pendingAction.awaitingResponseFrom.length > 0) {
@@ -381,9 +423,16 @@ function composeDiagnostics(input: ComposeRuntimeSessionInput): RuntimeSession['
   };
 }
 
-function resolveSessionStage(state: MediationState): RuntimeSessionStage {
+function resolveSessionStage(
+  state: MediationState,
+  sessionMemory: SessionMemory
+): RuntimeSessionStage {
   if (state.dynamics.mode === 'SAFETY' || state.sessionOutcome === 'safety_stopped') {
     return 'safety_hold';
+  }
+
+  if (state.currentGoal === 'CLOSURE' && sessionMemory.runtimeFlowControl?.extensionActive) {
+    return 'extension';
   }
 
   switch (state.currentGoal) {
@@ -409,7 +458,12 @@ function resolveSessionStage(state: MediationState): RuntimeSessionStage {
   }
 }
 
-function resolveRuntimeOutcome(state: MediationState): RuntimeSessionOutcome {
+function resolveRuntimeOutcome(
+  state: MediationState,
+  sessionMemory: SessionMemory
+): RuntimeSessionOutcome {
+  const flowControl = sessionMemory.runtimeFlowControl;
+
   switch (state.sessionOutcome) {
     case 'resolved':
       return 'resolved';
@@ -420,13 +474,25 @@ function resolveRuntimeOutcome(state: MediationState): RuntimeSessionOutcome {
     case 'paused':
       return 'paused';
     case 'in_progress':
-      if (state.agreements.acceptedByBoth) {
+      if (flowControl?.proposalPhase === 'rejected') {
+        return 'ongoing';
+      }
+      if (flowControl?.extensionActive) {
+        return 'extension_active';
+      }
+      if (state.agreements.acceptedByBoth || flowControl?.sessionResolvedByEvent) {
         return 'resolved';
+      }
+      if (flowControl?.proposalPhase === 'presented') {
+        return 'proposal_pending';
       }
       if (state.currentGoal === 'FUTURE_PLAN' || state.currentGoal === 'AGREEMENT') {
         return 'proposal_pending';
       }
       if (state.currentGoal === 'CLOSURE') {
+        if (flowControl?.continueAfterSummaryAcknowledged) {
+          return 'ongoing';
+        }
         return 'needs_extension_offer';
       }
       return 'ongoing';
@@ -474,10 +540,28 @@ function resolveNextBeatAfterIntervention(
 
 function resolveProposalPhase(
   state: MediationState,
+  sessionMemory: SessionMemory,
   interventionType: InterventionType
 ): RuntimeProposalPhase {
-  if (state.agreements.acceptedByBoth) {
+  const flowControl = sessionMemory.runtimeFlowControl;
+
+  if (flowControl?.proposalPhase === 'accepted' || flowControl?.proposalPhase === 'rejected') {
+    return flowControl.proposalPhase;
+  }
+
+  if (state.agreements.acceptedByBoth || state.sessionOutcome === 'resolved') {
     return 'accepted';
+  }
+
+  if (flowControl?.proposalPhase === 'presented') {
+    return 'presented';
+  }
+
+  if (
+    flowControl &&
+    (flowControl.proposalVotes.host !== 'pending' || flowControl.proposalVotes.partner !== 'pending')
+  ) {
+    return 'presented';
   }
 
   if (

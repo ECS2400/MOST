@@ -1,5 +1,6 @@
 import type { BreakthroughType, SessionBreakthroughRecord, SessionMemory } from '@/types/mediator';
 import { createEmptySessionMemory } from '@/services/mediatorEngine/_internal/skeletonDefaults';
+import { normalizeRuntimeFlowControl } from '@/services/mediatorEngine/clientEvents/applyRuntimeClientEvents';
 
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
@@ -35,7 +36,7 @@ export function normalizeMemory(memory: Partial<SessionMemory> | null | undefine
   const empty = createEmptySessionMemory();
   if (!memory || typeof memory !== 'object') return empty;
 
-  return {
+  return normalizeRuntimeFlowControl({
     breakthroughs: sanitizeBreakthroughs(memory.breakthroughs),
     confirmedEmotions: asArray(memory.confirmedEmotions),
     confirmedNeeds: asArray(memory.confirmedNeeds),
@@ -53,5 +54,6 @@ export function normalizeMemory(memory: Partial<SessionMemory> | null | undefine
     lastGoalTransitionReason:
       typeof memory.lastGoalTransitionReason === 'string' ? memory.lastGoalTransitionReason : null,
     reflectionLog: asArray(memory.reflectionLog),
-  };
+    runtimeFlowControl: memory.runtimeFlowControl,
+  });
 }

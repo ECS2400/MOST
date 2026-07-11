@@ -4,6 +4,7 @@ import { composePrompt } from '@/services/mediatorEngine/promptComposer/composeP
 import { createFallbackMediatorReply } from '@/services/mediatorEngine/llm/fallback/createFallbackMediatorReply';
 import { buildPromptComposerInputFromTurn } from '@/services/mediatorEngine/runtime/lib/buildPromptComposerInputFromTurn';
 import { safeRuntimeInput } from '@/services/mediatorEngine/runtime/lib/safeRuntimeInput';
+import { applyRuntimeClientEvents } from '@/services/mediatorEngine/clientEvents/applyRuntimeClientEvents';
 import { runReplyRetryLoop } from '@/services/mediatorEngine/runtime/retry/runReplyRetryLoop';
 import {
   buildFinalMediatorMessage,
@@ -31,14 +32,24 @@ export async function runMediatorEngineTurn(
   try {
     const ctx = safeRuntimeInput(input);
 
+    const stateBefore =
+      ctx.turnInput.mediationState ?? createEmptyMediationState(ctx.turnInput);
+
+    const clientEventResult = applyRuntimeClientEvents({
+      mediationState: stateBefore,
+      sessionMemory: ctx.sessionMemory,
+      clientEvents: ctx.turnInput.clientEvents ?? [],
+    });
+
     const turnInput = {
       ...ctx.turnInput,
       language: ctx.language,
+      mediationState: clientEventResult.mediationState,
     };
 
     const orchestratedTurn = orchestrateTurn({
       request: turnInput,
-      sessionMemory: ctx.sessionMemory,
+      sessionMemory: clientEventResult.sessionMemory,
     });
 
     const promptInput = buildPromptComposerInputFromTurn(

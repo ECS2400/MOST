@@ -78,6 +78,25 @@ export interface SessionReflectionLogEntry {
   expectedEffectEvaluation: ExpectedEffectEvaluation | null;
 }
 
+import type { RuntimeProposalPhase } from './runtimeSession';
+
+/** Per-participant proposal vote persisted from client events. */
+export type RuntimeFlowControlProposalVote = 'pending' | 'accepted' | 'rejected';
+
+/** Flow-control flags derived from applied runtime client events (Phase UI-B.3d.3+). */
+export interface RuntimeFlowControlState {
+  extensionActive: boolean;
+  continueAfterSummaryAcknowledged: boolean;
+  continueAfterExtensionAcknowledged: boolean;
+  appliedClientEventFingerprints: string[];
+  proposalVotes: {
+    host: RuntimeFlowControlProposalVote;
+    partner: RuntimeFlowControlProposalVote;
+  };
+  proposalPhase: RuntimeProposalPhase;
+  sessionResolvedByEvent: boolean;
+}
+
 /** Input to Session Memory update pipeline step. */
 export interface SessionMemoryUpdateInput {
   previousMemory: SessionMemory;
@@ -114,6 +133,8 @@ export interface SessionMemory {
   goalTransitionHistory: GoalTransition[];
   lastGoalTransitionReason: string | null;
   reflectionLog: SessionReflectionLogEntry[];
+  /** Client-event flow signals — persisted across turns within a session. */
+  runtimeFlowControl: RuntimeFlowControlState;
 }
 
 /** Condensed session memory exported to analytics events. */

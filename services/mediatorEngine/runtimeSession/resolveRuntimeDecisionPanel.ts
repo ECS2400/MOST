@@ -46,6 +46,10 @@ export function inferExtensionActive(
   mediationState: MediationState,
   intervention: Intervention
 ): boolean {
+  if (sessionMemory.runtimeFlowControl?.extensionActive) {
+    return true;
+  }
+
   if (mediationState.currentGoal !== 'CLOSURE') {
     return false;
   }
@@ -87,9 +91,28 @@ function isSafetyHold(
 function resolveProposalDecisionPanel(
   input: ResolveRuntimeDecisionPanelInput
 ): RuntimeDecisionPanelSpec | null {
-  const { mediationState, intervention, proposalPhase, turnOrdinal } = input;
+  const { mediationState, sessionMemory, intervention, proposalPhase, turnOrdinal } = input;
+  const flowControl = sessionMemory.runtimeFlowControl;
 
   if (proposalPhase !== 'presented') {
+    return null;
+  }
+
+  if (flowControl?.proposalPhase === 'accepted' || flowControl?.proposalPhase === 'rejected') {
+    return null;
+  }
+
+  if (
+    flowControl?.proposalVotes.host === 'rejected' ||
+    flowControl?.proposalVotes.partner === 'rejected'
+  ) {
+    return null;
+  }
+
+  if (
+    flowControl?.proposalVotes.host === 'accepted' &&
+    flowControl?.proposalVotes.partner === 'accepted'
+  ) {
     return null;
   }
 
@@ -122,6 +145,23 @@ function resolveSummaryDecisionPanel(
   input: ResolveRuntimeDecisionPanelInput
 ): RuntimeDecisionPanelSpec | null {
   const { mediationState, sessionMemory, intervention, turnOrdinal } = input;
+  const flowControl = sessionMemory.runtimeFlowControl;
+
+  if (flowControl?.extensionActive) {
+    return null;
+  }
+
+  const persistedClosureCount = sessionMemory.interventionHistory.filter(
+    (entry) => entry.type === 'summarize_close' && entry.goal === 'CLOSURE'
+  ).length;
+
+  if (
+    flowControl?.continueAfterSummaryAcknowledged &&
+    !flowControl?.continueAfterExtensionAcknowledged &&
+    persistedClosureCount < 2
+  ) {
+    return null;
+  }
 
   if (intervention.type !== 'summarize_close' || mediationState.currentGoal !== 'CLOSURE') {
     return null;
@@ -130,6 +170,9 @@ function resolveSummaryDecisionPanel(
   const closureSummaryCount = countClosureSummaries(sessionMemory, intervention);
 
   if (closureSummaryCount >= 2) {
+    if (flowControl?.continueAfterExtensionAcknowledged) {
+      return null;
+    }
     return {
       kind: 'continue_after_extension',
       summaryAnchorTurn: turnOrdinal,
@@ -139,6 +182,9 @@ function resolveSummaryDecisionPanel(
   }
 
   if (closureSummaryCount === 1 && input.runtimeOutcome === 'needs_extension_offer') {
+    if (flowControl?.continueAfterSummaryAcknowledged) {
+      return null;
+    }
     return {
       kind: 'continue_after_summary',
       summaryAnchorTurn: turnOrdinal,

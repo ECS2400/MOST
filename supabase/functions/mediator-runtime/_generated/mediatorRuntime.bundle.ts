@@ -1030,6 +1030,372 @@ function makeDecision(input) {
   }
 }
 
+// services/mediatorEngine/clientEvents/proposalFlowHelpers.ts
+var PROPOSAL_INTERVENTION_TYPES = /* @__PURE__ */ new Set([
+  "propose_rule",
+  "propose_future_plan",
+  "confirm_agreement"
+]);
+function hasAgreementContent(agreements) {
+  return Boolean(agreements.sharedRule?.trim()) || Boolean(agreements.hostCommitment?.trim()) || Boolean(agreements.partnerCommitment?.trim()) || Boolean(agreements.futurePlan?.trim());
+}
+function isProposalPresentedForEvents(mediationState, sessionMemory) {
+  const flowControl = sessionMemory.runtimeFlowControl;
+  if (!flowControl) {
+    return false;
+  }
+  if (flowControl.proposalPhase === "accepted" || flowControl.proposalPhase === "rejected") {
+    return false;
+  }
+  if (mediationState.agreements.acceptedByBoth || mediationState.sessionOutcome === "resolved") {
+    return false;
+  }
+  if (!hasAgreementContent(mediationState.agreements)) {
+    return false;
+  }
+  if (flowControl.proposalPhase === "presented") {
+    return true;
+  }
+  const hasProposalIntervention = sessionMemory.interventionHistory.some(
+    (entry) => PROPOSAL_INTERVENTION_TYPES.has(entry.type)
+  );
+  return hasProposalIntervention || mediationState.currentGoal === "AGREEMENT" || mediationState.currentGoal === "FUTURE_PLAN";
+}
+function countPersistedClosureSummaries(sessionMemory) {
+  return sessionMemory.interventionHistory.filter(
+    (entry) => entry.type === "summarize_close" && entry.goal === "CLOSURE"
+  ).length;
+}
+function isAwaitingResolutionDecision(mediationState, sessionMemory) {
+  if (mediationState.sessionOutcome !== "in_progress") {
+    return false;
+  }
+  const flowControl = sessionMemory.runtimeFlowControl;
+  if (flowControl?.sessionResolvedByEvent) {
+    return false;
+  }
+  if (mediationState.currentGoal !== "CLOSURE") {
+    return false;
+  }
+  const closureSummaryCount = countPersistedClosureSummaries(sessionMemory);
+  if (closureSummaryCount >= 1 && !flowControl?.continueAfterSummaryAcknowledged) {
+    return true;
+  }
+  if (closureSummaryCount >= 2 && !flowControl?.continueAfterExtensionAcknowledged) {
+    return true;
+  }
+  return false;
+}
+
+// services/mediatorEngine/clientEvents/applyRuntimeClientEvents.ts
+var INTERPRETED_EVENT_KINDS = /* @__PURE__ */ new Set([
+  "continue_session",
+  "start_extension",
+  "proposal_accepted",
+  "proposal_rejected",
+  "resolve_session"
+]);
+function createDefaultRuntimeFlowControl() {
+  return {
+    extensionActive: false,
+    continueAfterSummaryAcknowledged: false,
+    continueAfterExtensionAcknowledged: false,
+    appliedClientEventFingerprints: [],
+    proposalVotes: {
+      host: "pending",
+      partner: "pending"
+    },
+    proposalPhase: "none",
+    sessionResolvedByEvent: false
+  };
+}
+function clientEventFingerprint(event) {
+  return `${event.kind}|${event.actor}|${event.at}`;
+}
+function clientEventFingerprintDigest(event) {
+  const raw = clientEventFingerprint(event);
+  let hash = 2166136261;
+  for (let index = 0; index < raw.length; index += 1) {
+    hash ^= raw.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+function ensureFlowControl(memory) {
+  return memory.runtimeFlowControl ?? createDefaultRuntimeFlowControl();
+}
+function countPersistedClosureSummaries2(sessionMemory) {
+  return sessionMemory.interventionHistory.filter(
+    (entry) => entry.type === "summarize_close" && entry.goal === "CLOSURE"
+  ).length;
+}
+function inferContinueContext(sessionMemory, mediationState) {
+  const flowControl = ensureFlowControl(sessionMemory);
+  const closureSummaryCount = countPersistedClosureSummaries2(sessionMemory);
+  if (!flowControl.continueAfterSummaryAcknowledged && closureSummaryCount >= 1 && mediationState.currentGoal === "CLOSURE") {
+    return "after_summary";
+  }
+  if (!flowControl.continueAfterExtensionAcknowledged && closureSummaryCount >= 2) {
+    return "after_extension";
+  }
+  return null;
+}
+function touchMediationState(mediationState, at) {
+  return {
+    ...mediationState,
+    sessionOutcome: "in_progress",
+    meta: {
+      ...mediationState.meta,
+      lastUpdatedAt: at
+    }
+  };
+}
+function resolveMediationState(mediationState, at) {
+  return {
+    ...mediationState,
+    sessionOutcome: "resolved",
+    meta: {
+      ...mediationState.meta,
+      lastUpdatedAt: at
+    }
+  };
+}
+function applyContinueSession(mediationState, sessionMemory, event) {
+  const context = inferContinueContext(sessionMemory, mediationState);
+  const flowControl = { ...ensureFlowControl(sessionMemory) };
+  if (context === "after_summary") {
+    flowControl.continueAfterSummaryAcknowledged = true;
+    return {
+      mediationState: touchMediationState(mediationState, event.at),
+      sessionMemory: { ...sessionMemory, runtimeFlowControl: flowControl },
+      changed: true
+    };
+  }
+  if (context === "after_extension") {
+    flowControl.continueAfterExtensionAcknowledged = true;
+    return {
+      mediationState: touchMediationState(mediationState, event.at),
+      sessionMemory: { ...sessionMemory, runtimeFlowControl: flowControl },
+      changed: true
+    };
+  }
+  return { mediationState, sessionMemory, changed: false };
+}
+function applyStartExtension(mediationState, sessionMemory, event) {
+  const flowControl = { ...ensureFlowControl(sessionMemory) };
+  if (flowControl.extensionActive) {
+    return { mediationState, sessionMemory, changed: false };
+  }
+  flowControl.extensionActive = true;
+  flowControl.continueAfterSummaryAcknowledged = true;
+  return {
+    mediationState: touchMediationState(mediationState, event.at),
+    sessionMemory: { ...sessionMemory, runtimeFlowControl: flowControl },
+    changed: true
+  };
+}
+function bothVotesAccepted(votes) {
+  return votes.host === "accepted" && votes.partner === "accepted";
+}
+function setActorProposalVote(votes, actor, vote) {
+  if (actor === "host") {
+    return { ...votes, host: vote };
+  }
+  return { ...votes, partner: vote };
+}
+function applyProposalAccepted(mediationState, sessionMemory, event) {
+  if (!isProposalPresentedForEvents(mediationState, sessionMemory)) {
+    return { mediationState, sessionMemory, changed: false };
+  }
+  const flowControl = { ...ensureFlowControl(sessionMemory) };
+  if (flowControl.proposalPhase === "rejected") {
+    return { mediationState, sessionMemory, changed: false };
+  }
+  const actorVote = event.actor === "host" ? flowControl.proposalVotes.host : flowControl.proposalVotes.partner;
+  if (actorVote === "accepted") {
+    return { mediationState, sessionMemory, changed: false };
+  }
+  if (actorVote === "rejected") {
+    return { mediationState, sessionMemory, changed: false };
+  }
+  flowControl.proposalVotes = setActorProposalVote(flowControl.proposalVotes, event.actor, "accepted");
+  flowControl.proposalPhase = "presented";
+  if (bothVotesAccepted(flowControl.proposalVotes)) {
+    flowControl.proposalPhase = "accepted";
+    flowControl.sessionResolvedByEvent = true;
+    return {
+      mediationState: resolveMediationState(
+        {
+          ...mediationState,
+          agreements: {
+            ...mediationState.agreements,
+            acceptedByBoth: true
+          }
+        },
+        event.at
+      ),
+      sessionMemory: { ...sessionMemory, runtimeFlowControl: flowControl },
+      changed: true
+    };
+  }
+  return {
+    mediationState: touchMediationState(mediationState, event.at),
+    sessionMemory: { ...sessionMemory, runtimeFlowControl: flowControl },
+    changed: true
+  };
+}
+function applyProposalRejected(mediationState, sessionMemory, event) {
+  if (!isProposalPresentedForEvents(mediationState, sessionMemory)) {
+    return { mediationState, sessionMemory, changed: false };
+  }
+  const flowControl = { ...ensureFlowControl(sessionMemory) };
+  if (flowControl.proposalPhase === "rejected") {
+    return { mediationState, sessionMemory, changed: false };
+  }
+  const actorVote = event.actor === "host" ? flowControl.proposalVotes.host : flowControl.proposalVotes.partner;
+  if (actorVote === "rejected") {
+    return { mediationState, sessionMemory, changed: false };
+  }
+  flowControl.proposalVotes = setActorProposalVote(flowControl.proposalVotes, event.actor, "rejected");
+  flowControl.proposalPhase = "rejected";
+  return {
+    mediationState: touchMediationState(
+      {
+        ...mediationState,
+        agreements: {
+          ...mediationState.agreements,
+          acceptedByBoth: false
+        }
+      },
+      event.at
+    ),
+    sessionMemory: { ...sessionMemory, runtimeFlowControl: flowControl },
+    changed: true
+  };
+}
+function applyResolveSession(mediationState, sessionMemory, event) {
+  if (!isAwaitingResolutionDecision(mediationState, sessionMemory)) {
+    return { mediationState, sessionMemory, changed: false };
+  }
+  const flowControl = { ...ensureFlowControl(sessionMemory) };
+  const closureSummaryCount = countPersistedClosureSummaries2(sessionMemory);
+  if (flowControl.sessionResolvedByEvent) {
+    return { mediationState, sessionMemory, changed: false };
+  }
+  flowControl.sessionResolvedByEvent = true;
+  if (closureSummaryCount >= 1) {
+    flowControl.continueAfterSummaryAcknowledged = true;
+  }
+  if (closureSummaryCount >= 2) {
+    flowControl.continueAfterExtensionAcknowledged = true;
+  }
+  return {
+    mediationState: resolveMediationState(mediationState, event.at),
+    sessionMemory: { ...sessionMemory, runtimeFlowControl: flowControl },
+    changed: true
+  };
+}
+function normalizeProposalVote(value) {
+  if (value === "accepted" || value === "rejected") {
+    return value;
+  }
+  return "pending";
+}
+function normalizeProposalPhase(value) {
+  if (value === "none" || value === "preparing" || value === "presented" || value === "accepted" || value === "rejected" || value === "superseded") {
+    return value;
+  }
+  return "none";
+}
+function applyRuntimeClientEvents(input) {
+  const appliedEvents = [];
+  const ignoredEvents = [];
+  let mediationState = input.mediationState;
+  let sessionMemory = {
+    ...input.sessionMemory,
+    runtimeFlowControl: ensureFlowControl(input.sessionMemory)
+  };
+  if (!input.clientEvents.length) {
+    return { mediationState, sessionMemory, appliedEvents, ignoredEvents };
+  }
+  for (const event of input.clientEvents) {
+    const fingerprint = clientEventFingerprintDigest(event);
+    const flowControl = ensureFlowControl(sessionMemory);
+    if (flowControl.appliedClientEventFingerprints.includes(fingerprint)) {
+      ignoredEvents.push(event);
+      continue;
+    }
+    if (!INTERPRETED_EVENT_KINDS.has(event.kind)) {
+      ignoredEvents.push(event);
+      continue;
+    }
+    let changed = false;
+    if (event.kind === "continue_session") {
+      const result = applyContinueSession(mediationState, sessionMemory, event);
+      mediationState = result.mediationState;
+      sessionMemory = result.sessionMemory;
+      changed = result.changed;
+    } else if (event.kind === "start_extension") {
+      const result = applyStartExtension(mediationState, sessionMemory, event);
+      mediationState = result.mediationState;
+      sessionMemory = result.sessionMemory;
+      changed = result.changed;
+    } else if (event.kind === "proposal_accepted") {
+      const result = applyProposalAccepted(mediationState, sessionMemory, event);
+      mediationState = result.mediationState;
+      sessionMemory = result.sessionMemory;
+      changed = result.changed;
+    } else if (event.kind === "proposal_rejected") {
+      const result = applyProposalRejected(mediationState, sessionMemory, event);
+      mediationState = result.mediationState;
+      sessionMemory = result.sessionMemory;
+      changed = result.changed;
+    } else if (event.kind === "resolve_session") {
+      const result = applyResolveSession(mediationState, sessionMemory, event);
+      mediationState = result.mediationState;
+      sessionMemory = result.sessionMemory;
+      changed = result.changed;
+    }
+    if (!changed) {
+      ignoredEvents.push(event);
+      continue;
+    }
+    sessionMemory = {
+      ...sessionMemory,
+      runtimeFlowControl: {
+        ...ensureFlowControl(sessionMemory),
+        appliedClientEventFingerprints: [
+          ...ensureFlowControl(sessionMemory).appliedClientEventFingerprints,
+          fingerprint
+        ]
+      }
+    };
+    appliedEvents.push(event);
+  }
+  return { mediationState, sessionMemory, appliedEvents, ignoredEvents };
+}
+function normalizeRuntimeFlowControl(memory) {
+  const base = memory && typeof memory === "object" ? memory : createEmptySessionMemory();
+  const raw = base.runtimeFlowControl;
+  const rawVotes = raw?.proposalVotes;
+  const flowControl = {
+    extensionActive: raw?.extensionActive === true,
+    continueAfterSummaryAcknowledged: raw?.continueAfterSummaryAcknowledged === true,
+    continueAfterExtensionAcknowledged: raw?.continueAfterExtensionAcknowledged === true,
+    appliedClientEventFingerprints: Array.isArray(raw?.appliedClientEventFingerprints) ? raw.appliedClientEventFingerprints.filter((entry) => typeof entry === "string") : [],
+    proposalVotes: {
+      host: normalizeProposalVote(rawVotes?.host),
+      partner: normalizeProposalVote(rawVotes?.partner)
+    },
+    proposalPhase: normalizeProposalPhase(raw?.proposalPhase),
+    sessionResolvedByEvent: raw?.sessionResolvedByEvent === true
+  };
+  return {
+    ...base,
+    runtimeFlowControl: flowControl
+  };
+}
+
 // services/mediatorEngine/_internal/skeletonDefaults.ts
 var SKELETON_TIMESTAMP = "1970-01-01T00:00:00.000Z";
 function skeletonConfidence(value) {
@@ -1066,7 +1432,8 @@ function createEmptySessionMemory() {
     regressHistory: [],
     goalTransitionHistory: [],
     lastGoalTransitionReason: null,
-    reflectionLog: []
+    reflectionLog: [],
+    runtimeFlowControl: createDefaultRuntimeFlowControl()
   };
 }
 function resolveRequestLanguage(request) {
@@ -2838,7 +3205,7 @@ function sanitizeBreakthroughs(value) {
 function normalizeMemory(memory) {
   const empty = createEmptySessionMemory();
   if (!memory || typeof memory !== "object") return empty;
-  return {
+  return normalizeRuntimeFlowControl({
     breakthroughs: sanitizeBreakthroughs(memory.breakthroughs),
     confirmedEmotions: asArray(memory.confirmedEmotions),
     confirmedNeeds: asArray(memory.confirmedNeeds),
@@ -2854,8 +3221,9 @@ function normalizeMemory(memory) {
     regressHistory: asArray(memory.regressHistory),
     goalTransitionHistory: asArray(memory.goalTransitionHistory),
     lastGoalTransitionReason: typeof memory.lastGoalTransitionReason === "string" ? memory.lastGoalTransitionReason : null,
-    reflectionLog: asArray(memory.reflectionLog)
-  };
+    reflectionLog: asArray(memory.reflectionLog),
+    runtimeFlowControl: memory.runtimeFlowControl
+  });
 }
 
 // services/mediatorEngine/memory/update/buildSessionMemoryUpdate.ts
@@ -7171,7 +7539,7 @@ function resolveFinalDraftReply(validation) {
 }
 
 // services/mediatorEngine/runtimeSession/resolveRuntimeDecisionPanel.ts
-var PROPOSAL_INTERVENTION_TYPES = /* @__PURE__ */ new Set([
+var PROPOSAL_INTERVENTION_TYPES2 = /* @__PURE__ */ new Set([
   "propose_rule",
   "propose_future_plan",
   "confirm_agreement"
@@ -7182,6 +7550,9 @@ var SAFETY_INTERVENTION_TYPES = /* @__PURE__ */ new Set([
   "pause_session"
 ]);
 function inferExtensionActive(sessionMemory, mediationState, intervention) {
+  if (sessionMemory.runtimeFlowControl?.extensionActive) {
+    return true;
+  }
   if (mediationState.currentGoal !== "CLOSURE") {
     return false;
   }
@@ -7196,24 +7567,34 @@ function countClosureSummaries(sessionMemory, intervention) {
   }
   return count;
 }
-function hasAgreementContent(agreements) {
+function hasAgreementContent2(agreements) {
   return Boolean(agreements.sharedRule?.trim()) || Boolean(agreements.hostCommitment?.trim()) || Boolean(agreements.partnerCommitment?.trim()) || Boolean(agreements.futurePlan?.trim());
 }
 function isSafetyHold(safetyLevel, interventionType) {
   return safetyLevel === "L3_stop" || SAFETY_INTERVENTION_TYPES.has(interventionType);
 }
 function resolveProposalDecisionPanel(input) {
-  const { mediationState, intervention, proposalPhase, turnOrdinal } = input;
+  const { mediationState, sessionMemory, intervention, proposalPhase, turnOrdinal } = input;
+  const flowControl = sessionMemory.runtimeFlowControl;
   if (proposalPhase !== "presented") {
+    return null;
+  }
+  if (flowControl?.proposalPhase === "accepted" || flowControl?.proposalPhase === "rejected") {
+    return null;
+  }
+  if (flowControl?.proposalVotes.host === "rejected" || flowControl?.proposalVotes.partner === "rejected") {
+    return null;
+  }
+  if (flowControl?.proposalVotes.host === "accepted" && flowControl?.proposalVotes.partner === "accepted") {
     return null;
   }
   if (mediationState.agreements.acceptedByBoth) {
     return null;
   }
-  if (!hasAgreementContent(mediationState.agreements)) {
+  if (!hasAgreementContent2(mediationState.agreements)) {
     return null;
   }
-  const proposalIntervention = PROPOSAL_INTERVENTION_TYPES.has(intervention.type) || mediationState.currentGoal === "AGREEMENT" || mediationState.currentGoal === "FUTURE_PLAN";
+  const proposalIntervention = PROPOSAL_INTERVENTION_TYPES2.has(intervention.type) || mediationState.currentGoal === "AGREEMENT" || mediationState.currentGoal === "FUTURE_PLAN";
   if (!proposalIntervention) {
     return null;
   }
@@ -7226,11 +7607,24 @@ function resolveProposalDecisionPanel(input) {
 }
 function resolveSummaryDecisionPanel(input) {
   const { mediationState, sessionMemory, intervention, turnOrdinal } = input;
+  const flowControl = sessionMemory.runtimeFlowControl;
+  if (flowControl?.extensionActive) {
+    return null;
+  }
+  const persistedClosureCount = sessionMemory.interventionHistory.filter(
+    (entry) => entry.type === "summarize_close" && entry.goal === "CLOSURE"
+  ).length;
+  if (flowControl?.continueAfterSummaryAcknowledged && !flowControl?.continueAfterExtensionAcknowledged && persistedClosureCount < 2) {
+    return null;
+  }
   if (intervention.type !== "summarize_close" || mediationState.currentGoal !== "CLOSURE") {
     return null;
   }
   const closureSummaryCount = countClosureSummaries(sessionMemory, intervention);
   if (closureSummaryCount >= 2) {
+    if (flowControl?.continueAfterExtensionAcknowledged) {
+      return null;
+    }
     return {
       kind: "continue_after_extension",
       summaryAnchorTurn: turnOrdinal,
@@ -7239,6 +7633,9 @@ function resolveSummaryDecisionPanel(input) {
     };
   }
   if (closureSummaryCount === 1 && input.runtimeOutcome === "needs_extension_offer") {
+    if (flowControl?.continueAfterSummaryAcknowledged) {
+      return null;
+    }
     return {
       kind: "continue_after_summary",
       summaryAnchorTurn: turnOrdinal,
@@ -7303,10 +7700,11 @@ var SAFETY_INTERVENTION_TYPES2 = /* @__PURE__ */ new Set([
   "pause_session"
 ]);
 function composeRuntimeSession(input) {
-  const stage = resolveSessionStage(input.mediationState);
-  const outcome = resolveRuntimeOutcome(input.mediationState);
+  const stage = resolveSessionStage(input.mediationState, input.sessionMemory);
+  const outcome = resolveRuntimeOutcome(input.mediationState, input.sessionMemory);
   const proposalPhase = resolveProposalPhase(
     input.mediationState,
+    input.sessionMemory,
     input.intervention.type
   );
   const decisionPanel = resolveRuntimeDecisionPanel({
@@ -7366,6 +7764,21 @@ function composeDecision(input, outcome, decisionPanel) {
       blockedReason: decisionBlockReason,
       triggerHint: null
     };
+  }
+  const extensionActive = inferExtensionActive(
+    input.sessionMemory,
+    mediationState,
+    intervention
+  );
+  if (extensionActive && outcome === "extension_active" && mediationState.currentGoal === "CLOSURE") {
+    if (SUMMARY_INTERVENTION_TYPES.has(intervention.type)) {
+      return {
+        nextBeat: "deliver_extension_questions",
+        mayAutoAdvance: true,
+        blockedReason: null,
+        triggerHint: "host_generate"
+      };
+    }
   }
   if (outcome !== "ongoing" && outcome !== "extension_active" && outcome !== "needs_extension_offer") {
     return {
@@ -7455,21 +7868,26 @@ function composePresentation(input, decisionPanel) {
 function composeProposal(input, phase) {
   const { mediationState, intervention, finalMediatorMessage } = input;
   const agreements = mediationState.agreements;
-  const hasAgreementContent2 = Boolean(agreements.sharedRule?.trim()) || Boolean(agreements.hostCommitment?.trim()) || Boolean(agreements.partnerCommitment?.trim()) || Boolean(agreements.futurePlan?.trim());
-  const content = phase === "none" || phase === "preparing" || !hasAgreementContent2 ? null : {
+  const flowControl = input.sessionMemory.runtimeFlowControl;
+  const hasAgreementContent3 = Boolean(agreements.sharedRule?.trim()) || Boolean(agreements.hostCommitment?.trim()) || Boolean(agreements.partnerCommitment?.trim()) || Boolean(agreements.futurePlan?.trim());
+  const content = phase === "none" || phase === "preparing" || !hasAgreementContent3 ? null : {
     proposalId: intervention.id,
     body: finalMediatorMessage.text.trim(),
     hostCommitment: agreements.hostCommitment,
     partnerCommitment: agreements.partnerCommitment,
     sharedRule: agreements.sharedRule
   };
+  const votes = flowControl != null ? {
+    host: flowControl.proposalVotes.host === "pending" ? null : flowControl.proposalVotes.host,
+    partner: flowControl.proposalVotes.partner === "pending" ? null : flowControl.proposalVotes.partner
+  } : {
+    host: agreements.acceptedByBoth ? "accepted" : null,
+    partner: agreements.acceptedByBoth ? "accepted" : null
+  };
   return {
     phase,
     content,
-    votes: {
-      host: agreements.acceptedByBoth ? "accepted" : null,
-      partner: agreements.acceptedByBoth ? "accepted" : null
-    },
+    votes,
     requiresBothAcceptance: true
   };
 }
@@ -7487,6 +7905,13 @@ function composeClosure(input, outcome) {
 }
 function composePending(input, decisionPanel) {
   const { mediationState, intervention } = input;
+  if (mediationState.sessionOutcome !== "in_progress") {
+    return {
+      awaiting: "nothing",
+      awaitingFrom: [],
+      satisfiedBy: []
+    };
+  }
   const pendingAction = mediationState.pendingAction;
   if (pendingAction && pendingAction.awaitingResponseFrom.length > 0) {
     return {
@@ -7524,9 +7949,12 @@ function composeDiagnostics(input) {
     validationWarnings: []
   };
 }
-function resolveSessionStage(state) {
+function resolveSessionStage(state, sessionMemory) {
   if (state.dynamics.mode === "SAFETY" || state.sessionOutcome === "safety_stopped") {
     return "safety_hold";
+  }
+  if (state.currentGoal === "CLOSURE" && sessionMemory.runtimeFlowControl?.extensionActive) {
+    return "extension";
   }
   switch (state.currentGoal) {
     case "SAFE_OPENING":
@@ -7550,7 +7978,8 @@ function resolveSessionStage(state) {
       return "understanding";
   }
 }
-function resolveRuntimeOutcome(state) {
+function resolveRuntimeOutcome(state, sessionMemory) {
+  const flowControl = sessionMemory.runtimeFlowControl;
   switch (state.sessionOutcome) {
     case "resolved":
       return "resolved";
@@ -7561,13 +7990,25 @@ function resolveRuntimeOutcome(state) {
     case "paused":
       return "paused";
     case "in_progress":
-      if (state.agreements.acceptedByBoth) {
+      if (flowControl?.proposalPhase === "rejected") {
+        return "ongoing";
+      }
+      if (flowControl?.extensionActive) {
+        return "extension_active";
+      }
+      if (state.agreements.acceptedByBoth || flowControl?.sessionResolvedByEvent) {
         return "resolved";
+      }
+      if (flowControl?.proposalPhase === "presented") {
+        return "proposal_pending";
       }
       if (state.currentGoal === "FUTURE_PLAN" || state.currentGoal === "AGREEMENT") {
         return "proposal_pending";
       }
       if (state.currentGoal === "CLOSURE") {
+        if (flowControl?.continueAfterSummaryAcknowledged) {
+          return "ongoing";
+        }
         return "needs_extension_offer";
       }
       return "ongoing";
@@ -7599,9 +8040,19 @@ function resolveNextBeatAfterIntervention(interventionType, currentGoal) {
   }
   return "deliver_question";
 }
-function resolveProposalPhase(state, interventionType) {
-  if (state.agreements.acceptedByBoth) {
+function resolveProposalPhase(state, sessionMemory, interventionType) {
+  const flowControl = sessionMemory.runtimeFlowControl;
+  if (flowControl?.proposalPhase === "accepted" || flowControl?.proposalPhase === "rejected") {
+    return flowControl.proposalPhase;
+  }
+  if (state.agreements.acceptedByBoth || state.sessionOutcome === "resolved") {
     return "accepted";
+  }
+  if (flowControl?.proposalPhase === "presented") {
+    return "presented";
+  }
+  if (flowControl && (flowControl.proposalVotes.host !== "pending" || flowControl.proposalVotes.partner !== "pending")) {
+    return "presented";
   }
   if (interventionType === "propose_rule" || interventionType === "propose_future_plan" || interventionType === "confirm_agreement") {
     return "presented";
@@ -7839,13 +8290,20 @@ async function runMediatorEngineTurn(input) {
   const startedAt = (/* @__PURE__ */ new Date()).toISOString();
   try {
     const ctx = safeRuntimeInput(input);
+    const stateBefore = ctx.turnInput.mediationState ?? createEmptyMediationState(ctx.turnInput);
+    const clientEventResult = applyRuntimeClientEvents({
+      mediationState: stateBefore,
+      sessionMemory: ctx.sessionMemory,
+      clientEvents: ctx.turnInput.clientEvents ?? []
+    });
     const turnInput = {
       ...ctx.turnInput,
-      language: ctx.language
+      language: ctx.language,
+      mediationState: clientEventResult.mediationState
     };
     const orchestratedTurn = orchestrateTurn({
       request: turnInput,
-      sessionMemory: ctx.sessionMemory
+      sessionMemory: clientEventResult.sessionMemory
     });
     const promptInput = buildPromptComposerInputFromTurn(
       turnInput,
