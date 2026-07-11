@@ -167,4 +167,17 @@ export type {
   LiveLegacyDecisionPanelState,
 } from '@/services/mediatorRuntimeClient/resolveLegacyLiveDecisionPanel';
 
+export {
+  mapRuntimeClosureNavigationOutcome,
+  resolveEffectiveClosureDbStatus,
+  resolveRuntimeClosureAction,
+  shouldPerformRuntimeClosureNavigation,
+} from '@/services/mediatorRuntimeClient/resolveRuntimeClosureAction';
+export type {
+  ClosureDirective,
+  MediationDbStatus,
+  ResolveRuntimeClosureActionParams,
+  RuntimeClosureAction,
+} from '@/services/mediatorRuntimeClient/resolveRuntimeClosureAction';
+
 export { isRuntimeSessionShape, isRecord } from '@/services/mediatorRuntimeClient/runtimeSessionShape';

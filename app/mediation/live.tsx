@@ -46,8 +46,15 @@ import {
 } from '@/services/mediatorRuntimeClient/resolveRuntimeGenerationMode';
 import { resolveLegacyLiveDecisionPanelState } from '@/services/mediatorRuntimeClient/resolveLegacyLiveDecisionPanel';
 import { resolveRuntimeDecisionPanelVisibility } from '@/services/mediatorRuntimeClient/resolveRuntimeDecisionPanelVisibility';
+import {
+  mapRuntimeClosureNavigationOutcome,
+  resolveEffectiveClosureDbStatus,
+  resolveRuntimeClosureAction,
+  shouldPerformRuntimeClosureNavigation,
+} from '@/services/mediatorRuntimeClient/resolveRuntimeClosureAction';
 import { buildRuntimeClientEvents } from '@/services/mediatorRuntimeClient/buildRuntimeClientEvents';
 import type { RuntimeClientEvent } from '@/types/mediator';
+import type { RuntimeSession } from '@/types/mediator/runtimeSession';
 import { getLiveMediationExtras } from '@/constants/i18n/liveMediation';
 import { getClosureBundle } from '@/constants/i18n/closure';
 import type { Language } from '@/constants/i18n';
@@ -461,6 +468,7 @@ export default function LiveMediationScreen() {
   const focusFetchInFlightRef = useRef(false);
   const skipNextFocusRefreshRef = useRef(true);
   const navigatingAwayRef = useRef(false);
+  const runtimeClosureNavigatedRef = useRef(false);
   const initialLoadKeyRef = useRef<string | null>(null);
   const lastSyncedProgressRef = useRef<number | null>(null);
   const routerRef = useRef(router);
@@ -554,6 +562,69 @@ export default function LiveMediationScreen() {
       outcome: inferClosureOutcomeFromStatus(sessionRef.current?.status),
     });
   }, [mediationId, router]);
+
+  const goToClosureFromRuntime = useCallback(
+    async (session: RuntimeSession) => {
+      if (!mediationId || navigatingAwayRef.current || runtimeClosureNavigatedRef.current) {
+        return;
+      }
+
+      const action = resolveRuntimeClosureAction({ runtimeSession: session });
+      if (!shouldPerformRuntimeClosureNavigation(action, runtimeClosureNavigatedRef.current)) {
+        return;
+      }
+
+      runtimeClosureNavigatedRef.current = true;
+      navigatingAwayRef.current = true;
+      skipNextFocusRefreshRef.current = true;
+      isActiveSendRef.current = false;
+      generateLockRef.current = null;
+
+      const dbStatus = resolveEffectiveClosureDbStatus(action, session.session.outcome);
+      if (dbStatus && sessionRef.current?.status === 'live') {
+        try {
+          await supabase
+            .from('mediations')
+            .update({
+              status: dbStatus,
+              live_progress: 100,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', mediationId);
+          setSessionDebug((prev) =>
+            prev ? { ...prev, status: dbStatus, live_progress: 100 } : prev
+          );
+        } catch (error) {
+          console.warn('[runtime closure] status update failed', error);
+        }
+      }
+
+      const msgCount = messagesRef.current.filter((m) => m.message_type === 'message').length;
+      const closurePhase =
+        sessionRef.current?.live_phase ||
+        countAskedQuestions(messagesRef.current) ||
+        1;
+      const outcome = mapRuntimeClosureNavigationOutcome(action, session.session.outcome);
+
+      navigateToDisputeClosure(router, {
+        mode: 'live',
+        mediationId,
+        messageCount: msgCount,
+        phase: closurePhase,
+        outcome,
+      });
+    },
+    [mediationId, router, setSessionDebug]
+  );
+
+  useEffect(() => {
+    runtimeClosureNavigatedRef.current = false;
+  }, [mediationId]);
+
+  useEffect(() => {
+    if (!runtimeSession || loading) return;
+    void goToClosureFromRuntime(runtimeSession);
+  }, [runtimeSession, loading, goToClosureFromRuntime]);
 
   const hostUserId = mediationHostId || session?.user_id || user?.id || '';
 
