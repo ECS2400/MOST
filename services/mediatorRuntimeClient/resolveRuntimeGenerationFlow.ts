@@ -1,4 +1,6 @@
-import { hasRuntimeSession } from '@/services/mediatorRuntimeClient/hasRuntimeSession';
+import {
+  resolveRuntimeActionExecution,
+} from '@/services/mediatorRuntimeClient/resolveRuntimeActionExecution';
 import type { MediatorMode } from '@/services/liveMediation';
 import type { MediatorBeat } from '@/types/mediator/runtimeSession';
 import type { RuntimeSession } from '@/types/mediator/runtimeSession';
@@ -18,11 +20,13 @@ export interface ResolveRuntimeGenerationFlowParams {
   getLegacyMode?: () => MediatorMode | null;
   runtimeFailed?: boolean;
   invalidRuntimeState?: boolean;
+  /** Test/migration diagnostics only — production live mediation must keep false. */
+  allowLegacyFallback?: boolean;
 }
 
 export interface RuntimeGenerationFlowResolution {
   mode: MediatorMode | null;
-  source: 'runtime' | 'legacy_fallback';
+  source: 'runtime' | 'legacy_fallback' | 'runtime_unavailable';
   reason: RuntimeGenerationFlowReason;
 }
 
@@ -130,32 +134,30 @@ function resolveLegacyMode(params: ResolveRuntimeGenerationFlowParams): Mediator
 export function resolveRuntimeGenerationFlow(
   params: ResolveRuntimeGenerationFlowParams
 ): RuntimeGenerationFlowResolution {
-  const { runtimeSession, runtimeFailed, invalidRuntimeState } = params;
+  const execution = resolveRuntimeActionExecution({
+    runtimeSession: params.runtimeSession,
+    runtimeFailed: params.runtimeFailed,
+    invalidRuntimeState: params.invalidRuntimeState,
+    allowLegacyFallback: params.allowLegacyFallback,
+  });
 
-  if (runtimeFailed) {
+  if (execution.useLegacyFallback) {
     return {
       mode: resolveLegacyMode(params),
       source: 'legacy_fallback',
-      reason: 'runtime_failed',
+      reason: execution.reason,
     };
   }
 
-  if (invalidRuntimeState) {
+  if (execution.runtimeUnavailable) {
     return {
-      mode: resolveLegacyMode(params),
-      source: 'legacy_fallback',
-      reason: 'invalid_runtime_state',
+      mode: null,
+      source: 'runtime_unavailable',
+      reason: execution.reason,
     };
   }
 
-  if (!hasRuntimeSession(runtimeSession)) {
-    return {
-      mode: resolveLegacyMode(params),
-      source: 'legacy_fallback',
-      reason: 'runtime_unavailable',
-    };
-  }
-
+  const runtimeSession = params.runtimeSession!;
   const nextBeat = runtimeSession.decision.nextBeat;
 
   if (RUNTIME_WAIT_BEATS.has(nextBeat)) {
@@ -168,9 +170,16 @@ export function resolveRuntimeGenerationFlow(
 
   const mappedMode = mapRuntimeBeatToMediatorMode(nextBeat);
   if (mappedMode === null) {
+    if (params.allowLegacyFallback) {
+      return {
+        mode: resolveLegacyMode(params),
+        source: 'legacy_fallback',
+        reason: 'invalid_runtime_state',
+      };
+    }
     return {
-      mode: resolveLegacyMode(params),
-      source: 'legacy_fallback',
+      mode: null,
+      source: 'runtime_unavailable',
       reason: 'invalid_runtime_state',
     };
   }

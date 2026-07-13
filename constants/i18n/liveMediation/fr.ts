@@ -246,6 +246,8 @@ export const LIVE_MEDIATION_FR: LiveMediationBundle = {
     proposalAcceptWaiting: 'Waiting for partner to accept…',
     proposalAcceptPartner: 'Partner accepted — your decision',
     proposalPanelTitle: 'Do you accept the mediator proposal?',
+    runtimeRecoveryMessage: 'Mościk temporarily lost mediation state.',
+    runtimeRecoveryRefresh: 'Refresh state',
   },
   summary: {
     title: 'Résumé de la médiation',

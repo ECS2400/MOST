@@ -663,7 +663,7 @@ describe('liveFlowE2E — legacy fallback only on runtime failure', () => {
     assert.equal(resolution.mode, 'generate_question');
   });
 
-  it('runtime failure uses legacy generate mode getter', () => {
+  it('runtime failure does not invoke legacy generate getter in production default', () => {
     let legacyCalled = false;
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession: runtimeWith({
@@ -676,9 +676,9 @@ describe('liveFlowE2E — legacy fallback only on runtime failure', () => {
       },
     });
 
-    assert.equal(legacyCalled, true);
-    assert.equal(resolution.source, 'legacy_fallback');
+    assert.equal(legacyCalled, false);
+    assert.equal(resolution.source, 'runtime_unavailable');
     assert.equal(resolution.reason, 'runtime_failed');
-    assert.equal(resolution.mode, 'generate_question');
+    assert.equal(resolution.mode, null);
   });
 });

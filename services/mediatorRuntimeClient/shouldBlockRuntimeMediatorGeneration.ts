@@ -53,7 +53,7 @@ export function shouldBlockRuntimeMediatorGeneration(
   const { runtimeSession, mode, force, clientEvents, allowOpeningBootstrap } = params;
 
   if (!hasRuntimeSession(runtimeSession)) {
-    return false;
+    return isPublicMediatorMode(mode);
   }
 
   if (force && hasFlowControlClientEvents(clientEvents)) {

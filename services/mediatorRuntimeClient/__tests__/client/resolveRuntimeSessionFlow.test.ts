@@ -65,10 +65,26 @@ describe('resolveRuntimeSessionFlow', () => {
     assert.equal(resolution.flow.questionNumber, 5);
   });
 
-  it('calls lazy legacy getter when runtime is unavailable', () => {
+  it('returns recovery flow when runtime is unavailable (production default)', () => {
     let called = false;
     const resolution = resolveRuntimeSessionFlow({
       runtimeSession: null,
+      getLegacySessionFlow: () => {
+        called = true;
+        return LEGACY_DEFAULT;
+      },
+    });
+
+    assert.equal(called, false);
+    assert.equal(resolution.source, 'runtime_unavailable');
+    assert.equal(resolution.flow.maxQuestions, 0);
+  });
+
+  it('calls lazy legacy getter when legacy explicitly allowed', () => {
+    let called = false;
+    const resolution = resolveRuntimeSessionFlow({
+      runtimeSession: null,
+      allowLegacyFallback: true,
       getLegacySessionFlow: () => {
         called = true;
         return LEGACY_DEFAULT;
@@ -156,7 +172,7 @@ describe('resolveRuntimeSessionFlow', () => {
     assert.equal(mapRuntimeSessionStageForTests(runtimeSession), 'finished');
   });
 
-  it('falls back to legacy flow when runtime is unavailable', () => {
+  it('returns recovery flow when runtime is unavailable (production default)', () => {
     const legacy: LiveSessionFlow = {
       ...LEGACY_DEFAULT,
       stage: 'awaiting_main_decision',
@@ -168,12 +184,12 @@ describe('resolveRuntimeSessionFlow', () => {
       legacySessionFlow: legacy,
     });
 
-    assert.equal(resolution.source, 'legacy_fallback');
+    assert.equal(resolution.source, 'runtime_unavailable');
     assert.equal(resolution.reason, 'runtime_unavailable');
-    assert.deepEqual(resolution.flow, legacy);
+    assert.equal(resolution.flow.maxQuestions, 0);
   });
 
-  it('falls back to legacy flow when runtime failed', () => {
+  it('falls back to legacy flow when runtime failed and legacy allowed', () => {
     const legacy: LiveSessionFlow = {
       ...LEGACY_DEFAULT,
       stage: 'extension',
@@ -185,6 +201,7 @@ describe('resolveRuntimeSessionFlow', () => {
       runtimeSession: createMinimalRuntimeSuccess().runtimeSession,
       legacySessionFlow: legacy,
       runtimeFailed: true,
+      allowLegacyFallback: true,
     });
 
     assert.equal(resolution.source, 'legacy_fallback');
@@ -192,7 +209,7 @@ describe('resolveRuntimeSessionFlow', () => {
     assert.deepEqual(resolution.flow, legacy);
   });
 
-  it('falls back to legacy flow on invalid runtime state', () => {
+  it('returns recovery flow on invalid runtime state (production default)', () => {
     const legacy: LiveSessionFlow = {
       ...LEGACY_DEFAULT,
       stage: 'awaiting_proposal_decision',
@@ -205,9 +222,9 @@ describe('resolveRuntimeSessionFlow', () => {
       invalidRuntimeState: true,
     });
 
-    assert.equal(resolution.source, 'legacy_fallback');
+    assert.equal(resolution.source, 'runtime_unavailable');
     assert.equal(resolution.reason, 'invalid_runtime_state');
-    assert.deepEqual(resolution.flow, legacy);
+    assert.equal(resolution.flow.maxQuestions, 0);
   });
 
   it('maps awaiting_main_decision from continue pending and needs_extension_offer', () => {

@@ -1,6 +1,7 @@
 import type { MediatorRuntimeEdgeSuccess } from '@/services/mediatorEngine/edge/types';
 import { MEDIATOR_RUNTIME_ENGINE_VERSION } from '@/services/mediatorRuntimeClient/mediatorRuntimeConfig';
 import { isRecord, isRuntimeSessionShape } from '@/services/mediatorRuntimeClient/runtimeSessionShape';
+import { normalizeStoredRuntimeSession } from '@/services/mediatorRuntimeClient/normalizeStoredRuntimeSession';
 import type { MediationState } from '@/types/mediator/mediationState';
 import type { SafetyLevel } from '@/types/mediator/safety';
 import type { SessionMemory } from '@/types/mediator/sessionMemory';
@@ -19,8 +20,12 @@ function parseStoredJsonObject<T extends object>(value: unknown): T | null {
   return value as T;
 }
 
-/** Parses a JSONB column value into RuntimeSession; returns null when shape is invalid. */
+/** Parses a JSONB column value into RuntimeSession; normalizes older compatible shapes. */
 export function parseStoredRuntimeSession(value: unknown): RuntimeSession | null {
+  const normalized = normalizeStoredRuntimeSession(value);
+  if (normalized) {
+    return normalized;
+  }
   return isRuntimeSessionShape(value) ? value : null;
 }
 

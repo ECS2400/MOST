@@ -1,15 +1,32 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadMediationRuntimeSessionWithDiagnostics } from '@/services/mediatorRuntimeClient/loadMediationRuntimeSession';
 import { hasRuntimeSession } from '@/services/mediatorRuntimeClient/hasRuntimeSession';
+import { logRuntimeRecoveryDev } from '@/services/mediatorRuntimeClient/runtimeRecoveryDevLog';
 import { shouldCommitRuntimeSessionRefresh } from '@/services/mediatorRuntimeClient/runtimeSessionRefreshGuard';
-import type { RuntimeSessionParticipantRole } from '@/services/mediatorRuntimeClient/runtimeSessionLoadDiagnostics';
+import type {
+  RuntimeSessionLoadDiagnostics,
+  RuntimeSessionParticipantRole,
+} from '@/services/mediatorRuntimeClient/runtimeSessionLoadDiagnostics';
+
+export { hasRuntimeSession };
 import type { RuntimeSession } from '@/types/mediator/runtimeSession';
 import { normalizeRouteParam } from '@/utils/normalizeRouteParam';
 
-export { hasRuntimeSession };
+export interface UseRuntimeSessionResult {
+  runtimeSession: RuntimeSession | null;
+  devDiagnostics: import('@/services/mediatorEngine/edge/types').MediatorRuntimeEdgeDevDiagnostics | null;
+  runtimeSessionLoadSettled: boolean;
+  loadDiagnostics: RuntimeSessionLoadDiagnostics | null;
+  refreshRuntimeSession: () => Promise<RuntimeSession | null>;
+  getCurrentRuntimeSession: () => RuntimeSession | null;
+  hasRuntimeSession: () => boolean;
+  mediationId: string | undefined;
+  recoveryClickCount: number;
+}
 
 export interface UseRuntimeSessionOptions {
   role?: RuntimeSessionParticipantRole;
+  userId?: string | null;
 }
 
 function logRuntimeSessionLoaded(
@@ -40,16 +57,24 @@ export function useRuntimeSession(
 ) {
   const mediationId = normalizeRouteParam(mediationIdInput);
   const role = options.role ?? 'unknown';
+  const userId = options.userId ?? null;
   const [runtimeSession, setRuntimeSession] = useState<RuntimeSession | null>(null);
   const [devDiagnostics, setDevDiagnostics] = useState<
     import('@/services/mediatorEngine/edge/types').MediatorRuntimeEdgeDevDiagnostics | null
   >(null);
-  const runtimeSessionRef = useRef<RuntimeSession | null>(null);
+  const [loadDiagnostics, setLoadDiagnostics] = useState<RuntimeSessionLoadDiagnostics | null>(
+    null
+  );
+  const [runtimeSessionLoadSettled, setRuntimeSessionLoadSettled] = useState(false);
+  const [recoveryClickCount, setRecoveryClickCount] = useState(0);
   const mediationIdRef = useRef<string | undefined>(mediationId);
   const refreshRequestIdRef = useRef(0);
+  const recoveryClickCountRef = useRef(0);
   const mountedRef = useRef(false);
+  const userIdRef = useRef(userId);
   mediationIdRef.current = mediationId;
   runtimeSessionRef.current = runtimeSession;
+  userIdRef.current = userId;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -64,6 +89,10 @@ export function useRuntimeSession(
     setRuntimeSession(null);
     runtimeSessionRef.current = null;
     setDevDiagnostics(null);
+    setLoadDiagnostics(null);
+    setRuntimeSessionLoadSettled(false);
+    setRecoveryClickCount(0);
+    recoveryClickCountRef.current = 0;
   }, [mediationId]);
 
   const refreshRuntimeSession = useCallback(async (): Promise<RuntimeSession | null> => {
@@ -83,29 +112,55 @@ export function useRuntimeSession(
         logDiagnostics: true,
       });
 
-      if (
-        !shouldCommitRuntimeSessionRefresh({
-          requestId,
-          latestRequestId: refreshRequestIdRef.current,
-          mounted: mountedRef.current,
-          activeMediationId,
-          currentMediationId: mediationIdRef.current,
-        })
-      ) {
+      const commitAllowed = shouldCommitRuntimeSessionRefresh({
+        requestId,
+        latestRequestId: refreshRequestIdRef.current,
+        mounted: mountedRef.current,
+        activeMediationId,
+        currentMediationId: mediationIdRef.current,
+      });
+
+      logRuntimeRecoveryDev({
+        mediationId: activeMediationId,
+        requestId,
+        userId: userIdRef.current,
+        role,
+        rowFound: loaded.diagnostics.rowFound,
+        supabaseErrorCode: loaded.diagnostics.supabaseErrorCode,
+        supabaseErrorMessage: loaded.diagnostics.supabaseErrorMessage,
+        rawRuntimeSessionPresent: loaded.diagnostics.runtimeSessionPresent,
+        runtimeMetadataPresent: loaded.diagnostics.runtimeMetadataPresent,
+        shapeValid: loaded.diagnostics.shapeValid,
+        rejectedShapeField: loaded.diagnostics.rejectedShapeField,
+        commitAllowed,
+        staleRequest: !commitAllowed,
+        mounted: mountedRef.current,
+        recoveryClickCount: recoveryClickCountRef.current,
+      });
+
+      if (!commitAllowed) {
         return runtimeSessionRef.current;
       }
 
       setRuntimeSession(loaded.runtimeSession);
       runtimeSessionRef.current = loaded.runtimeSession;
       setDevDiagnostics(loaded.devDiagnostics ?? null);
+      setLoadDiagnostics(loaded.diagnostics ?? null);
+      setRuntimeSessionLoadSettled(true);
       if (loaded.runtimeSession) {
         logRuntimeSessionLoaded(activeMediationId, role, loaded.runtimeSession);
       }
       return loaded.runtimeSession;
     } catch {
+      setRuntimeSessionLoadSettled(true);
       return runtimeSessionRef.current;
     }
   }, [role]);
+
+  const bumpRecoveryClickCount = useCallback(() => {
+    recoveryClickCountRef.current += 1;
+    setRecoveryClickCount(recoveryClickCountRef.current);
+  }, []);
 
   useEffect(() => {
     if (!mediationId) return;
@@ -119,6 +174,12 @@ export function useRuntimeSession(
   return {
     runtimeSession,
     devDiagnostics,
+    loadDiagnostics,
+    runtimeSessionLoadSettled,
+    recoveryClickCount,
+    bumpRecoveryClickCount,
+    recoveryClickCount,
+    bumpRecoveryClickCount,
     refreshRuntimeSession,
     getCurrentRuntimeSession,
     hasRuntimeSession: useCallback(

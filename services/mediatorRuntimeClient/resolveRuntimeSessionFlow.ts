@@ -10,6 +10,8 @@ import type {
 } from '@/services/liveMediation';
 import type { RuntimeSession } from '@/types/mediator/runtimeSession';
 
+import { RUNTIME_UNAVAILABLE_SESSION_FLOW } from '@/services/mediatorRuntimeClient/runtimeUnavailableRecoveryFlow';
+
 const LIVE_QUESTIONS_TARGET = 15;
 const LIVE_EXTENSION_QUESTIONS = 5;
 
@@ -21,13 +23,15 @@ export interface ResolveRuntimeSessionFlowParams {
   getLegacySessionFlow?: () => LiveSessionFlow;
   runtimeFailed?: boolean;
   invalidRuntimeState?: boolean;
+  /** Test/migration diagnostics only — production live mediation must keep false. */
+  allowLegacyFallback?: boolean;
   /** Question count for runtime-only mapping (e.g. from computeLiveTurnState). */
   questionNumberHint?: number;
 }
 
 export interface RuntimeSessionFlowResolution {
   flow: LiveSessionFlow;
-  source: 'runtime' | 'legacy_fallback';
+  source: 'runtime' | 'legacy_fallback' | 'runtime_unavailable';
   reason: RuntimeActionExecutionReason;
 }
 
@@ -206,12 +210,21 @@ export function resolveRuntimeSessionFlow(
     runtimeSession: params.runtimeSession,
     runtimeFailed: params.runtimeFailed,
     invalidRuntimeState: params.invalidRuntimeState,
+    allowLegacyFallback: params.allowLegacyFallback,
   });
 
-  if (execution.useLegacyFallback || !hasRuntimeSession(params.runtimeSession)) {
+  if (execution.useLegacyFallback) {
     return {
       flow: resolveLegacySessionFlow(params),
       source: 'legacy_fallback',
+      reason: execution.reason,
+    };
+  }
+
+  if (execution.runtimeUnavailable || !hasRuntimeSession(params.runtimeSession)) {
+    return {
+      flow: RUNTIME_UNAVAILABLE_SESSION_FLOW,
+      source: 'runtime_unavailable',
       reason: execution.reason,
     };
   }

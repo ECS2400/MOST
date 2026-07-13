@@ -11,6 +11,7 @@ export type RuntimeActionExecutionReason =
 export interface RuntimeActionExecution {
   useRuntime: boolean;
   useLegacyFallback: boolean;
+  runtimeUnavailable: boolean;
   reason: RuntimeActionExecutionReason;
 }
 
@@ -18,6 +19,8 @@ export interface ResolveRuntimeActionExecutionParams {
   runtimeSession: RuntimeSession | null | undefined;
   runtimeFailed?: boolean;
   invalidRuntimeState?: boolean;
+  /** Test/migration diagnostics only — production live mediation must keep false. */
+  allowLegacyFallback?: boolean;
 }
 
 export type LiveRuntimeClientActionKind =
@@ -46,10 +49,13 @@ export interface LiveRuntimeClientActionPlan {
 export function resolveRuntimeActionExecution(
   params: ResolveRuntimeActionExecutionParams
 ): RuntimeActionExecution {
+  const allowLegacyFallback = params.allowLegacyFallback === true;
+
   if (params.runtimeFailed) {
     return {
       useRuntime: false,
-      useLegacyFallback: true,
+      useLegacyFallback: allowLegacyFallback,
+      runtimeUnavailable: true,
       reason: 'runtime_failed',
     };
   }
@@ -57,7 +63,8 @@ export function resolveRuntimeActionExecution(
   if (params.invalidRuntimeState) {
     return {
       useRuntime: false,
-      useLegacyFallback: true,
+      useLegacyFallback: allowLegacyFallback,
+      runtimeUnavailable: true,
       reason: 'invalid_runtime_state',
     };
   }
@@ -65,7 +72,8 @@ export function resolveRuntimeActionExecution(
   if (!hasRuntimeSession(params.runtimeSession)) {
     return {
       useRuntime: false,
-      useLegacyFallback: true,
+      useLegacyFallback: allowLegacyFallback,
+      runtimeUnavailable: true,
       reason: 'runtime_unavailable',
     };
   }
@@ -73,6 +81,7 @@ export function resolveRuntimeActionExecution(
   return {
     useRuntime: true,
     useLegacyFallback: false,
+    runtimeUnavailable: false,
     reason: 'runtime_available',
   };
 }
@@ -84,6 +93,10 @@ export function shouldUseLegacyClosureFallback(
   const execution = resolveRuntimeActionExecution(params);
   if (execution.useLegacyFallback) {
     return true;
+  }
+
+  if (execution.runtimeUnavailable) {
+    return false;
   }
 
   const closure = resolveRuntimeClosureAction({ runtimeSession: params.runtimeSession });
@@ -112,19 +125,24 @@ export function planLiveRuntimeClientAction(
     };
   }
 
+  const legacyEnabled = execution.useLegacyFallback;
+
   return {
     execution,
     emitClientEvent: false,
     callRuntimeTurn: false,
     legacySteps: {
       signalSessionDecision:
-        kind === 'continue_session' || kind === 'resolve_session',
+        legacyEnabled &&
+        (kind === 'continue_session' || kind === 'resolve_session'),
       signalProposalDecision:
-        kind === 'proposal_accepted' || kind === 'proposal_rejected',
-      insertProposalClosureSummary: kind === 'proposal_rejected',
-      signalExtensionStart: kind === 'start_extension',
+        legacyEnabled &&
+        (kind === 'proposal_accepted' || kind === 'proposal_rejected'),
+      insertProposalClosureSummary: legacyEnabled && kind === 'proposal_rejected',
+      signalExtensionStart: legacyEnabled && kind === 'start_extension',
       immediateGoToClosure:
-        kind === 'proposal_rejected' || kind === 'resolve_session',
+        legacyEnabled &&
+        (kind === 'proposal_rejected' || kind === 'resolve_session'),
     },
   };
 }

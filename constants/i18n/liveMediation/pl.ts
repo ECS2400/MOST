@@ -224,6 +224,8 @@ export const LIVE_MEDIATION_PL: LiveMediationBundle = {
     proposalAcceptWaiting: 'Czekam na akceptację partnera…',
     proposalAcceptPartner: 'Partner zaakceptował — Twoja decyzja',
     proposalPanelTitle: 'Czy akceptujecie propozycję mediatora?',
+    runtimeRecoveryMessage: 'Mościk chwilowo utracił stan mediacji.',
+    runtimeRecoveryRefresh: 'Odśwież stan',
   },
   summary: {
     title: 'Podsumowanie mediacji',

@@ -212,6 +212,8 @@ export interface LiveMediationBundle {
     proposalAcceptWaiting: string;
     proposalAcceptPartner: string;
     proposalPanelTitle: string;
+    runtimeRecoveryMessage: string;
+    runtimeRecoveryRefresh: string;
   };
   summary: {
     title: string;

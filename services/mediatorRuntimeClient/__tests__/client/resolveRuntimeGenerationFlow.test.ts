@@ -180,22 +180,23 @@ describe('resolveRuntimeGenerationFlow', () => {
     assert.equal(resolution.source, 'runtime');
   });
 
-  it('falls back when runtime is unavailable', () => {
+  it('returns null mode when runtime is unavailable (production default)', () => {
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession: null,
       legacyMode: 'mid_summary',
     });
 
-    assert.equal(resolution.mode, 'mid_summary');
-    assert.equal(resolution.source, 'legacy_fallback');
+    assert.equal(resolution.mode, null);
+    assert.equal(resolution.source, 'runtime_unavailable');
     assert.equal(resolution.reason, 'runtime_unavailable');
   });
 
-  it('falls back when runtime failed', () => {
+  it('falls back when runtime failed only with allowLegacyFallback', () => {
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession: runtimeWithBeat('deliver_question'),
       legacyMode: 'generate_question',
       runtimeFailed: true,
+      allowLegacyFallback: true,
     });
 
     assert.equal(resolution.mode, 'generate_question');
@@ -203,15 +204,16 @@ describe('resolveRuntimeGenerationFlow', () => {
     assert.equal(resolution.reason, 'runtime_failed');
   });
 
-  it('falls back on invalid runtime state flag', () => {
+  it('returns unavailable on invalid runtime state flag (production default)', () => {
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession: runtimeWithBeat('deliver_question'),
       legacyMode: 'generate_question',
       invalidRuntimeState: true,
     });
 
-    assert.equal(resolution.source, 'legacy_fallback');
+    assert.equal(resolution.source, 'runtime_unavailable');
     assert.equal(resolution.reason, 'invalid_runtime_state');
+    assert.equal(resolution.mode, null);
   });
 
   it('does not duplicate generate turn when runtime blocks auto-advance', () => {
@@ -245,11 +247,12 @@ describe('resolveRuntimeGenerationFlow', () => {
     assert.equal(resolution.mode, 'generate_question');
   });
 
-  it('calls lazy legacy getter when runtime is unavailable', () => {
+  it('calls lazy legacy getter when runtime is unavailable and legacy allowed', () => {
     let called = false;
 
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession: null,
+      allowLegacyFallback: true,
       getLegacyMode: () => {
         called = true;
         return 'mid_summary';

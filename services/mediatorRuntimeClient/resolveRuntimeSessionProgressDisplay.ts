@@ -55,23 +55,29 @@ export function resolveRuntimeStageLabel(
   return labels[stage] ?? null;
 }
 
-/** Progress bar percent — runtime completionEstimate when available, else legacy value. */
+/** Progress bar percent — runtime completionEstimate when available, else legacy or zero when unavailable. */
 export function resolveLiveProgressPercent(
   runtimeSession: RuntimeSession | null | undefined,
-  legacyProgress: number
+  legacyProgress: number,
+  runtimeUnavailable = false
 ): number {
-  if (!hasRuntimeSession(runtimeSession)) {
-    return clampProgressPercent(legacyProgress);
+  if (runtimeUnavailable || !hasRuntimeSession(runtimeSession)) {
+    return runtimeUnavailable ? 0 : clampProgressPercent(legacyProgress);
   }
   return clampProgressPercent(runtimeSession.progress.completionEstimate);
 }
 
-/** Header phase label — runtime goal-driven label when available, else legacy label. */
+/** Header phase label — runtime goal-driven label when available, else recovery or legacy label. */
 export function resolveLivePhaseHeaderLabel(
   runtimeSession: RuntimeSession | null | undefined,
   legacyLabel: string,
-  lang: Language
+  lang: Language,
+  options: { runtimeUnavailable?: boolean; recoveryLabel?: string } = {}
 ): string {
+  if (options.runtimeUnavailable) {
+    return options.recoveryLabel ?? legacyLabel;
+  }
+
   if (!hasRuntimeSession(runtimeSession)) {
     return legacyLabel;
   }

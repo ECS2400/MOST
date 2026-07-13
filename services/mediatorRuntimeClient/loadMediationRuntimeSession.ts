@@ -77,7 +77,9 @@ export async function loadMediationRuntimeSessionWithDiagnostics(
       loadAttempted: true,
       rowFound: Boolean(data),
       rawRuntimeSession: data?.mediator_runtime_session ?? null,
+      rawRuntimeMetadata: data?.mediator_runtime_metadata ?? null,
       supabaseErrorCode: error?.code ?? null,
+      supabaseErrorMessage: error?.message ?? null,
     });
 
     if (options.logDiagnostics !== false) {

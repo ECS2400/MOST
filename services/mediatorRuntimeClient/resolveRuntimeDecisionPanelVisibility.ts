@@ -23,6 +23,7 @@ export interface ResolveRuntimeDecisionPanelVisibilityParams {
   runtimeSession: RuntimeSession | null | undefined;
   legacy: LiveLegacyDecisionPanelState;
   legacyVisibility: LegacyDecisionPanelVisibilityInput;
+  runtimeUnavailable?: boolean;
   sessionFlowStage: LiveSessionStage | undefined;
 }
 
@@ -80,6 +81,17 @@ function mapRuntimeConfirmedVisibility(
 export function resolveRuntimeDecisionPanelVisibility(
   params: ResolveRuntimeDecisionPanelVisibilityParams
 ): RuntimeDecisionPanelVisibility {
+  if (params.runtimeUnavailable) {
+    return {
+      kind: null,
+      source: 'runtime_confirmed',
+      showMainDecisionPanel: false,
+      showExtensionDecisionPanel: false,
+      showProposalPanel: false,
+      showResolvedConfirmationPanel: false,
+    };
+  }
+
   const { runtimeSession, legacy, legacyVisibility, sessionFlowStage } = params;
   const comparison = compareLiveDecisionPanels(runtimeSession, legacy);
   const useRuntime = comparison.flowKindsMatch;

@@ -65,28 +65,41 @@ describe('resolveRuntimeActionExecution', () => {
     assert.equal(execution.reason, 'runtime_available');
   });
 
-  it('falls back when runtimeSession is unavailable', () => {
+  it('does not legacy-fallback when runtimeSession is unavailable (production default)', () => {
     const execution = resolveRuntimeActionExecution({ runtimeSession: null });
 
     assert.equal(execution.useRuntime, false);
-    assert.equal(execution.useLegacyFallback, true);
+    assert.equal(execution.useLegacyFallback, false);
+    assert.equal(execution.runtimeUnavailable, true);
     assert.equal(execution.reason, 'runtime_unavailable');
   });
 
-  it('falls back when runtime request failed', () => {
+  it('legacy-fallback only when explicitly allowed (migration/tests)', () => {
+    const execution = resolveRuntimeActionExecution({
+      runtimeSession: null,
+      allowLegacyFallback: true,
+    });
+
+    assert.equal(execution.useLegacyFallback, true);
+  });
+
+  it('falls back when runtime request failed only with allowLegacyFallback', () => {
     const execution = resolveRuntimeActionExecution({
       runtimeSession: createMinimalRuntimeSuccess().runtimeSession,
       runtimeFailed: true,
+      allowLegacyFallback: true,
     });
 
     assert.equal(execution.useRuntime, false);
+    assert.equal(execution.useLegacyFallback, true);
     assert.equal(execution.reason, 'runtime_failed');
   });
 
-  it('falls back on invalid runtime state flag', () => {
+  it('falls back on invalid runtime state flag only with allowLegacyFallback', () => {
     const execution = resolveRuntimeActionExecution({
       runtimeSession: createMinimalRuntimeSuccess().runtimeSession,
       invalidRuntimeState: true,
+      allowLegacyFallback: true,
     });
 
     assert.equal(execution.reason, 'invalid_runtime_state');
@@ -107,14 +120,23 @@ describe('planLiveRuntimeClientAction', () => {
     assert.equal(plan.legacySteps.immediateGoToClosure, false);
   });
 
-  it('runtime unavailable → legacy fallback for proposal accept', () => {
+  it('runtime unavailable → legacy fallback for proposal accept only when allowed', () => {
     const plan = planLiveRuntimeClientAction('proposal_accepted', {
       runtimeSession: null,
+      allowLegacyFallback: true,
     });
 
     assert.equal(plan.emitClientEvent, false);
     assert.equal(plan.callRuntimeTurn, false);
     assert.equal(plan.legacySteps.signalProposalDecision, true);
+  });
+
+  it('runtime unavailable → no legacy side effects in production default', () => {
+    const plan = planLiveRuntimeClientAction('proposal_accepted', {
+      runtimeSession: null,
+    });
+
+    assert.equal(plan.legacySteps.signalProposalDecision, false);
   });
 
   it('runtime available → proposal reject skips legacy closure summary', () => {
@@ -126,9 +148,10 @@ describe('planLiveRuntimeClientAction', () => {
     assert.equal(plan.legacySteps.immediateGoToClosure, false);
   });
 
-  it('runtime unavailable → proposal reject keeps legacy closure side effects', () => {
+  it('runtime unavailable → proposal reject keeps legacy closure side effects when allowed', () => {
     const plan = planLiveRuntimeClientAction('proposal_rejected', {
       runtimeSession: null,
+      allowLegacyFallback: true,
     });
 
     assert.equal(plan.legacySteps.signalProposalDecision, true);
@@ -146,9 +169,10 @@ describe('planLiveRuntimeClientAction', () => {
     assert.equal(plan.legacySteps.signalSessionDecision, false);
   });
 
-  it('runtime unavailable → resolve uses legacy session decision and closure', () => {
+  it('runtime unavailable → resolve uses legacy session decision and closure when allowed', () => {
     const plan = planLiveRuntimeClientAction('resolve_session', {
       runtimeSession: null,
+      allowLegacyFallback: true,
     });
 
     assert.equal(plan.legacySteps.signalSessionDecision, true);
@@ -157,11 +181,15 @@ describe('planLiveRuntimeClientAction', () => {
 });
 
 describe('shouldUseLegacyClosureFallback', () => {
-  it('uses legacy closure when runtime is unavailable', () => {
+  it('uses legacy closure only when explicitly allowed', () => {
     assert.equal(
-      shouldUseLegacyClosureFallback({ runtimeSession: null }),
+      shouldUseLegacyClosureFallback({
+        runtimeSession: null,
+        allowLegacyFallback: true,
+      }),
       true
     );
+    assert.equal(shouldUseLegacyClosureFallback({ runtimeSession: null }), false);
   });
 
   it('skips legacy auto-closure when runtime terminal closure is ready', () => {
