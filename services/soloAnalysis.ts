@@ -1,3 +1,4 @@
+import { sanitizeAnalysisPersona } from '@/services/analysisPersona';
 import { callEdge, EDGE } from '@/services/supabase';
 import {
   interpretMediationLocally,
@@ -40,7 +41,8 @@ export function buildSoloCombinedDescription(
 
 export async function resolveSoloAnalysis(
   combinedDescription: string,
-  language: Language = 'pl'
+  language: Language = 'pl',
+  participantName?: string
 ): Promise<MediationAnalysis> {
   const extras = getSoloExtras(language);
   try {
@@ -49,6 +51,7 @@ export async function resolveSoloAnalysis(
       perspectiveB: '',
       category: 'Solo Analysis',
       language,
+      participant_name: participantName,
     });
     if (!isAnalysisEchoingForm(edge, combinedDescription)) {
       if (language !== 'pl') {
@@ -64,7 +67,7 @@ export async function resolveSoloAnalysis(
           throw new Error(extras.errors.analyzeFailed);
         }
       }
-      return edge;
+      return sanitizeAnalysisPersona(edge);
     }
   } catch {
     if (language !== 'pl') {
@@ -76,7 +79,7 @@ export async function resolveSoloAnalysis(
     throw new Error(extras.errors.analyzeFailed);
   }
 
-  return interpretMediationLocally(combinedDescription, '');
+  return interpretMediationLocally(combinedDescription, '', participantName);
 }
 
 export interface SoloAnalysisRunResult {
@@ -87,10 +90,11 @@ export interface SoloAnalysisRunResult {
 
 export async function runSoloAnalysis(
   input: SoloAnalysisInput,
-  language: Language = 'pl'
+  language: Language = 'pl',
+  participantName?: string
 ): Promise<SoloAnalysisRunResult> {
   const combined = buildSoloCombinedDescription(input, language);
-  const raw = await resolveSoloAnalysis(combined, language);
+  const raw = await resolveSoloAnalysis(combined, language, participantName);
   const extras = getSoloExtras(language);
   let view = mapAnalysisToView(raw, language);
   if (!view) {

@@ -5,6 +5,11 @@ import {
   logLiveRuntimeDevDiagnostics,
   type LiveRuntimeDevDiagnostics,
 } from '@/services/mediatorRuntimeClient/formatLiveRuntimeDevDiagnostics';
+import { isRuntimeSessionShape } from '@/services/mediatorRuntimeClient/runtimeSessionShape';
+import {
+  liveRuntimeDevStatusLabel,
+  resolveLiveRuntimeDevStatus,
+} from '@/services/mediatorRuntimeClient/runtimeSessionRefreshGuard';
 import type { RuntimeSession } from '@/types/mediator/runtimeSession';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 
@@ -12,6 +17,7 @@ interface LiveRuntimeDevDiagnosticsProps {
   mediationId: string | undefined;
   runtimeSession: RuntimeSession | null | undefined;
   runtimeFailed: boolean;
+  invalidRuntimeState?: boolean;
 }
 
 function DiagnosticsRow({ label, value }: { label: string; value: string }) {
@@ -30,6 +36,7 @@ export function LiveRuntimeDevDiagnostics({
   mediationId,
   runtimeSession,
   runtimeFailed,
+  invalidRuntimeState = false,
 }: LiveRuntimeDevDiagnosticsProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -43,6 +50,18 @@ export function LiveRuntimeDevDiagnostics({
     [mediationId, runtimeSession, runtimeFailed]
   );
 
+  const devStatus = useMemo(
+    () =>
+      resolveLiveRuntimeDevStatus({
+        runtimeFailed,
+        hasValidRuntimeSession:
+          runtimeSession != null &&
+          isRuntimeSessionShape(runtimeSession) &&
+          !invalidRuntimeState,
+      }),
+    [runtimeFailed, runtimeSession, invalidRuntimeState]
+  );
+
   useEffect(() => {
     if (!diagnostics) return;
     logLiveRuntimeDevDiagnostics(diagnostics);
@@ -52,8 +71,13 @@ export function LiveRuntimeDevDiagnostics({
     return null;
   }
 
-  const statusLabel = runtimeFailed ? 'Runtime Failed' : 'Runtime OK';
-  const statusColor = runtimeFailed ? Colors.error : Colors.success;
+  const statusLabel = liveRuntimeDevStatusLabel(devStatus);
+  const statusColor =
+    devStatus === 'failed'
+      ? Colors.error
+      : devStatus === 'ok'
+        ? Colors.success
+        : Colors.warning;
 
   return (
     <View style={styles.container} pointerEvents="box-none">

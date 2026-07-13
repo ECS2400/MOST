@@ -66,8 +66,10 @@ export function resolveRuntimeTrigger(
   if (HOST_GENERATE_MODES.has(mode)) {
     return 'host_generate';
   }
+  if (mode === 'answer_ack') {
+    return 'partner_message';
+  }
   if (senderRole === 'partner') return 'partner_message';
-  if (senderRole === 'user') return 'host_generate';
   return 'partner_message';
 }
 

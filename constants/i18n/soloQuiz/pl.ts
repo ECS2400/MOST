@@ -11,7 +11,7 @@ export const SOLO_QUIZ_PL: SoloQuizBundle = {
     intensity: 'Intensywność (1-10)',
     mainPain: 'Co najbardziej boli',
     partnerReaction: 'Typowa reakcja partnera',
-    goal: 'Cel użytkownika',
+    goal: 'Twój cel',
   },
   questions: [
     {

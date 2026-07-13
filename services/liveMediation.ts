@@ -27,6 +27,11 @@ import {
   buildMediationRuntimePersistencePatch,
 } from '@/services/mediatorRuntimeClient/mediationRuntimeSessionPersistence';
 import { loadMediationRuntimeState } from '@/services/mediatorRuntimeClient/loadMediationRuntimeSession';
+import { shouldBlockRuntimeMediatorGeneration } from '@/services/mediatorRuntimeClient/shouldBlockRuntimeMediatorGeneration';
+import {
+  hasMediatorOpeningDelivered,
+  shouldSkipOpeningBootstrap as shouldSkipOpeningBootstrapGuard,
+} from '@/services/mediatorRuntimeClient/openingBootstrapGuards';
 import type { MediatorRuntimeParsedSuccess } from '@/services/mediatorRuntimeClient/mediatorRuntimeClient';
 import {
   buildBootstrapMediationStateFromContext,
@@ -880,15 +885,13 @@ export function hasOpeningFactsQuestion(messages: LiveMessage[]): boolean {
   );
 }
 
+export { hasMediatorOpeningDelivered } from '@/services/mediatorRuntimeClient/openingBootstrapGuards';
+
 export function shouldSkipOpeningBootstrap(
   messages: LiveMessage[],
   conversationState?: ConversationState | null
 ): boolean {
-  return (
-    hasOpeningSummaryMessage(messages) ||
-    hasOpeningFactsQuestion(messages) ||
-    Boolean(conversationState?.openingSummaryDone)
-  );
+  return shouldSkipOpeningBootstrapGuard(messages, conversationState);
 }
 
 /** Czy wskazówki po danym pytaniu zostały już wysłane. */
@@ -4175,6 +4178,27 @@ export async function processMediationTurn(
   participantNames?: ParticipantNames,
   clientEvents?: RuntimeClientEvent[]
 ): Promise<LiveMediatorResponse> {
+  if (mode === 'answer_ack') {
+    const turn = computeLiveTurnState(allMessages, hostUserId, partnerUserIds);
+    if (!turn.bothAnswered) {
+      return {
+        phase: currentPhase,
+        progress: getPhaseProgress(currentPhase),
+      };
+    }
+
+    return sanitizeAnswerAckResponse(
+      analyzeMediationTurn(
+        triggerMessage,
+        hostUserId,
+        partnerUserIds,
+        currentPhase,
+        allMessages,
+        currentQuestionIndex
+      )
+    );
+  }
+
   const senderRole = resolveSenderRole(
     triggerMessage.sender_id,
     hostUserId,
@@ -4331,6 +4355,21 @@ export async function processMediationTurn(
         currentQuestionIndex
       )
     );
+  }
+
+  if (
+    persistedRuntime.runtimeSession &&
+    shouldBlockRuntimeMediatorGeneration({
+      runtimeSession: persistedRuntime.runtimeSession,
+      mode,
+      force: false,
+      allowOpeningBootstrap: false,
+    })
+  ) {
+    return {
+      phase: currentPhase,
+      progress: getPhaseProgress(currentPhase),
+    };
   }
 
   const recentAnswers = allMessages

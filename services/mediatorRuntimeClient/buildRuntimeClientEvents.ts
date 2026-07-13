@@ -27,3 +27,17 @@ export function buildRuntimeClientEvents(
     },
   ];
 }
+
+/** Records a participant chat reply for the next runtime turn. */
+export function buildParticipantReplyClientEvents(
+  actor: ParticipantRole,
+  at: string = new Date().toISOString()
+): RuntimeClientEvent[] {
+  return [
+    {
+      kind: actor === 'host' ? 'host_message' : 'partner_message',
+      actor,
+      at,
+    },
+  ];
+}

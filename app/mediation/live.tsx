@@ -19,6 +19,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCouple } from '@/hooks/useCouple';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useRuntimeSession } from '@/hooks/useRuntimeSession';
+import type { RuntimeSessionParticipantRole } from '@/services/mediatorRuntimeClient/runtimeSessionLoadDiagnostics';
+import { normalizeRouteParam } from '@/utils/normalizeRouteParam';
 import {
   resolveLivePhaseHeaderLabel,
   resolveLiveProgressPercent,
@@ -57,14 +59,29 @@ import {
 } from '@/services/mediatorRuntimeClient/resolveRuntimeActionExecution';
 import { resolveRuntimeProposalPanelState } from '@/services/mediatorRuntimeClient/resolveRuntimeProposalPanelState';
 import { resolveRuntimeSessionFlow } from '@/services/mediatorRuntimeClient/resolveRuntimeSessionFlow';
-import { buildRuntimeClientEvents } from '@/services/mediatorRuntimeClient/buildRuntimeClientEvents';
+import { buildRuntimeClientEvents, buildParticipantReplyClientEvents } from '@/services/mediatorRuntimeClient/buildRuntimeClientEvents';
+import { shouldBlockRuntimeMediatorGeneration } from '@/services/mediatorRuntimeClient/shouldBlockRuntimeMediatorGeneration';
+import {
+  buildApplyAiTurnDevLogPayload,
+  logApplyAiTurnDev,
+  resolveApplyAiTurnTriggerSource,
+  silentSyncDetectedNewMessages,
+} from '@/services/mediatorRuntimeClient/applyAiTurnDevLog';
+import {
+  buildMediatorTurnFingerprint,
+  isDuplicateMediatorTurnFingerprint,
+} from '@/services/mediatorRuntimeClient/mediatorTurnFingerprint';
+import {
+  shouldRefreshRuntimeSessionOnSessionPoll,
+  shouldRefreshRuntimeSessionOnSilentSync,
+} from '@/services/mediatorRuntimeClient/runtimeSessionRefreshGuard';
 import type { RuntimeClientEvent } from '@/types/mediator';
 import type { RuntimeSession } from '@/types/mediator/runtimeSession';
 import { LiveRuntimeDevDiagnostics } from '@/components/feature/LiveRuntimeDevDiagnostics';
 import { getLiveMediationExtras } from '@/constants/i18n/liveMediation';
 import { getClosureBundle } from '@/constants/i18n/closure';
 import type { Language } from '@/constants/i18n';
-import { fmt } from '@/utils/i18nFormat';
+import { linkPartnerToMediation } from '@/services/mediationPartner';
 import { fetchPriorAgreementsContext } from '@/services/agreementArchive';
 import { supabase } from '@/services/supabase';
 import {
@@ -438,9 +455,10 @@ export default function LiveMediationScreen() {
     partner: liveUi.partner,
     aiName: lm.service.aiName,
   };
-  const { mediationId } = useLocalSearchParams<{
-    mediationId?: string;
+  const { mediationId: routeMediationId } = useLocalSearchParams<{
+    mediationId?: string | string[];
   }>();
+  const mediationId = normalizeRouteParam(routeMediationId);
 
   const [session, setSession] = useState<LiveSession | null>(null);
   const [mediationHostId, setMediationHostId] = useState<string | null>(null);
@@ -459,7 +477,18 @@ export default function LiveMediationScreen() {
 
   const funFactScope = mediationId ? `live-${mediationId}` : 'live-local';
 
-  const runtimeSessionReadonly = useRuntimeSession(mediationId);
+  const runtimeParticipantRole = useMemo((): RuntimeSessionParticipantRole => {
+    if (!user?.id) return 'unknown';
+    const hostId = mediationHostId || session?.user_id;
+    if (hostId && user.id === hostId) return 'host';
+    if (session?.partner_id && user.id === session.partner_id) return 'partner';
+    if (partner?.id && user.id === partner.id) return 'partner';
+    return 'unknown';
+  }, [user?.id, mediationHostId, session?.user_id, session?.partner_id, partner?.id]);
+
+  const runtimeSessionReadonly = useRuntimeSession(mediationId, {
+    role: runtimeParticipantRole,
+  });
   const { runtimeSession, refreshRuntimeSession } = runtimeSessionReadonly;
   const invalidRuntimeState =
     runtimeSession != null && !isRuntimeSessionShape(runtimeSession);
@@ -483,6 +512,9 @@ export default function LiveMediationScreen() {
   const mediationContextRef = useRef<MediationContext | null>(null);
   const generateLockRef = useRef<string | null>(null);
   const sessionBootstrapLockRef = useRef(false);
+  const openingBootstrapDoneRef = useRef(false);
+  const lastAiTurnFingerprintRef = useRef<string | null>(null);
+  const messageCountAtLastAiTurnRef = useRef(0);
   const liveUsageIncrementedRef = useRef(false);
   const extensionStartLockRef = useRef(false);
   const proposedSolutionLockRef = useRef(false);
@@ -1013,6 +1045,24 @@ export default function LiveMediationScreen() {
         mediationHostIdRef.current = medRow?.user_id ?? null;
         setMediationHostId(medRow?.user_id ?? null);
 
+        if (
+          !isHost &&
+          partner?.id &&
+          medRow?.user_id &&
+          medRow.partner_id !== partner.id
+        ) {
+          try {
+            await linkPartnerToMediation(
+              mediationId,
+              medRow.user_id,
+              partner.id,
+              couple?.id
+            );
+          } catch (linkError) {
+            console.warn('[live] partner mediation link failed', linkError);
+          }
+        }
+
         if (!isHost && medRow?.status !== 'live') {
           if (
             medRow?.status === 'pending_agreements' ||
@@ -1137,12 +1187,17 @@ export default function LiveMediationScreen() {
 
       const merged = mergeLiveMessages(pendingEphemeral, msgResult.messages, user.id);
       const current = messagesRef.current;
-      const hasNewMessages =
-        merged.length !== current.length ||
-        merged[merged.length - 1]?.id !== current[current.length - 1]?.id;
+      const hasNewMessages = silentSyncDetectedNewMessages(
+        merged.length,
+        current.length,
+        merged[merged.length - 1]?.id,
+        current[current.length - 1]?.id
+      );
       if (hasNewMessages) {
         setMessagesDebug(merged);
-        void refreshRuntimeSession();
+        if (shouldRefreshRuntimeSessionOnSilentSync(hasNewMessages)) {
+          void refreshRuntimeSession();
+        }
       }
     } finally {
       focusFetchInFlightRef.current = false;
@@ -1198,8 +1253,9 @@ export default function LiveMediationScreen() {
           `[phase sync] DB live_phase: ${sess.live_phase}, rendering: ${renderingPhase}`
         );
         const prevProgress = lastSyncedProgressRef.current;
-        if (prevProgress !== null && sess.live_progress !== prevProgress) {
+        if (shouldRefreshRuntimeSessionOnSessionPoll(prevProgress, sess.live_progress ?? 0)) {
           void silentSyncRef.current();
+          void refreshRuntimeSession();
         }
         lastSyncedProgressRef.current = sess.live_progress ?? 0;
         setSessionDebug(sess);
@@ -1211,7 +1267,7 @@ export default function LiveMediationScreen() {
     syncSessionFromSupabase();
     const intervalId = setInterval(syncSessionFromSupabase, 2000);
     return () => clearInterval(intervalId);
-  }, [mediationId, user, loading, setSessionDebug]);
+  }, [mediationId, user, loading, setSessionDebug, refreshRuntimeSession]);
 
   useEffect(() => {
     console.log(
@@ -1230,6 +1286,7 @@ export default function LiveMediationScreen() {
       (update) => {
         if (navigatingAwayRef.current) return;
         setSessionDebug((prev) => (prev ? { ...prev, ...update } : prev));
+        void refreshRuntimeSession();
 
         const status = (update as { status?: string }).status;
         if (status === 'pending_agreements' || status === 'resolved') {
@@ -1237,7 +1294,7 @@ export default function LiveMediationScreen() {
         }
       }
     );
-  }, [mediationId, setMessagesDebug, setSessionDebug, goToClosureIfLegacyFallback]);
+  }, [mediationId, setMessagesDebug, setSessionDebug, goToClosureIfLegacyFallback, refreshRuntimeSession]);
 
   // Fallback gdy realtime nie dostarczy wiadomości — cicha sync co 3s, bez blokady UI.
   useEffect(() => {
@@ -1286,6 +1343,42 @@ export default function LiveMediationScreen() {
     ): Promise<LiveMessage[]> => {
       if (!user || !mediationId || !hostUserId) return currentMessages;
 
+      const triggerSource = resolveApplyAiTurnTriggerSource(mode, triggerMessage);
+      logApplyAiTurnDev(
+        buildApplyAiTurnDevLogPayload({
+          triggerSource,
+          runtimeSession,
+          messages: currentMessages,
+          previousMessageCount: messageCountAtLastAiTurnRef.current,
+          hostUserId,
+          partnerUserIds,
+          runtimeFailed,
+        })
+      );
+
+      if (mode === 'answer_ack') {
+        const ackTurn = computeLiveTurnState(currentMessages, hostUserId, partnerUserIds);
+        if (!ackTurn.bothAnswered) {
+          return currentMessages;
+        }
+      }
+
+      const openingBootstrapAllowed =
+        mode === 'opening_summary' &&
+        !shouldSkipOpeningBootstrap(currentMessages, getConversationState(currentMessages));
+
+      if (
+        shouldBlockRuntimeMediatorGeneration({
+          runtimeSession,
+          mode,
+          force,
+          clientEvents,
+          allowOpeningBootstrap: openingBootstrapAllowed,
+        })
+      ) {
+        return currentMessages;
+      }
+
       if (mode === 'opening_summary' || mode === 'generate_question' || mode === 'extension_question') {
         if (!shouldHostLeadGeneration(user.id, hostUserId)) return currentMessages;
       }
@@ -1324,6 +1417,20 @@ export default function LiveMediationScreen() {
         if (!isBootstrap && lastQ && questionAdvancedAfter(currentMessages, lastQ.id)) {
           return currentMessages;
         }
+      }
+
+      const turnFingerprint = buildMediatorTurnFingerprint({
+        mediationId,
+        mode,
+        messages: currentMessages,
+        runtimeSession,
+        questionIndex: sessionRef.current?.current_question_index ?? questionCount,
+      });
+      if (
+        !force &&
+        isDuplicateMediatorTurnFingerprint(turnFingerprint, lastAiTurnFingerprintRef.current)
+      ) {
+        return currentMessages;
       }
 
       const currentPhase = sessionRef.current?.live_phase || questionCount || 1;
@@ -1407,6 +1514,8 @@ export default function LiveMediationScreen() {
 
       const nextMessages = dedupeLiveMessages([...currentMessages, ...localAiMessages]);
       setMessagesDebug(nextMessages);
+      lastAiTurnFingerprintRef.current = turnFingerprint;
+      messageCountAtLastAiTurnRef.current = currentMessages.length;
 
       if (mode === 'opening_summary') {
         console.log('[messages after insert]', nextMessages);
@@ -1467,7 +1576,7 @@ export default function LiveMediationScreen() {
         throw error instanceof Error ? error : new Error(String(error ?? 'Unknown mediation error'));
       }
     },
-    [user, mediationId, hostUserId, partnerUserIds, partnerUserId, partner?.name, setMessagesDebug, setSessionDebug, language, couple?.id, questionCount, stableParticipantNames, isCurrentUserHost, logMediatorCall, refreshRuntimeSession, consumeRuntimeClientEvents]
+    [user, mediationId, hostUserId, partnerUserIds, partnerUserId, partner?.name, setMessagesDebug, setSessionDebug, language, couple?.id, questionCount, stableParticipantNames, isCurrentUserHost, logMediatorCall, refreshRuntimeSession, consumeRuntimeClientEvents, runtimeSession, runtimeFailed]
   );
 
   const applyRuntimeClientActionTurn = useCallback(
@@ -1699,6 +1808,14 @@ export default function LiveMediationScreen() {
     if (!shouldHostLeadGeneration(user.id, hostUserId)) return;
     if (processing || paused || sending || isActiveSendRef.current) return;
     if (generationInProgressRef.current) return;
+    if (
+      shouldBlockRuntimeMediatorGeneration({
+        runtimeSession,
+        mode: 'generate_question',
+      })
+    ) {
+      return;
+    }
     const lastQ = turnState.lastQuestion;
     if (!lastQ || questionAdvancedAfter(messages, lastQ.id)) return;
     if (generationLockAfter(messages, lastQ.id)) return;
@@ -1720,6 +1837,7 @@ export default function LiveMediationScreen() {
     messages.length,
     runGenerateNextQuestion,
     liveUi.sendError,
+    runtimeSession,
   ]);
 
   // Start sesji: podsumowanie → pierwsze pytanie (tylko lider).
@@ -1727,12 +1845,28 @@ export default function LiveMediationScreen() {
     if (navigatingAwayRef.current) return;
     if (!user || !mediationId || !hostUserId || loading || processing || paused) return;
     if (!shouldHostLeadGeneration(user.id, hostUserId)) return;
-    if (sessionBootstrapLockRef.current) return;
+    if (openingBootstrapDoneRef.current || sessionBootstrapLockRef.current) return;
 
     const msgs = messagesRef.current;
     const convState = getConversationState(msgs);
-    if (shouldSkipOpeningBootstrap(msgs, convState)) return;
+    if (shouldSkipOpeningBootstrap(msgs, convState)) {
+      openingBootstrapDoneRef.current = true;
+      return;
+    }
 
+    if (
+      shouldBlockRuntimeMediatorGeneration({
+        runtimeSession,
+        mode: 'opening_summary',
+        force: true,
+        allowOpeningBootstrap: true,
+      })
+    ) {
+      openingBootstrapDoneRef.current = true;
+      return;
+    }
+
+    openingBootstrapDoneRef.current = true;
     sessionBootstrapLockRef.current = true;
     const mode: MediatorMode = 'opening_summary';
 
@@ -1770,9 +1904,9 @@ export default function LiveMediationScreen() {
     loading,
     processing,
     paused,
-    messages.length,
     applyAiTurn,
     liveUi.sendError,
+    runtimeSession,
   ]);
 
   const userDecisionMade = isCurrentUserHost
@@ -2195,6 +2329,9 @@ export default function LiveMediationScreen() {
         sessionRef.current?.live_phase || 1,
         replyToQuestionId
       );
+      enqueueRuntimeClientEvents(
+        buildParticipantReplyClientEvents(currentUserActor === 'host' ? 'host' : 'partner')
+      );
       const workingMessages = [...messagesRef.current, sent];
       setMessagesDebug(workingMessages);
 
@@ -2235,6 +2372,8 @@ export default function LiveMediationScreen() {
     setMessagesDebug,
     liveUi.you,
     liveUi.sendError,
+    currentUserActor,
+    enqueueRuntimeClientEvents,
   ]);
 
   async function handlePause() {
@@ -2339,6 +2478,7 @@ export default function LiveMediationScreen() {
             mediationId={mediationId}
             runtimeSession={runtimeSession}
             runtimeFailed={runtimeFailed}
+            invalidRuntimeState={invalidRuntimeState}
           />
         ) : null}
         {/* Header */}

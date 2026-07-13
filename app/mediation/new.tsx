@@ -23,23 +23,22 @@ import {
   ChatScreenshotFlow,
   type ChatScreenshotStep,
 } from '@/components/feature/ChatScreenshotFlow';
-import {
-  buildCombinedDescription,
-  createMediationRecord,
-  resolveCombinedDescription,
-  updateMediationScreenshots,
-} from '@/services/mediationCreate';
-import { uploadMediationScreenshot } from '@/services/mediationStorage';
-import {
-  analyzeMediationScreenshotUrls,
-  appendOcrTextToMediation,
-} from '@/services/mediationOcr';
+import { buildCombinedDescription } from '@/services/mediationCreate';
 import {
   applyStructuredForm,
   type StructuredFormResult,
 } from '@/services/screenshotInterpret';
 import { ensureFeatureAllowed } from '@/services/checkLimits';
-import { FeatureLimitBlockedError, navigateToPaywall } from '@/utils/paywallReason';
+import {
+  FeatureLimitBlockedError,
+  LIMIT_CHECK_ERROR,
+  navigateToPaywall,
+} from '@/utils/paywallReason';
+import { LimitCheckTechnicalError } from '@/services/checkLimits.types';
+import {
+  MediationSubmitError,
+  submitNewMediation,
+} from '@/services/mediationSubmit';
 
 export default function NewMediationScreen() {
   const router = useRouter();
@@ -113,67 +112,35 @@ export default function NewMediationScreen() {
         coupleId: couple.id,
       });
 
-      const mediation = await createMediationRecord({
+      const { mediationId } = await submitNewMediation({
         userId: user.id,
+        coupleId: couple.id,
+        language: language || 'pl',
         whatHappened,
         whatAngered,
         howFelt,
         whatNeeded,
         whatToSay,
         pastedText: effectivePastedText,
-        hasScreenshots: screenshotUris.length > 0,
+        screenshotUris,
+        hasDescription,
       });
-
-      const screenshotUrls: string[] = [];
-      for (let i = 0; i < screenshotUris.length; i++) {
-        try {
-          const url = await uploadMediationScreenshot(
-            user.id,
-            mediation.id,
-            screenshotUris[i],
-            i
-          );
-          screenshotUrls.push(url);
-        } catch {
-          // Continue without blocking analysis if upload fails
-        }
-      }
-
-      await updateMediationScreenshots(mediation.id, screenshotUrls);
-
-      const baseDescription = resolveCombinedDescription({
-        userId: user.id,
-        whatHappened,
-        whatAngered,
-        howFelt,
-        whatNeeded,
-        whatToSay,
-        pastedText: effectivePastedText,
-        hasScreenshots: screenshotUrls.length > 0,
-      });
-
-      if (
-        screenshotUrls.length > 0 &&
-        !effectivePastedText &&
-        !hasDescription
-      ) {
-        const ocrText = await analyzeMediationScreenshotUrls(
-          screenshotUrls,
-          language,
-          { userId: user.id }
-        );
-        if (ocrText) {
-          await appendOcrTextToMediation(mediation.id, baseDescription, ocrText);
-        }
-      }
 
       router.replace({
         pathname: '/mediation/analysis',
-        params: { mediationId: mediation.id },
+        params: { mediationId },
       });
     } catch (e: unknown) {
       if (e instanceof FeatureLimitBlockedError) {
         navigateToPaywall(router, e.paywallReason);
+        return;
+      }
+      if (e instanceof LimitCheckTechnicalError) {
+        setError(LIMIT_CHECK_ERROR);
+        return;
+      }
+      if (e instanceof MediationSubmitError) {
+        setError(lm.new.submitError);
         return;
       }
       setError(e instanceof Error ? e.message : lm.new.submitError);

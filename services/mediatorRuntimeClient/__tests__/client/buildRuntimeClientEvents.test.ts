@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { buildRuntimeClientEvents } from '@/services/mediatorRuntimeClient/buildRuntimeClientEvents';
+import { buildRuntimeClientEvents, buildParticipantReplyClientEvents } from '@/services/mediatorRuntimeClient/buildRuntimeClientEvents';
 import { buildLiveRuntimeTurnInput } from '@/services/mediatorRuntimeClient/liveMediationBridge';
 import { buildMediatorRuntimeRequest } from '@/services/mediatorRuntimeClient/buildMediatorRuntimeRequest';
 import { isValidRuntimeClientEvent } from '@/services/mediatorEngine/edge/normalizeClientEvents';
@@ -50,6 +50,23 @@ describe('buildRuntimeClientEvents', () => {
       assert.equal(events[0]?.kind, action);
       assert.equal(isValidRuntimeClientEvent(events[0]), true);
     }
+  });
+});
+
+describe('buildParticipantReplyClientEvents', () => {
+  it('creates host_message for host actor', () => {
+    const events = buildParticipantReplyClientEvents('host', ISO_TIMESTAMP);
+    assert.deepEqual(events, [
+      { kind: 'host_message', actor: 'host', at: ISO_TIMESTAMP },
+    ]);
+    assert.equal(isValidRuntimeClientEvent(events[0]), true);
+  });
+
+  it('creates partner_message for partner actor', () => {
+    const events = buildParticipantReplyClientEvents('partner', ISO_TIMESTAMP);
+    assert.deepEqual(events, [
+      { kind: 'partner_message', actor: 'partner', at: ISO_TIMESTAMP },
+    ]);
   });
 });
 

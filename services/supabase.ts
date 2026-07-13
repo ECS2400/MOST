@@ -71,7 +71,13 @@ export async function prepareSupabaseRequest(): Promise<void> {
 }
 
 supabase.auth.onAuthStateChange((event, session) => {
-  console.log('[Supabase auth]', event, session?.user?.id ?? 'no user');
+  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    console.log('[Supabase auth]', {
+      event,
+      hasSession: Boolean(session),
+      hasUser: Boolean(session?.user),
+    });
+  }
 });
 
 // ─── Edge Function URLs ───────────────────────────────────────────────────────
@@ -219,6 +225,8 @@ export type Tables = {
   };
 };
 
+import { parseEdgeErrorBody } from '@/utils/edgeFunctionError';
+
 // ─── Edge Function caller ─────────────────────────────────────────────────────
 export async function callEdge<T = any>(
   url: string,
@@ -237,7 +245,7 @@ export async function callEdge<T = any>(
   });
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(err || `Edge function error: ${response.status}`);
+    throw parseEdgeErrorBody(response.status, err);
   }
   return response.json();
 }

@@ -3,12 +3,65 @@ import {
   parseLoadedMediationRuntimeRow,
   type LoadedMediationRuntimeState,
 } from '@/services/mediatorRuntimeClient/mediationRuntimeSessionPersistence';
+import {
+  buildRuntimeSessionLoadDiagnostics,
+  logRuntimeSessionLoadDiagnostics,
+  resolveRuntimeSessionFromRow,
+  type RuntimeSessionLoadDiagnostics,
+  type RuntimeSessionParticipantRole,
+} from '@/services/mediatorRuntimeClient/runtimeSessionLoadDiagnostics';
 import type { RuntimeSession } from '@/types/mediator/runtimeSession';
+
+export interface LoadMediationRuntimeSessionResult {
+  runtimeSession: RuntimeSession | null;
+  diagnostics: RuntimeSessionLoadDiagnostics;
+}
+
+export interface LoadMediationRuntimeSessionOptions {
+  role?: RuntimeSessionParticipantRole;
+  logDiagnostics?: boolean;
+}
 
 /** Loads v2.3 runtime state persisted on mediations (Phase UI-B.1b + UI-B.3b.4). */
 export async function loadMediationRuntimeState(
-  mediationId: string
+  mediationId: string,
+  options: LoadMediationRuntimeSessionOptions = {}
 ): Promise<LoadedMediationRuntimeState> {
+  const result = await loadMediationRuntimeSessionWithDiagnostics(mediationId, options);
+  return {
+    mediationState: result.mediationState,
+    sessionMemory: result.sessionMemory,
+    runtimeSession: result.runtimeSession,
+  };
+}
+
+/** Loads runtime session with sanitized DEV diagnostics — no transcript content. */
+export async function loadMediationRuntimeSessionWithDiagnostics(
+  mediationId: string,
+  options: LoadMediationRuntimeSessionOptions = {}
+): Promise<LoadedMediationRuntimeState & { diagnostics: RuntimeSessionLoadDiagnostics }> {
+  const role = options.role ?? 'unknown';
+  const emptyDiagnostics = buildRuntimeSessionLoadDiagnostics({
+    role,
+    mediationId,
+    loadAttempted: false,
+    rowFound: false,
+    rawRuntimeSession: null,
+    supabaseErrorCode: null,
+  });
+
+  if (!mediationId.trim()) {
+    if (options.logDiagnostics !== false) {
+      logRuntimeSessionLoadDiagnostics(emptyDiagnostics);
+    }
+    return {
+      mediationState: null,
+      sessionMemory: null,
+      runtimeSession: null,
+      diagnostics: emptyDiagnostics,
+    };
+  }
+
   try {
     await prepareSupabaseRequest();
     const { data, error } = await supabase
@@ -17,20 +70,63 @@ export async function loadMediationRuntimeState(
       .eq('id', mediationId)
       .maybeSingle();
 
-    if (error || !data) {
-      return { mediationState: null, sessionMemory: null, runtimeSession: null };
+    const diagnostics = buildRuntimeSessionLoadDiagnostics({
+      role,
+      mediationId,
+      loadAttempted: true,
+      rowFound: Boolean(data),
+      rawRuntimeSession: data?.mediator_runtime_session ?? null,
+      supabaseErrorCode: error?.code ?? null,
+    });
+
+    if (options.logDiagnostics !== false) {
+      logRuntimeSessionLoadDiagnostics(diagnostics);
     }
 
-    return parseLoadedMediationRuntimeRow(data);
-  } catch {
-    return { mediationState: null, sessionMemory: null, runtimeSession: null };
+    if (error || !data) {
+      return {
+        mediationState: null,
+        sessionMemory: null,
+        runtimeSession: null,
+        diagnostics,
+      };
+    }
+
+    const parsed = parseLoadedMediationRuntimeRow(data);
+    return {
+      ...parsed,
+      runtimeSession: resolveRuntimeSessionFromRow(data.mediator_runtime_session) ?? parsed.runtimeSession,
+      diagnostics,
+    };
+  } catch (error) {
+    const diagnostics = buildRuntimeSessionLoadDiagnostics({
+      role,
+      mediationId,
+      loadAttempted: true,
+      rowFound: false,
+      rawRuntimeSession: null,
+      supabaseErrorCode:
+        error && typeof error === 'object' && 'code' in error
+          ? String((error as { code?: unknown }).code ?? 'unknown')
+          : 'unknown',
+    });
+    if (options.logDiagnostics !== false) {
+      logRuntimeSessionLoadDiagnostics(diagnostics);
+    }
+    return {
+      mediationState: null,
+      sessionMemory: null,
+      runtimeSession: null,
+      diagnostics,
+    };
   }
 }
 
 /** Loads the last persisted RuntimeSession for a mediation, if any. */
 export async function loadMediationRuntimeSession(
-  mediationId: string
+  mediationId: string,
+  options: LoadMediationRuntimeSessionOptions = {}
 ): Promise<RuntimeSession | null> {
-  const loaded = await loadMediationRuntimeState(mediationId);
+  const loaded = await loadMediationRuntimeSessionWithDiagnostics(mediationId, options);
   return loaded.runtimeSession;
 }

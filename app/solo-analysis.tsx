@@ -141,7 +141,8 @@ export default function SoloAnalysis() {
           needs: selectedNeeds,
           quizAnswers,
         },
-        language || 'pl'
+        language || 'pl',
+        user.name
       );
 
       const usageKey = `solo-${Date.now()}`;

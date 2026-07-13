@@ -1,4 +1,8 @@
 import {
+  sanitizeAnalysisPersona,
+  sanitizePersonaText,
+} from '@/services/analysisPersona';
+import {
   sanitizeTags,
   type MediationAnalysis,
 } from '@/services/mediationAnalysisInterpret';
@@ -167,49 +171,55 @@ export function mapAnalysisToView(
   lang: Language = 'pl'
 ): MappedAnalysisView | null {
   if (!raw) return null;
+  const sanitized = sanitizeAnalysisPersona(raw);
   const d = getDefaults(lang);
   const defaultTip = d.sayTip;
 
-  const situationSummary =
-    raw.situation_summary?.trim() ||
-    raw.situation_facts?.trim() ||
-    d.situationSummary;
+  const situationSummary = sanitizePersonaText(
+    sanitized.situation_summary?.trim() ||
+      sanitized.situation_facts?.trim() ||
+      d.situationSummary
+  );
 
-  const emotionTags = sanitizeTags(stringTags(raw.user_emotions || raw.emotions));
-  const emotionsExplanation =
-    raw.emotions_explanation?.trim() || d.emotionsExplanation;
+  const emotionTags = sanitizeTags(stringTags(sanitized.user_emotions || sanitized.emotions));
+  const emotionsExplanation = sanitizePersonaText(
+    sanitized.emotions_explanation?.trim() || d.emotionsExplanation
+  );
 
-  const needTags = sanitizeTags(stringTags(raw.user_needs || raw.common_ground));
-  const needsExplanation = raw.needs_explanation?.trim() || d.needsExplanation;
+  const needTags = sanitizeTags(stringTags(sanitized.user_needs || sanitized.common_ground));
+  const needsExplanation = sanitizePersonaText(
+    sanitized.needs_explanation?.trim() || d.needsExplanation
+  );
 
-  const keyTrigger = cleanInsightPrefix(raw.key_trigger?.trim() || '');
+  const keyTrigger = cleanInsightPrefix(
+    sanitizePersonaText(sanitized.key_trigger?.trim() || '')
+  );
 
-  const whatCouldImprove =
-    raw.what_could_improve?.trim()?.includes('—')
-      ? ''
-      : raw.what_could_improve?.trim() || '';
+  const whatCouldImprove = sanitized.what_could_improve?.trim()?.includes('—')
+    ? ''
+    : sanitizePersonaText(sanitized.what_could_improve?.trim() || '');
 
   const doingWell = mapTextPair(
-    raw.doing_well,
-    raw.doing_well_detail,
-    raw.celebration || raw.bridgeStatement,
+    sanitized.doing_well,
+    sanitized.doing_well_detail,
+    sanitized.celebration || sanitized.bridgeStatement,
     d.doingWellLead,
     d.doingWellDetail
   );
 
   const perspectiveGap = mapTextPair(
-    raw.perspective_gap_title,
-    raw.perspective_gap_detail,
-    raw.perspective_gap || raw.misunderstanding,
+    sanitized.perspective_gap_title,
+    sanitized.perspective_gap_detail,
+    sanitized.perspective_gap || sanitized.misunderstanding,
     d.perspectiveGapLead,
     d.perspectiveGapDetail
   );
 
   const partnerEmotions = sanitizeTags(
-    stringTags(raw.partner_emotions || raw.partnerEmotions)
+    stringTags(sanitized.partner_emotions || sanitized.partnerEmotions)
   );
   const partnerNeeds = sanitizeTags(
-    stringTags(raw.partner_needs || raw.partnerNeeds)
+    stringTags(sanitized.partner_needs || sanitized.partnerNeeds)
   );
 
   return {
@@ -221,7 +231,7 @@ export function mapAnalysisToView(
     keyTrigger,
     whatCouldImprove,
     doingWell,
-    suggestion: mapSuggestion(raw, defaultTip),
+    suggestion: mapSuggestion(sanitized, defaultTip),
     partnerEmotions:
       partnerEmotions.length > 0 ? partnerEmotions : d.partnerEmotions,
     partnerNeeds: partnerNeeds.length > 0 ? partnerNeeds : d.partnerNeeds,

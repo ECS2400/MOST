@@ -26,6 +26,9 @@ function runtimeWithBeat(
       },
       pending: {
         ...createMinimalRuntimeSuccess().runtimeSession.pending,
+        awaiting: 'nothing',
+        awaitingFrom: [],
+        satisfiedBy: [],
         ...overrides.pending,
       },
     },
@@ -147,6 +150,18 @@ describe('resolveRuntimeGenerationFlow', () => {
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession: runtimeWithBeat('deliver_answer_ack', { mayAutoAdvance: false }),
       legacyMode: 'answer_ack',
+    });
+
+    assert.equal(resolution.mode, null);
+    assert.equal(resolution.source, 'runtime');
+  });
+
+  it('blocks question generation when pending awaits both replies', () => {
+    const resolution = resolveRuntimeGenerationFlow({
+      runtimeSession: runtimeWithBeat('deliver_question', {
+        pending: { awaiting: 'both_replies' },
+      }),
+      legacyMode: 'generate_question',
     });
 
     assert.equal(resolution.mode, null);

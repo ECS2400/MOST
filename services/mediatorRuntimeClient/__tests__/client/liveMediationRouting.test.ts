@@ -55,6 +55,16 @@ describe('buildLiveRuntimeTurnInput', () => {
     assert.equal(input.sessionMemory, null);
   });
 
+  it('maps host answer_ack to partner_message trigger (not host_generate)', () => {
+    const input = buildLiveRuntimeTurnInput({
+      ...BASE_PARAMS,
+      mode: 'answer_ack',
+      senderRole: 'user',
+    });
+    assert.equal(input.trigger, 'partner_message');
+    assert.equal(input.transcriptDelta[0]?.authorRole, 'host');
+  });
+
   it('maps partner answer_ack to partner_message trigger', () => {
     const input = buildLiveRuntimeTurnInput(BASE_PARAMS);
     assert.equal(input.trigger, 'partner_message');

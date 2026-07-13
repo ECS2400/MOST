@@ -1,19 +1,12 @@
-import { supabase } from '@/services/supabase';
+import { prepareSupabaseRequest, supabase } from '@/services/supabase';
+import {
+  MediationPersistenceError,
+  type CreateMediationInput,
+  type CreateMediationResult,
+} from '@/services/mediationCreate.types';
 
-export interface CreateMediationInput {
-  userId: string;
-  whatHappened: string;
-  whatAngered: string;
-  howFelt: string;
-  whatNeeded: string;
-  whatToSay: string;
-  pastedText?: string | null;
-  hasScreenshots: boolean;
-}
-
-export interface CreateMediationResult {
-  id: string;
-}
+export type { CreateMediationInput, CreateMediationResult } from '@/services/mediationCreate.types';
+export { MediationPersistenceError } from '@/services/mediationCreate.types';
 
 /** Builds combined_description from the 5 guided form fields. */
 export function buildCombinedDescription(
@@ -72,12 +65,15 @@ export function resolveCombinedDescription(input: CreateMediationInput): string 
 export async function createMediationRecord(
   input: CreateMediationInput
 ): Promise<CreateMediationResult> {
+  await prepareSupabaseRequest();
+
   const combinedDescription = resolveCombinedDescription(input);
 
   const { data, error } = await supabase
     .from('mediations')
     .insert({
       user_id: input.userId,
+      couple_id: input.coupleId ?? null,
       what_happened: input.whatHappened.trim() || null,
       what_angered: input.whatAngered.trim() || null,
       how_felt: input.howFelt.trim() || null,
@@ -92,7 +88,11 @@ export async function createMediationRecord(
     .single();
 
   if (error || !data?.id) {
-    throw new Error(error?.message || 'Nie udało się zapisać mediacji');
+    throw new MediationPersistenceError(
+      'create_record',
+      error?.message || 'Nie udało się zapisać mediacji',
+      error?.code
+    );
   }
 
   return { id: data.id };
@@ -104,12 +104,18 @@ export async function updateMediationScreenshots(
 ): Promise<void> {
   if (screenshotUrls.length === 0) return;
 
+  await prepareSupabaseRequest();
+
   const { error } = await supabase
     .from('mediations')
     .update({ screenshot_urls: screenshotUrls })
     .eq('id', mediationId);
 
   if (error) {
-    throw new Error(error.message || 'Nie udało się zapisać zrzutów ekranu');
+    throw new MediationPersistenceError(
+      'update_screenshots',
+      error.message || 'Nie udało się zapisać zrzutów ekranu',
+      error.code
+    );
   }
 }

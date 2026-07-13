@@ -1,3 +1,8 @@
+import {
+  sanitizeAnalysisPersona,
+  withDirectAddress,
+} from '@/services/analysisPersona';
+
 export const ANALYSIS_VERSION = 2;
 
 export interface MediationAnalysis {
@@ -111,9 +116,9 @@ function summarizeSituation(happened: string, anger: string, felt: string): stri
 function buildEmotionsExplanation(felt: string, anger: string): string {
   const tags = detectEmotionTags(felt, anger);
   if (!felt && !anger) {
-    return 'Przy takim konflikcie naturalne jest zranienie lub frustracja — to sygnał, że coś w relacji wymaga uwagi, a nie „przesada”.';
+    return 'Wygląda na to, że przy takim konflikcie naturalne jest zranienie lub frustracja — to sygnał, że coś w relacji wymaga uwagi, a nie „przesada”.';
   }
-  return `Z opisu wynika ${tags.join(', ')}. To typowe reakcje, gdy oczekiwania w relacji się rozjechały — nie oznaczają słabości.`;
+  return `Z opisu wynika, że możesz czuć ${tags.join(', ')}. To typowe reakcje, gdy oczekiwania w relacji się rozjechały — nie oznaczają słabości.`;
 }
 
 function buildNeedsExplanation(need: string): string {
@@ -169,7 +174,8 @@ function buildSuggestion(need: string, felt: string): string {
 /** Lokalna interpretacja — nigdy nie kopiuje dosłownie pól formularza. */
 export function interpretMediationLocally(
   combinedDescription: string,
-  perspectiveB = ''
+  perspectiveB = '',
+  participantName?: string
 ): MediationAnalysis {
   const felt =
     extractField(combinedDescription, 'Jak się czułem', 'Jak się czułam') || '';
@@ -178,7 +184,7 @@ export function interpretMediationLocally(
   const happened = extractField(combinedDescription, 'Co się wydarzyło') || '';
   const hasPartner = perspectiveB.trim().length > 0;
 
-  return {
+  return sanitizeAnalysisPersona({
     analysis_version: ANALYSIS_VERSION,
     situation_summary: summarizeSituation(happened, anger, felt),
     user_emotions: detectEmotionTags(felt, anger),
@@ -187,7 +193,7 @@ export function interpretMediationLocally(
     needs_explanation: buildNeedsExplanation(need),
     key_trigger: buildKeyTrigger(anger, felt, happened),
     what_could_improve: buildWhatCouldImprove(happened, anger, felt),
-    doing_well: 'Szukasz dialogu zamiast eskalacji.',
+    doing_well: withDirectAddress(participantName, 'szukasz dialogu zamiast eskalacji.'),
     doing_well_detail: 'Formułowanie uczuć i szukanie mediacji to dojrzały krok.',
     partner_emotions: ['presja', 'niezrozumienie'],
     partner_needs: ['autonomia', 'brak oskarżeń'],
@@ -197,7 +203,7 @@ export function interpretMediationLocally(
       : 'Analiza opiera się na Twoim opisie — partner może widzieć sytuację inaczej.',
     suggestion_quote: buildSuggestion(need, felt),
     suggestion_tip: 'Powiedz spokojnie, w pierwszej osobie. Unikaj „Ty zawsze…”.',
-  };
+  });
 }
 
 function normalizeForCompare(text: string): string {

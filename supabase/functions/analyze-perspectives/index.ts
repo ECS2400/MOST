@@ -1,4 +1,10 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import {
+  ANALYSIS_PERSONA_PROMPT_EN,
+  ANALYSIS_PERSONA_PROMPT_PL,
+  sanitizeAnalysisPersona,
+  withDirectAddress,
+} from '../_shared/analysisPersona.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -70,9 +76,9 @@ function detectEmotionTags(felt: string, anger: string): string[] {
 function buildEmotionsExplanation(felt: string, anger: string): string {
   const tags = detectEmotionTags(felt, anger);
   if (!felt && !anger) {
-    return 'W takiej sytuacji naturalne jest poczucie zranienia lub frustracji — to sygnał, że coś w relacji wymaga uwagi.';
+    return 'Wygląda na to, że w takiej sytuacji naturalne jest poczucie zranienia lub frustracji — to sygnał, że coś w relacji wymaga uwagi.';
   }
-  return `Z opisu wynika ${tags.join(', ')}. To typowe reakcje, gdy oczekiwania w relacji się rozjechały.`;
+  return `Z opisu wynika, że możesz czuć ${tags.join(', ')}. To typowe reakcje, gdy oczekiwania w relacji się rozjechały.`;
 }
 
 function buildNeedsExplanation(need: string): string {
@@ -147,7 +153,11 @@ function buildSuggestion(need: string, felt: string): string {
   return 'Gdy będziesz gotowy/a: „Chcę, żebyśmy usiedli i porozmawiali o tym, co mnie boli — bez awantury.”';
 }
 
-function fallbackAnalysis(perspectiveA: string, perspectiveB: string): AnalysisResponse {
+function fallbackAnalysis(
+  perspectiveA: string,
+  perspectiveB: string,
+  participantName?: string
+): AnalysisResponse {
   const felt = extractLines(perspectiveA, 'Jak się czułem') || extractLines(perspectiveA, 'Jak się czułam');
   const anger = extractLines(perspectiveA, 'Co mnie zdenerwowało');
   const need = extractLines(perspectiveA, 'Czego potrzebuję');
@@ -163,7 +173,7 @@ function fallbackAnalysis(perspectiveA: string, perspectiveB: string): AnalysisR
     needs_explanation: buildNeedsExplanation(need),
     key_trigger: buildKeyTrigger(anger, felt, happened),
     what_could_improve: buildWhatCouldImprove(happened, anger),
-    doing_well: 'Szukasz dialogu zamiast eskalacji.',
+    doing_well: withDirectAddress(participantName, 'szukasz dialogu zamiast eskalacji.'),
     doing_well_detail: 'To dojrzały krok — formułowanie uczuć i potrzeb to podstawa mediacji.',
     partner_emotions: ['presja', 'niezrozumienie'],
     partner_needs: ['autonomia', 'brak oskarżeń'],
@@ -178,14 +188,14 @@ function fallbackAnalysis(perspectiveA: string, perspectiveB: string): AnalysisR
 
 const JSON_SCHEMA = `{
   "analysis_version": 2,
-  "situation_summary": "2-3 zdania: NEUTRALNE streszczenie sytuacji, własnymi słowami mediatora. NIGDY nie cytuj użytkownika.",
+  "situation_summary": "2-3 zdania: NEUTRALNE streszczenie sytuacji, własnymi słowami mediatora. NIGDY nie cytuj dosłownie opisu. Pisz do osoby (Ty / imię), nie o „użytkowniku”.",
   "user_emotions": ["2-4 krótkie etykiety emocji, np. zranienie, frustracja"],
-  "emotions_explanation": "2-3 zdania: jak użytkownik MOŻE się czuć i dlaczego — interpretacja, nie cytat",
+  "emotions_explanation": "2-3 zdania: jak MOŻESZ się czuć i dlaczego — interpretacja w drugiej osobie, nie cytat",
   "user_needs": ["2-3 krótkie potrzeby zinterpretowane z opisu"],
-  "needs_explanation": "1-2 zdania: co stoi za tymi potrzebami",
-  "key_trigger": "1-2 zdania: co najbardziej zabolało — interpretacja, nie dosłowne zdanie usera",
-  "what_could_improve": "1-2 zdania: co MOGŁO pójść inaczej w komunikacji użytkownika (delikatnie, bez oceniania)",
-  "doing_well": "1 zdanie: co użytkownik robi dobrze w tej sytuacji",
+  "needs_explanation": "1-2 zdania: co stoi za Twoimi potrzebami — bezpośrednio do rozmówcy",
+  "key_trigger": "1-2 zdania: co najbardziej mogło zaboleć — interpretacja, nie dosłowne zdanie z formularza",
+  "what_could_improve": "1-2 zdania: co MOGŁO pójść inaczej w Twojej komunikacji (delikatnie, bez oceniania)",
+  "doing_well": "1 zdanie: co robisz dobrze w tej sytuacji — bezpośrednio do rozmówcy",
   "doing_well_detail": "1 krótkie zdanie wyjaśniające",
   "partner_emotions": ["2-3 hipotezy o emocjach partnera"],
   "partner_needs": ["2-3 hipotezy o potrzebach partnera"],
@@ -199,14 +209,16 @@ const SYSTEM_PROMPT = `You are a couples mediator. You receive a raw conflict de
 Your task: INTERPRET and DESCRIBE the situation in your own words.
 
 CRITICAL RULES:
-- NEVER copy user sentences verbatim
+- NEVER copy sentences from the input verbatim
 - NEVER paste form fragments
 - Paraphrase everything — write like a mediator summarizing a session
-- Use phrasing like "you may feel", "it seems that", "behind this conflict"
-- what_could_improve: gently note what in the user's COMMUNICATION might have escalated (no moralizing)
-- suggestion_quote: write a NEW I-message sentence, do not take from user input
+- Address the person directly (you may feel / it seems that you / behind this conflict for you)
+- what_could_improve: gently note what in THEIR communication might have escalated (no moralizing)
+- suggestion_quote: write a NEW I-message sentence, do not take from input
 - Each field = one thought, no em-dash joining two sentences
-- Respond ONLY with valid JSON, no markdown`;
+- Respond ONLY with valid JSON, no markdown
+
+${ANALYSIS_PERSONA_PROMPT_EN}`;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -223,6 +235,9 @@ serve(async (req) => {
     const perspectiveA = String(body.perspectiveA || body.perspective_a || '');
     const perspectiveB = String(body.perspectiveB || body.perspective_b || '');
     const language = String(body.language || 'pl');
+    const participantName = String(
+      body.participantName || body.participant_name || ''
+    ).trim();
 
     if (!perspectiveA.trim()) {
       return new Response(JSON.stringify({ error: 'perspectiveA is required' }), {
@@ -232,14 +247,24 @@ serve(async (req) => {
     }
 
     const openaiKey = Deno.env.get('OPENAI_API_KEY');
-    const fallback = fallbackAnalysis(perspectiveA, perspectiveB);
+    const fallback = fallbackAnalysis(
+      perspectiveA,
+      perspectiveB,
+      participantName || undefined
+    );
 
     if (openaiKey) {
+      const personaRule =
+        language === 'pl' ? ANALYSIS_PERSONA_PROMPT_PL : ANALYSIS_PERSONA_PROMPT_EN;
       const prompt = `Response language: ${LANGUAGE_NAMES[language] || language}.
+${personaRule}
 Return ONLY JSON:
 ${JSON_SCHEMA}
 
-User description (CONTEXT — do not quote verbatim):
+Participant name (optional — use for direct address if provided):
+${participantName || '(brak — używaj Ty, Tobie, Twoje)'}
+
+Description (CONTEXT — do not quote verbatim):
 ${perspectiveA}
 
 Partner perspective:
@@ -266,7 +291,7 @@ ${perspectiveB || '(none)'}`;
         const content = aiJson.choices?.[0]?.message?.content || '';
         const cleaned = content.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
         const parsed = JSON.parse(cleaned) as Partial<AnalysisResponse>;
-        const result: AnalysisResponse = {
+        const result: AnalysisResponse = sanitizeAnalysisPersona({
           analysis_version: ANALYSIS_VERSION,
           situation_summary: parsed.situation_summary || fallback.situation_summary,
           user_emotions: parsed.user_emotions?.length ? parsed.user_emotions : fallback.user_emotions,
@@ -283,14 +308,14 @@ ${perspectiveB || '(none)'}`;
           perspective_gap_detail: parsed.perspective_gap_detail || fallback.perspective_gap_detail,
           suggestion_quote: parsed.suggestion_quote || fallback.suggestion_quote,
           suggestion_tip: parsed.suggestion_tip || fallback.suggestion_tip,
-        };
+        });
         return new Response(JSON.stringify(result), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
     }
 
-    return new Response(JSON.stringify(fallback), {
+    return new Response(JSON.stringify(sanitizeAnalysisPersona(fallback)), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {

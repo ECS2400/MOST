@@ -1,73 +1,61 @@
-import { callEdge, EDGE } from '@/services/supabase';
 import {
-  actionToPaywallReason,
-  FeatureLimitBlockedError,
-  LIMIT_CHECK_ERROR,
-} from '@/utils/paywallReason';
+  EDGE,
+  prepareSupabaseRequest,
+  supabase,
+  SUPABASE_ANON_KEY,
+} from '@/services/supabase';
+import {
+  buildCheckLimitsRequestHeaders,
+  resolveUserAccessToken,
+  type CheckLimitsAuthDeps,
+} from '@/services/checkLimits.auth';
+import { assertFeatureAllowed } from '@/services/checkLimits.logic';
+import {
+  defaultFetch,
+  runCheckLimitsRequest,
+  type CheckLimitsRequestDeps,
+} from '@/services/checkLimits.request';
+import {
+  type CheckLimitsResponse,
+  type FeatureAccessOptions,
+  type LimitAction,
+  type LimitCheckErrorDetails,
+  type LimitReason,
+} from '@/services/checkLimits.types';
 
-export type LimitAction =
-  | 'create_dispute'
-  | 'create_live_mediation'
-  | 'solo_analysis'
-  | 'ocr_analyze'
-  | 'ai_chat';
+export type {
+  CheckLimitsResponse,
+  FeatureAccessOptions,
+  LimitAction,
+  LimitCheckErrorDetails,
+  LimitReason,
+} from '@/services/checkLimits.types';
+export { LimitCheckTechnicalError } from '@/services/checkLimits.types';
+export {
+  buildCheckLimitsRequestHeaders,
+  resolveUserAccessToken,
+  type CheckLimitsAuthDeps,
+} from '@/services/checkLimits.auth';
 
-export type LimitReason = 'premium' | 'free_available' | 'limit_reached';
-
-export interface CheckLimitsResponse {
-  allowed: boolean;
-  isPremium: boolean;
-  used: number;
-  limit: number | null;
-  resetAt: string;
-  reason: LimitReason;
-}
-
-export interface FeatureAccessOptions {
-  userId: string;
-  coupleId?: string;
-  usageKey?: string;
-}
-
-interface CheckLimitsRequestBody extends FeatureAccessOptions {
-  user_id: string;
-  couple_id?: string;
-  action: LimitAction;
-  increment?: boolean;
-  usage_key?: string;
-}
-
-function buildRequestBody(
-  action: LimitAction,
-  options: FeatureAccessOptions,
-  increment: boolean
-): CheckLimitsRequestBody {
+function defaultRequestDeps(): CheckLimitsRequestDeps {
   return {
-    user_id: options.userId,
-    couple_id: options.coupleId,
-    action,
-    increment,
-    usage_key: options.usageKey,
+    fetchImpl: defaultFetch,
+    edgeUrl: EDGE.checkLimits,
+    anonKey: SUPABASE_ANON_KEY,
+    auth: {
+      prepare: prepareSupabaseRequest,
+      getSession: () => supabase.auth.getSession(),
+      refreshSession: () => supabase.auth.refreshSession(),
+    },
   };
 }
 
-async function callCheckLimits(
+async function runCheckLimits(
   action: LimitAction,
   options: FeatureAccessOptions,
   increment: boolean
 ): Promise<CheckLimitsResponse> {
-  try {
-    return await callEdge<CheckLimitsResponse>(
-      EDGE.checkLimits,
-      buildRequestBody(action, options, increment)
-    );
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : 'Nie udało się sprawdzić limitów. Spróbuj ponownie.';
-    throw new Error(message);
-  }
+  return runCheckLimitsRequest(action, options, increment, defaultRequestDeps());
 }
 
 /** Read-only limit check — does not increment usage. */
@@ -75,7 +63,7 @@ export async function checkFeatureAccess(
   action: LimitAction,
   options: FeatureAccessOptions
 ): Promise<CheckLimitsResponse> {
-  return callCheckLimits(action, options, false);
+  return runCheckLimits(action, options, false);
 }
 
 /** Checks limit and increments usage when allowed. */
@@ -83,7 +71,7 @@ export async function incrementFeatureUsage(
   action: LimitAction,
   options: FeatureAccessOptions
 ): Promise<CheckLimitsResponse> {
-  return callCheckLimits(action, options, true);
+  return runCheckLimits(action, options, true);
 }
 
 /** Throws when limit is reached or the check fails — no silent allow. */
@@ -91,16 +79,6 @@ export async function ensureFeatureAllowed(
   action: LimitAction,
   options: FeatureAccessOptions
 ): Promise<CheckLimitsResponse> {
-  let result: CheckLimitsResponse;
-  try {
-    result = await checkFeatureAccess(action, options);
-  } catch {
-    throw new Error(LIMIT_CHECK_ERROR);
-  }
-
-  if (!result.allowed) {
-    throw new FeatureLimitBlockedError(actionToPaywallReason(action));
-  }
-
-  return result;
+  const result = await checkFeatureAccess(action, options);
+  return assertFeatureAllowed(action, result);
 }

@@ -6,6 +6,7 @@ import {
   isScreenshotInterpretAvailable,
 } from '@/services/screenshotInterpret';
 import { EDGE, callEdge, supabase } from '@/services/supabase';
+import { MediationPersistenceError } from '@/services/mediationCreate.types';
 import {
   ensureFeatureAllowed,
   incrementFeatureUsage,
@@ -194,6 +195,10 @@ export async function appendOcrTextToMediation(
     .eq('id', mediationId);
 
   if (error) {
-    throw new Error(error.message || 'Nie udało się zapisać analizy OCR');
+    throw new MediationPersistenceError(
+      'append_ocr',
+      error.message || 'Nie udało się zapisać analizy OCR',
+      error.code
+    );
   }
 }

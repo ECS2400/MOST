@@ -21,9 +21,10 @@ import {
 } from '@/services/mediatorRuntimeClient/mapMediationContextToBootstrapState';
 import { resolveRuntimeActionExecution } from '@/services/mediatorRuntimeClient/resolveRuntimeActionExecution';
 import { resolveRuntimeGenerationFlow } from '@/services/mediatorRuntimeClient/resolveRuntimeGenerationFlow';
+import { shouldBlockRuntimeMediatorGeneration } from '@/services/mediatorRuntimeClient/shouldBlockRuntimeMediatorGeneration';
 import { resolveRuntimeClosureAction } from '@/services/mediatorRuntimeClient/resolveRuntimeClosureAction';
 import { resolveRuntimeSessionFlow } from '@/services/mediatorRuntimeClient/resolveRuntimeSessionFlow';
-import { buildRuntimeClientEvents } from '@/services/mediatorRuntimeClient/buildRuntimeClientEvents';
+import { buildRuntimeClientEvents, buildParticipantReplyClientEvents } from '@/services/mediatorRuntimeClient/buildRuntimeClientEvents';
 import type {
   MediationState,
   MediatorRuntimeEdgeSuccess,
@@ -367,6 +368,33 @@ describe('liveFlowE2E — bootstrap', () => {
 });
 
 describe('liveFlowE2E — standard participant turns', () => {
+  it('host reply alone blocks client auto-advance until partner replies', async () => {
+    const bootstrapState = buildBootstrapMediationStateFromContext(SURVEY_CONTEXT);
+    const opening = await runRuntimeTurn({
+      turnNumber: 1,
+      trigger: 'session_start',
+      mediationState: bootstrapState,
+      sessionMemory: null,
+    });
+
+    assert.equal(opening.runtimeSession.pending.awaiting, 'both_replies');
+    assert.equal(opening.runtimeSession.decision.nextBeat, 'await_user_action');
+    assert.equal(
+      resolveRuntimeGenerationFlow({
+        runtimeSession: opening.runtimeSession,
+        legacyMode: 'generate_question',
+      }).mode,
+      null
+    );
+    assert.equal(
+      shouldBlockRuntimeMediatorGeneration({
+        runtimeSession: opening.runtimeSession,
+        mode: 'generate_question',
+      }),
+      true
+    );
+  });
+
   it('host → partner → host_generate advances without duplicate turn metadata', async () => {
     let mediationState = buildBootstrapMediationStateFromContext(SURVEY_CONTEXT);
     let sessionMemory: SessionMemory | null = null;
@@ -381,7 +409,7 @@ describe('liveFlowE2E — standard participant turns', () => {
       { turnNumber: 1, trigger: 'session_start' },
       {
         turnNumber: 2,
-        trigger: 'host_message',
+        trigger: 'partner_message',
         delta: [transcript('host', 'Czuję się pominięty.', 2, 'host-1')],
       },
       {

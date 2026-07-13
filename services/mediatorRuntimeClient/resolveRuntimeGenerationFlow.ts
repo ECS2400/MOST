@@ -98,6 +98,9 @@ function isRuntimeQuestionGenerationBlocked(
   }
 
   switch (runtimeSession.pending.awaiting) {
+    case 'host_reply':
+    case 'partner_reply':
+    case 'both_replies':
     case 'continue_decision':
     case 'extension_decision':
     case 'proposal_decision':

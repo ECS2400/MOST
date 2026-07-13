@@ -16,15 +16,20 @@ import { getSoloExtras } from '@/constants/i18n/soloExtras';
 import { Colors, Spacing, Typography, Radius, Shadow } from '@/constants/theme';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { callEdge, EDGE, supabase } from '@/services/supabase';
+import { supabase } from '@/services/supabase';
 import {
-  interpretMediationLocally,
+  fetchMediationForAnalysis,
+  MediationAnalysisError,
+  resolveMediationAnalysis,
+  saveHostMediationAnalysis,
+  type MediationAnalysisRow,
+} from '@/services/mediationAnalysisRun';
+import {
   isAnalysisEchoingForm,
   sanitizeTags,
   type MediationAnalysis,
 } from '@/services/mediationAnalysisInterpret';
 import { markPartnerJoined } from '@/services/mediationPartner';
-import { looksLikePolishAnalysis } from '@/utils/textTruncate';
 
 export type { MediationAnalysis };
 
@@ -73,33 +78,6 @@ function normalizeTip(tip?: string): string | undefined {
   if (!trimmed) return undefined;
   if (/w pierwszej osobie/i.test(trimmed)) return DEFAULT_SAY_TIP;
   return trimmed;
-}
-
-function isEdgeFailure(error: unknown): boolean {
-  const msg = error instanceof Error ? error.message : String(error);
-  const lower = msg.toLowerCase();
-  return (
-    lower.includes('json') ||
-    lower.includes('network') ||
-    lower.includes('fetch') ||
-    lower.includes('edge function') ||
-    lower.includes('unexpected end') ||
-    lower.includes('failed to fetch') ||
-    lower.includes('syntaxerror')
-  );
-}
-
-interface MediationRow {
-  id: string;
-  user_id: string;
-  partner_id: string | null;
-  combined_description: string;
-  partner_combined_description: string | null;
-  pasted_text: string | null;
-  screenshot_urls: string[];
-  analysis: MediationAnalysis | null;
-  partner_analysis: MediationAnalysis | null;
-  status: string;
 }
 
 function stripQuotes(text: string): string {
@@ -275,72 +253,6 @@ function mapAnalysis(raw: MediationAnalysis | null): MappedAnalysis | null {
   };
 }
 
-function perspectiveBFrom(mediation: MediationRow): string {
-  return (
-    mediation.pasted_text?.trim() ||
-    (mediation.screenshot_urls.length > 0
-      ? 'Kontekst rozmowy ze zrzutów ekranu.'
-      : '')
-  );
-}
-
-async function resolveAnalysis(
-  mediation: MediationRow,
-  language: string
-): Promise<MediationAnalysis> {
-  const perspectiveB = perspectiveBFrom(mediation);
-  const extras = getSoloExtras(language as import('@/constants/i18n').Language);
-
-  try {
-    const edge = await runAnalysis(mediation, language);
-    if (!isAnalysisEchoingForm(edge, mediation.combined_description)) {
-      if (language !== 'pl') {
-        const blob = [
-          edge.situation_summary,
-          edge.emotions_explanation,
-          edge.needs_explanation,
-          edge.key_trigger,
-        ]
-          .filter(Boolean)
-          .join(' ');
-        if (looksLikePolishAnalysis(blob)) {
-          throw new Error(extras.errors.analyzeFailed);
-        }
-      }
-      return edge;
-    }
-  } catch (e) {
-    if (language !== 'pl') {
-      throw e instanceof Error ? e : new Error(extras.errors.analyzeFailed);
-    }
-  }
-
-  if (language !== 'pl') {
-    throw new Error(extras.errors.analyzeFailed);
-  }
-
-  return interpretMediationLocally(mediation.combined_description, perspectiveB);
-}
-
-async function runAnalysis(
-  mediation: MediationRow,
-  language: string
-): Promise<MediationAnalysis> {
-  const perspectiveA = mediation.combined_description;
-  const perspectiveB =
-    mediation.pasted_text?.trim() ||
-    (mediation.screenshot_urls.length > 0
-      ? 'Kontekst rozmowy ze zrzutów ekranu.'
-      : '');
-
-  return callEdge<MediationAnalysis>(EDGE.analyzePerspectives, {
-    perspectiveA,
-    perspectiveB,
-    category: 'Mediacja',
-    language,
-  });
-}
-
 function LoadingView() {
   return (
     <View style={styles.loadingWrap}>
@@ -427,37 +339,19 @@ export default function MediationAnalysisScreen() {
     setError('');
 
     try {
-      const { data: mediation, error: fetchError } = await supabase
-        .from('mediations')
-        .select(
-          'id, user_id, partner_id, combined_description, partner_combined_description, pasted_text, screenshot_urls, analysis, partner_analysis, status'
-        )
-        .eq('id', mediationId)
-        .single();
+      const row = await fetchMediationForAnalysis(
+        mediationId,
+        user.id,
+        Boolean(isPartner)
+      );
 
-      if (fetchError || !mediation) {
-        throw new Error(fetchError?.message || lm.analysis.notFound);
-      }
+      setRowId(row.id);
 
-      const isHost = mediation.user_id === user.id;
-      const isPartnerRow = mediation.partner_id === user.id;
-
-      if (isPartner && !isPartnerRow) {
-        throw new Error(lm.analysis.notFound);
-      }
-
-      if (!isPartner && !isHost) {
-        throw new Error(lm.analysis.notFound);
-      }
-
-      setRowId(mediation.id);
-
-      const row = mediation as MediationRow;
       const combined = isPartner
-        ? mediation.partner_combined_description || ''
-        : mediation.combined_description || '';
+        ? row.partner_combined_description || ''
+        : row.combined_description || '';
       const storedAnalysis = (
-        isPartner ? mediation.partner_analysis : mediation.analysis
+        isPartner ? row.partner_analysis : row.analysis
       ) as MediationAnalysis | null;
 
       const analysisRow: MediationRow = isPartner
@@ -470,32 +364,39 @@ export default function MediationAnalysisScreen() {
         return;
       }
 
-      const result = await resolveAnalysis(analysisRow, language || 'pl');
+      const result = await resolveMediationAnalysis(analysisRow, language || 'pl', {
+        participantName: user?.name,
+      });
 
       try {
-        const updatePayload = isPartner
-          ? {
+        if (isPartner) {
+          await supabase
+            .from('mediations')
+            .update({
               partner_analysis: result,
               partner_joined: true,
               partner_joined_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
-            }
-          : {
-              analysis: result,
-              status: 'completed',
-              updated_at: new Date().toISOString(),
-            };
-
-        await supabase.from('mediations').update(updatePayload).eq('id', mediation.id);
-      } catch {
-        // Wynik i tak pokazujemy
+            })
+            .eq('id', row.id);
+        } else {
+          await saveHostMediationAnalysis(row.id, result);
+        }
+      } catch (saveError) {
+        if (saveError instanceof MediationAnalysisError) {
+          // Show analysis even when persistence fails.
+        }
       }
 
       setAnalysis(mapAnalysis(result));
       setPhase('ready');
-    } catch (e: any) {
+    } catch (e: unknown) {
       setPhase('error');
-      setError(e.message || lm.analysis.loadError);
+      if (e instanceof MediationAnalysisError) {
+        setError(lm.analysis.loadError);
+        return;
+      }
+      setError(e instanceof Error ? e.message : lm.analysis.loadError);
     }
   }, [isPartner, language, lm.analysis.loadError, lm.analysis.noMediationId, lm.analysis.notFound, mediationId, user]);
 

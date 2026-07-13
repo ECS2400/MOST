@@ -91,7 +91,7 @@ const quizBlock = formatQuizContext({
 const quizOk =
   quizBlock.includes('Typ sytuacji') &&
   quizBlock.includes('Intensywność') &&
-  quizBlock.includes('Cel użytkownika');
+  quizBlock.includes('Twój cel');
 console.log('\n--- PR-S3 quiz ---');
 console.log(quizOk ? '✓ formatQuizContext' : '✗ formatQuizContext');
 if (!quizOk) process.exit(1);
