@@ -239,4 +239,10 @@ export {
 } from '@/services/mediatorRuntimeClient/mapMediationContextToBootstrapState';
 export type { BootstrapMediationContextInput } from '@/services/mediatorRuntimeClient/mapMediationContextToBootstrapState';
 
+export {
+  buildLiveRuntimeDevDiagnostics,
+  logLiveRuntimeDevDiagnostics,
+} from '@/services/mediatorRuntimeClient/formatLiveRuntimeDevDiagnostics';
+export type { LiveRuntimeDevDiagnostics } from '@/services/mediatorRuntimeClient/formatLiveRuntimeDevDiagnostics';
+
 export { isRuntimeSessionShape, isRecord } from '@/services/mediatorRuntimeClient/runtimeSessionShape';

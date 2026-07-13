@@ -60,6 +60,7 @@ import { resolveRuntimeSessionFlow } from '@/services/mediatorRuntimeClient/reso
 import { buildRuntimeClientEvents } from '@/services/mediatorRuntimeClient/buildRuntimeClientEvents';
 import type { RuntimeClientEvent } from '@/types/mediator';
 import type { RuntimeSession } from '@/types/mediator/runtimeSession';
+import { LiveRuntimeDevDiagnostics } from '@/components/feature/LiveRuntimeDevDiagnostics';
 import { getLiveMediationExtras } from '@/constants/i18n/liveMediation';
 import { getClosureBundle } from '@/constants/i18n/closure';
 import type { Language } from '@/constants/i18n';
@@ -2333,6 +2334,13 @@ export default function LiveMediationScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
     >
       <View style={[styles.flex, { paddingTop: insets.top }]}>
+        {__DEV__ ? (
+          <LiveRuntimeDevDiagnostics
+            mediationId={mediationId}
+            runtimeSession={runtimeSession}
+            runtimeFailed={runtimeFailed}
+          />
+        ) : null}
         {/* Header */}
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={styles.headerBtn}>
