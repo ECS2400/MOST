@@ -9,6 +9,7 @@ import { validateNonEmptyReply } from '@/services/mediatorEngine/responseValidat
 import { validateQuestions } from '@/services/mediatorEngine/responseValidator/rules/validateQuestions';
 import { validateSafetyCompliance } from '@/services/mediatorEngine/responseValidator/rules/validateSafetyCompliance';
 import { validateSentences } from '@/services/mediatorEngine/responseValidator/rules/validateSentences';
+import { validateTherapeuticFlow } from '@/services/mediatorEngine/responseValidator/rules/validateTherapeuticFlow';
 
 export type ResponseValidationRule = (
   ctx: ResponseValidationContext
@@ -22,6 +23,7 @@ export const RESPONSE_VALIDATION_RULES: ResponseValidationRule[] = [
   validateQuestions,
   validateSentences,
   validateForbiddenTerms,
+  validateTherapeuticFlow,
   validateNoTechnicalLeakage,
   validateSafetyCompliance,
   validateLanguage,
@@ -34,6 +36,7 @@ export {
   validateQuestions,
   validateSentences,
   validateForbiddenTerms,
+  validateTherapeuticFlow,
   validateNoTechnicalLeakage,
   validateSafetyCompliance,
   validateLanguage,

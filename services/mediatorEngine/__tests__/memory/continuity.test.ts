@@ -156,7 +156,7 @@ describe('buildContinuityContext — Phase 3A', () => {
       suggestedAvoidTypes: ['reflect'],
       suggestedPreferTypes: [],
     });
-    assert.match(hint ?? '', /reflection appeared ineffective/i);
+    assert.match(hint ?? '', /investigation/i);
   });
 });
 

@@ -12,6 +12,7 @@ import { createEmptyMediationState, createEmptySessionMemory } from '@/services/
 import type { AdaptiveGoalSelectionInput } from '@/services/mediatorEngine/goalContinuity/adaptiveGoalSelection/types';
 import { buildGoalContinuityHint } from '@/services/mediatorEngine/goalContinuity/buildGoalContinuityHint';
 import { chooseGoalContinuityRecommendation } from '@/services/mediatorEngine/goalContinuity/chooseGoalContinuityRecommendation';
+import { shouldBlockSolutionGoalAdvance } from '@/services/mediatorEngine/goalContinuity/therapeuticExplorationReadiness';
 import { dedupeGoals } from '@/services/mediatorEngine/goalContinuity/config/goalFlow';
 import { detectGoalCompletion } from '@/services/mediatorEngine/goalContinuity/detectGoalCompletion';
 import { detectGoalStagnation } from '@/services/mediatorEngine/goalContinuity/detectGoalStagnation';
@@ -171,14 +172,28 @@ export function buildGoalContinuityContext(
     )
   );
 
+  const blockedSolutionAdvance =
+    recommendation.recommendedGoalTransition === 'advance' &&
+    shouldBlockSolutionGoalAdvance(recommendation.recommendedNextGoal, state, sessionMemory);
+
+  const resolvedRecommendation = blockedSolutionAdvance
+    ? {
+        recommendedGoalTransition: 'stay' as const,
+        recommendedNextGoal: null,
+        suggestedStayReason:
+          'both perspectives, the real trigger, and the repeating argument pattern must be clear before proposing any deal',
+        suggestedAdvanceReason: null,
+      }
+    : recommendation;
+
   const partial = {
-    recommendedGoalTransition: recommendation.recommendedGoalTransition,
-    recommendedNextGoal: recommendation.recommendedNextGoal,
+    recommendedGoalTransition: resolvedRecommendation.recommendedGoalTransition,
+    recommendedNextGoal: resolvedRecommendation.recommendedNextGoal,
     currentGoal,
     completionDetected: completion.completionDetected,
     goalStagnationDetected: stagnation.goalStagnationDetected,
-    suggestedStayReason: recommendation.suggestedStayReason,
-    suggestedAdvanceReason: recommendation.suggestedAdvanceReason,
+    suggestedStayReason: resolvedRecommendation.suggestedStayReason,
+    suggestedAdvanceReason: resolvedRecommendation.suggestedAdvanceReason,
   };
 
   return {
@@ -192,10 +207,10 @@ export function buildGoalContinuityContext(
     goalStagnationReason: stagnation.goalStagnationReason,
     completionDetected: completion.completionDetected,
     completionReason: completion.completionReason,
-    recommendedGoalTransition: recommendation.recommendedGoalTransition,
-    recommendedNextGoal: recommendation.recommendedNextGoal,
-    suggestedStayReason: recommendation.suggestedStayReason,
-    suggestedAdvanceReason: recommendation.suggestedAdvanceReason,
+    recommendedGoalTransition: resolvedRecommendation.recommendedGoalTransition,
+    recommendedNextGoal: resolvedRecommendation.recommendedNextGoal,
+    suggestedStayReason: resolvedRecommendation.suggestedStayReason,
+    suggestedAdvanceReason: resolvedRecommendation.suggestedAdvanceReason,
     goalContinuityHint: buildGoalContinuityHint(partial),
     confidence: computeConfidence({ ...completion, completedGoals }, stagnation),
   };

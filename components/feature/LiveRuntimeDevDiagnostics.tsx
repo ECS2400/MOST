@@ -18,6 +18,7 @@ interface LiveRuntimeDevDiagnosticsProps {
   runtimeSession: RuntimeSession | null | undefined;
   runtimeFailed: boolean;
   invalidRuntimeState?: boolean;
+  devDiagnostics?: import('@/services/mediatorEngine/edge/types').MediatorRuntimeEdgeDevDiagnostics | null;
 }
 
 function DiagnosticsRow({ label, value }: { label: string; value: string }) {
@@ -37,6 +38,7 @@ export function LiveRuntimeDevDiagnostics({
   runtimeSession,
   runtimeFailed,
   invalidRuntimeState = false,
+  devDiagnostics = null,
 }: LiveRuntimeDevDiagnosticsProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -46,8 +48,9 @@ export function LiveRuntimeDevDiagnostics({
         mediationId,
         runtimeSession,
         runtimeFailed,
+        devDiagnostics,
       }),
-    [mediationId, runtimeSession, runtimeFailed]
+    [mediationId, runtimeSession, runtimeFailed, devDiagnostics]
   );
 
   const devStatus = useMemo(
@@ -116,6 +119,14 @@ function DiagnosticsPanel({ diagnostics }: { diagnostics: LiveRuntimeDevDiagnost
       <DiagnosticsRow label="pending" value={diagnostics.pendingAwaiting} />
       <DiagnosticsRow label="proposal" value={diagnostics.proposalPhase} />
       <DiagnosticsRow label="closure" value={diagnostics.closureDirective} />
+      <DiagnosticsRow label="source" value={diagnostics.responseSource} />
+      <DiagnosticsRow label="fallback" value={diagnostics.fallback} />
+      <DiagnosticsRow label="validation" value={diagnostics.validation} />
+      <DiagnosticsRow label="reasons" value={diagnostics.reasonCodes} />
+      <DiagnosticsRow label="retries" value={diagnostics.retries} />
+      <DiagnosticsRow label="providerOk" value={diagnostics.providerSucceeded} />
+      <DiagnosticsRow label="model" value={diagnostics.providerModel} />
+      <DiagnosticsRow label="textSource" value={diagnostics.finalTextSource} />
       <DiagnosticsRow
         label="runtimeFailed"
         value={diagnostics.runtimeFailed ? 'true' : 'false'}

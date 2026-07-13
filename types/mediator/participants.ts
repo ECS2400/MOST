@@ -80,6 +80,10 @@ export interface PreAnalysisContext {
   partnerEmotions: string[];
   partnerNeeds: string[];
   keyTrigger: string | null;
+  /** Short, paraphrased host perspective summary (no raw questionnaire dump). */
+  hostPerspective: string | null;
+  /** Short, paraphrased partner perspective summary (no raw questionnaire dump). */
+  partnerPerspective: string | null;
 }
 
 /**

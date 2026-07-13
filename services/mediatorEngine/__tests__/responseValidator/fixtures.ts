@@ -56,4 +56,23 @@ export function createValidationInput(
   };
 }
 
+/** Validation input with a non-exploration goal so localized fallback text can pass therapeutic flow. */
+export function createFallbackAcceptanceValidationInput(
+  overrides: Partial<ResponseValidationInput> = {}
+): ResponseValidationInput {
+  const language = overrides.language ?? 'en';
+  const promptComposerOutput =
+    overrides.promptComposerOutput ?? composePrompt(createRichPipelineInput(language));
+  promptComposerOutput.promptMetadata = {
+    ...promptComposerOutput.promptMetadata,
+    goal: 'FUTURE_PLAN',
+  };
+
+  return createValidationInput({
+    ...overrides,
+    language,
+    promptComposerOutput,
+  });
+}
+
 export { RESPONSE_VALIDATION_LIMITS };

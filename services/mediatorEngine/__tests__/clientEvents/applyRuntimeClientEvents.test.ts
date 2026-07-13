@@ -7,6 +7,7 @@ import { describe, it } from 'node:test';
 import {
   applyRuntimeClientEvents,
   clientEventFingerprintDigest,
+  createDefaultRuntimeFlowControl,
 } from '@/services/mediatorEngine/clientEvents/applyRuntimeClientEvents';
 import { composeRuntimeSession } from '@/services/mediatorEngine/runtimeSession/composeRuntimeSession';
 import { resolveRuntimeDecisionPanel } from '@/services/mediatorEngine/runtimeSession/resolveRuntimeDecisionPanel';
@@ -258,18 +259,70 @@ describe('applyRuntimeClientEvents', () => {
     ]);
   });
 
-  it('ignores unsupported message client event kinds', () => {
-    const result = applyRuntimeClientEvents({
-      mediationState: closureState(),
-      sessionMemory: withClosureSummary(createEmptySessionMemory()),
-      clientEvents: [
-        event('host_message'),
-        event('partner_message', 'partner'),
+  it('applies participant reply client events for the active question turn', () => {
+    const memory = {
+      ...createEmptySessionMemory(),
+      interventionHistory: [
+        {
+          interventionId: 'q-1',
+          turnNumber: 5,
+          type: 'open_deepen',
+          goal: 'EMOTION_NAMING',
+          intent: 'deepen',
+          strategy: 'explore',
+          expectedEffectId: 'effect-q',
+          signature: 'sig-q',
+          compliance: {
+            compliant: true,
+            violationCount: 0,
+            blockingViolationCount: 0,
+            fallbackUsed: false,
+            attemptNumber: 1,
+          },
+          effective: null,
+          confidence: 0,
+        },
       ],
-    });
+      runtimeFlowControl: {
+        ...createDefaultRuntimeFlowControl(),
+        participantReplies: {
+          hostReplied: false,
+          partnerReplied: false,
+          questionTurn: 5,
+        },
+      },
+    };
 
-    assert.equal(result.appliedEvents.length, 0);
-    assert.equal(result.ignoredEvents.length, 2);
+    const hostEvent: RuntimeClientEvent = {
+      kind: 'host_message',
+      actor: 'host',
+      at: ISO,
+      metadata: { questionTurn: 5 },
+    };
+    const partnerEvent: RuntimeClientEvent = {
+      kind: 'partner_message',
+      actor: 'partner',
+      at: ISO,
+      metadata: { questionTurn: 5 },
+    };
+
+    const hostOnly = applyRuntimeClientEvents({
+      mediationState: closureState(),
+      sessionMemory: memory,
+      clientEvents: [hostEvent],
+    });
+    assert.equal(hostOnly.appliedEvents.length, 1);
+    assert.equal(hostOnly.sessionMemory.runtimeFlowControl.participantReplies.hostReplied, true);
+    assert.equal(hostOnly.sessionMemory.runtimeFlowControl.participantReplies.partnerReplied, false);
+
+    const both = applyRuntimeClientEvents({
+      mediationState: closureState(),
+      sessionMemory: hostOnly.sessionMemory,
+      clientEvents: [partnerEvent],
+    });
+    assert.equal(both.appliedEvents.length, 1);
+    assert.equal(both.sessionMemory.runtimeFlowControl.participantReplies.hostReplied, true);
+    assert.equal(both.sessionMemory.runtimeFlowControl.participantReplies.partnerReplied, true);
   });
 });
 

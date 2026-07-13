@@ -53,6 +53,13 @@ function primaryAnalysisContext(analysis: Record<string, unknown> | null | undef
   );
 }
 
+function clipSummary(text: string, max = 240): string {
+  const t = (text || '').trim().replace(/\s+/g, ' ');
+  if (!t) return '';
+  if (t.length <= max) return t;
+  return `${t.slice(0, max).trim()}…`;
+}
+
 function hasIntakeContent(input: BootstrapMediationContextInput): boolean {
   return Boolean(
     input.combinedDescription?.trim() ||
@@ -95,6 +102,13 @@ export function buildBootstrapMediationStateFromContext(
     stringFromAnalysisField(input.partnerAnalysis, 'key_trigger') ||
     null;
 
+  const hostPerspective =
+    clipSummary(primaryAnalysisContext(input.analysis)) ||
+    clipSummary(input.combinedDescription?.trim() || '');
+  const partnerPerspective =
+    clipSummary(primaryAnalysisContext(input.partnerAnalysis)) ||
+    clipSummary(input.partnerCombinedDescription?.trim() || '');
+
   const conflictSummary = [
     input.combinedDescription?.trim(),
     primaryAnalysisContext(input.analysis),
@@ -114,6 +128,8 @@ export function buildBootstrapMediationStateFromContext(
       partnerEmotions,
       partnerNeeds,
       keyTrigger,
+      hostPerspective: hostPerspective || null,
+      partnerPerspective: partnerPerspective || null,
     },
   };
 

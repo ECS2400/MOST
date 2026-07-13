@@ -9,6 +9,7 @@ import { describe, it } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createDeterministicStubProvider } from '@/services/mediatorEngine/llm/adapters/deterministicStubProvider';
+import { createFakeLlmProvider } from '@/services/mediatorEngine/llm/adapters/fakeLlmProvider';
 import {
   createMediatorRuntimeOptionsResponse,
   MEDIATOR_RUNTIME_CORS_HEADERS,
@@ -133,6 +134,127 @@ describe('mediator-runtime edge — runtime handler', () => {
       assert.equal(result.finalMediatorMessage.accepted, true);
       assert.ok(result.runtimeSession);
       assert.equal(result.runtimeSession.session.turnOrdinal, result.runtimeMetadata.turnNumber);
+    }
+  });
+
+  it('DEV diagnostics: accepted provider output → source=llm, fallbackUsed=false', async () => {
+    const result = await handleMediatorRuntimeTurn(validRequestBody(), {
+      llmProviderOverride: createFakeLlmProvider({ language: 'en' }),
+    });
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.ok(result.devDiagnostics);
+      assert.equal(result.devDiagnostics!.responseSource, 'llm');
+      assert.equal(result.devDiagnostics!.fallbackUsed, false);
+      assert.equal(result.devDiagnostics!.validationAction, 'accept');
+      assert.equal(result.devDiagnostics!.retryCount, 0);
+      assert.equal(result.devDiagnostics!.providerSucceeded, true);
+      assert.ok(typeof result.devDiagnostics!.providerModel === 'string' || result.devDiagnostics!.providerModel === null);
+      assert.equal(result.devDiagnostics!.finalTextSource, 'provider');
+    }
+  });
+
+  it('DEV diagnostics: accepted retry → source=retry_llm', async () => {
+    let calls = 0;
+    const provider = {
+      providerId: 'test-retry-llm',
+      async generateText() {
+        calls += 1;
+        // 1st attempt invalid: too many questions → retry
+        if (calls === 1) {
+          return {
+            text: 'How do you feel? What do you need?',
+            provider: 'test-retry-llm',
+            model: 'test-retry-model',
+            latencyMs: 1,
+            finishReason: 'stop',
+          };
+        }
+        // 2nd attempt valid
+        return {
+          text: 'Okay. One clear question: what exactly happened right before the argument started?',
+          provider: 'test-retry-llm',
+          model: 'test-retry-model',
+          latencyMs: 1,
+          finishReason: 'stop',
+        };
+      },
+    } as const;
+
+    const result = await handleMediatorRuntimeTurn(validRequestBody(), {
+      llmProviderOverride: provider as never,
+    });
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.ok(result.devDiagnostics);
+      assert.equal(result.devDiagnostics!.responseSource, 'retry_llm');
+      assert.equal(result.devDiagnostics!.fallbackUsed, false);
+      assert.equal(result.devDiagnostics!.retryCount, 1);
+      assert.equal(result.devDiagnostics!.providerSucceeded, true);
+      assert.equal(result.devDiagnostics!.validationAction, 'accept');
+    }
+  });
+
+  it('DEV diagnostics: rejected after retries → source=fallback, reasons present', async () => {
+    const provider = {
+      providerId: 'test-always-invalid',
+      async generateText() {
+        return {
+          text: 'How do you feel? What do you need?',
+          provider: 'test-always-invalid',
+          model: 'test-invalid-model',
+          latencyMs: 1,
+          finishReason: 'stop',
+        };
+      },
+    } as const;
+
+    const result = await handleMediatorRuntimeTurn(validRequestBody(), {
+      llmProviderOverride: provider as never,
+    });
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.ok(result.devDiagnostics);
+      assert.equal(result.devDiagnostics!.responseSource, 'fallback');
+      assert.equal(result.devDiagnostics!.fallbackUsed, true);
+      assert.ok(result.devDiagnostics!.retryCount >= 1);
+      assert.ok(Array.isArray(result.devDiagnostics!.validationReasonCodes));
+      assert.ok(result.devDiagnostics!.validationReasonCodes.length > 0);
+      assert.ok(!JSON.stringify(result.devDiagnostics).includes('Host:'));
+      assert.ok(!JSON.stringify(result.devDiagnostics).includes('systemPrompt'));
+    }
+  });
+
+  it('normal mediation never returns localized normal fallback text (returns recoverable error instead)', async () => {
+    const result = await handleMediatorRuntimeTurn(validRequestBody({ language: 'pl' }), {
+      env: { openAiApiKey: 'test-key', openAiModel: 'gpt-4o-mini', openAiTimeoutMs: '10' },
+      fetchImpl: async () => {
+        // Force provider failure without real network.
+        throw new Error('Simulated OpenAI fetch failure');
+      },
+    });
+
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.ok(
+        result.error.code === MEDIATOR_RUNTIME_ERROR_CODES.LLM_VALIDATION_FAILED ||
+          result.error.code === MEDIATOR_RUNTIME_ERROR_CODES.LLM_TEMPORARILY_UNAVAILABLE
+      );
+      assert.equal(result.error.retryable, true);
+      assert.ok(Array.isArray(result.error.validationReasonCodes));
+    }
+  });
+
+  it('DEV diagnostics: deterministic provider → source=stub', async () => {
+    const result = await handleMediatorRuntimeTurn(validRequestBody(), {
+      llmProviderOverride: createDeterministicStubProvider(),
+    });
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.ok(result.devDiagnostics);
+      assert.equal(result.devDiagnostics!.responseSource, 'stub');
+      assert.equal(result.devDiagnostics!.providerSucceeded, true);
+      assert.ok(result.devDiagnostics!.providerModel);
     }
   });
 

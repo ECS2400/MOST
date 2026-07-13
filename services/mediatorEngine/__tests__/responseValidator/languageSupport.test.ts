@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { validateMediatorReply } from '@/services/mediatorEngine/responseValidator/validateMediatorReply';
 import { buildValidatedFallback } from '@/services/mediatorEngine/responseValidator/fallback/buildValidatedFallback';
-import { createValidationInput, createDraftReply } from '@/services/mediatorEngine/__tests__/responseValidator/fixtures';
+import { createValidationInput, createFallbackAcceptanceValidationInput, createDraftReply } from '@/services/mediatorEngine/__tests__/responseValidator/fixtures';
 import { SUPPORTED_MEDIATOR_LANGS } from '@/services/mediatorEngine/llm/config/localizedMediatorTexts';
 import type { MediatorLang, SafetyLevel } from '@/types/mediator';
 import {
@@ -26,7 +26,7 @@ describe('Response Validator — 6-language support', () => {
       for (const safetyLevel of safetyLevels) {
         const fallback = buildValidatedFallback(language, safetyLevel, 3);
         const result = validateMediatorReply(
-          createValidationInput({
+          createFallbackAcceptanceValidationInput({
             language,
             safetyLevel,
             draftReply: fallback,
@@ -44,7 +44,7 @@ describe('Response Validator — 6-language support', () => {
   it('ES mismatch nie blokuje agresywnie dla stub text', () => {
     const fallback = buildValidatedFallback('es', 'none', 3);
     const result = validateMediatorReply(
-      createValidationInput({
+      createFallbackAcceptanceValidationInput({
         language: 'es',
         draftReply: fallback,
       })

@@ -1,24 +1,27 @@
 import type { SafetyEnvelope, SafetyLevel } from '@/types/mediator';
+import { PERSONA_PRECEDENCE_SHORT } from '@/services/mediatorEngine/promptComposer/config/personaPrecedence';
 
 const L3_INSTRUCTIONS = [
   'Safety level L3: stop normal mediation immediately.',
-  'Respond with a safety-first message — acknowledge distress, suggest pause.',
+  'Say plainly this is no longer about who is right — pause the conversation first.',
   'Do not deepen conflict or explore blame.',
-  'Encourage reaching appropriate professional or emergency support without listing specific hotlines.',
-  'Keep the message calm, brief, and non-judgmental.',
+  'Point toward appropriate professional or emergency support without listing specific hotlines.',
+  'Keep it brief, direct, and human — Mościk voice, not therapist voice.',
+  PERSONA_PRECEDENCE_SHORT,
 ] as const;
 
 const L2_INSTRUCTIONS = [
   'Safety level L2: pause normal mediation flow.',
-  'Prioritize de-escalation and emotional safety over goal progress.',
+  'Slow the conflict down before pushing any goal forward.',
   'Do not push for agreement or goal advancement.',
-  'Suggest a pause or slow-down; validate distress without diagnosing.',
+  'Call for a pause or slow-down in plain, direct language — no clinical empathy formulas.',
+  PERSONA_PRECEDENCE_SHORT,
 ] as const;
 
 const L1_INSTRUCTIONS = [
-  'Safety level L1: proceed gently with extra care.',
-  'Use slower pace and shorter messages.',
-  'Monitor for escalation; avoid provocative framing.',
+  'Safety level L1: proceed with extra care — shorter, slower messages.',
+  'Watch for escalation; skip provocative framing.',
+  PERSONA_PRECEDENCE_SHORT,
 ] as const;
 
 /** Builds safety envelope from safety output level. */

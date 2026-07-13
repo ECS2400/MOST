@@ -140,20 +140,47 @@ describe('resolveRuntimeGenerationFlow — awaiting replies', () => {
     assert.equal(resolution.mode, null);
     assert.equal(resolution.source, 'runtime');
   });
+
+  it('allows generate_question when both replies satisfied and pending is nothing', () => {
+    const runtimeSession = runtimeAwaitingBothReplies();
+    runtimeSession.decision.nextBeat = 'deliver_question';
+    runtimeSession.decision.mayAutoAdvance = true;
+    runtimeSession.pending.awaiting = 'nothing';
+    runtimeSession.pending.awaitingFrom = [];
+    runtimeSession.pending.satisfiedBy = [];
+
+    const resolution = resolveRuntimeGenerationFlow({
+      runtimeSession,
+      legacyMode: 'generate_question',
+    });
+
+    assert.equal(resolution.mode, 'generate_question');
+    assert.equal(resolution.source, 'runtime');
+  });
 });
 
 describe('participant reply client events', () => {
-  it('emits host_message for host replies', () => {
-    const events = buildParticipantReplyClientEvents('host', '2026-07-13T10:00:00.000Z');
+  it('emits host_message for host replies with questionTurn', () => {
+    const events = buildParticipantReplyClientEvents('host', 2, '2026-07-13T10:00:00.000Z');
     assert.deepEqual(events, [
-      { kind: 'host_message', actor: 'host', at: '2026-07-13T10:00:00.000Z' },
+      {
+        kind: 'host_message',
+        actor: 'host',
+        at: '2026-07-13T10:00:00.000Z',
+        metadata: { questionTurn: 2 },
+      },
     ]);
   });
 
-  it('emits partner_message for partner replies', () => {
-    const events = buildParticipantReplyClientEvents('partner', '2026-07-13T10:00:00.000Z');
+  it('emits partner_message for partner replies with questionTurn', () => {
+    const events = buildParticipantReplyClientEvents('partner', 2, '2026-07-13T10:00:00.000Z');
     assert.deepEqual(events, [
-      { kind: 'partner_message', actor: 'partner', at: '2026-07-13T10:00:00.000Z' },
+      {
+        kind: 'partner_message',
+        actor: 'partner',
+        at: '2026-07-13T10:00:00.000Z',
+        metadata: { questionTurn: 2 },
+      },
     ]);
   });
 

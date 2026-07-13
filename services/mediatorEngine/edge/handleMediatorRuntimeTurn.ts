@@ -13,6 +13,42 @@ import type {
   MediatorRuntimeEdgeResult,
 } from '@/services/mediatorEngine/edge/types';
 
+function logDevResponseSource(runtimeOutput: Awaited<ReturnType<typeof runMediatorEngineTurn>>): void {
+  // Edge is server-side; this is a DEV-only console log consumed by local/dev debugging.
+  // Do not include prompts, transcripts, or message bodies.
+  const providerModel =
+    runtimeOutput.llmOutput.providerResponse?.model && typeof runtimeOutput.llmOutput.providerResponse.model === 'string'
+      ? runtimeOutput.llmOutput.providerResponse.model
+      : null;
+
+  const providerSucceeded = Boolean(runtimeOutput.llmOutput.providerResponse);
+
+  const reasonCodes = (runtimeOutput.responseValidation.ruleResults ?? [])
+    .filter((r) => r && r.passed === false)
+    .map((r) => r.ruleId)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0);
+
+  const uniqueReasonCodes = [...new Set(reasonCodes)];
+
+  const finalSource = runtimeOutput.finalMediatorMessage.source;
+  const source =
+    finalSource === 'llm'
+      ? runtimeOutput.retryCount > 0
+        ? 'retry_llm'
+        : 'llm'
+      : finalSource;
+
+  console.info('[mediatorResponseSource]', {
+    source,
+    fallbackUsed: runtimeOutput.fallbackUsed,
+    validationAction: runtimeOutput.responseValidation.action,
+    validationReasonCodes: uniqueReasonCodes,
+    retryCount: runtimeOutput.retryCount,
+    providerSucceeded,
+    model: providerModel,
+  });
+}
+
 export interface HandleMediatorRuntimeTurnOptions {
   env?: MediatorRuntimeEdgeEnv;
   llmProviderOverride?: LlmProviderPort;
@@ -61,6 +97,51 @@ export async function handleMediatorRuntimeTurn(
       language: parsed.value.language,
       llmProvider: providerResult.provider,
     });
+
+    // DEV-only log for tracing source/fallbacks (safe: no prompt/transcript/text).
+    logDevResponseSource(runtimeOutput);
+
+    // Production reliability rule:
+    // For normal mediation (non L2/L3) in the real production provider path,
+    // never return user-visible fallback/stub text. Instead return a recoverable
+    // structured error so the client can retry without advancing/persisting state.
+    // Tests pass llmProviderOverride and are allowed to observe stub/fallback output.
+    const safetyLevel = runtimeOutput.finalMediatorMessage.safetyLevel;
+    const isSafetyException = safetyLevel === 'L2_pause' || safetyLevel === 'L3_stop';
+    const finalSource = runtimeOutput.finalMediatorMessage.source;
+    const providerSucceeded = Boolean(runtimeOutput.llmOutput.providerResponse);
+    const reasonCodes = (runtimeOutput.responseValidation.ruleResults ?? [])
+      .filter((r) => r && r.passed === false)
+      .map((r) => r.ruleId)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+    const uniqueReasonCodes = [...new Set(reasonCodes)];
+
+    const enforceNoNormalFallbackInEdge = !options.llmProviderOverride;
+    if (
+      enforceNoNormalFallbackInEdge &&
+      !isSafetyException &&
+      (finalSource === 'fallback' || finalSource === 'stub')
+    ) {
+      const code = providerSucceeded
+        ? MEDIATOR_RUNTIME_ERROR_CODES.LLM_VALIDATION_FAILED
+        : MEDIATOR_RUNTIME_ERROR_CODES.LLM_TEMPORARILY_UNAVAILABLE;
+      const message =
+        code === MEDIATOR_RUNTIME_ERROR_CODES.LLM_TEMPORARILY_UNAVAILABLE
+          ? 'LLM temporarily unavailable'
+          : 'LLM reply failed validation';
+
+      return {
+        ok: false,
+        error: createMediatorRuntimeError(code, message, {
+          retryable: true,
+          retryAfterMs: 2000,
+          retryCount: runtimeOutput.retryCount,
+          validationReasonCodes: uniqueReasonCodes,
+          providerSucceeded,
+        }).error,
+        status: 503,
+      };
+    }
 
     return buildMediatorRuntimeEdgeSuccess(runtimeOutput);
   } catch {

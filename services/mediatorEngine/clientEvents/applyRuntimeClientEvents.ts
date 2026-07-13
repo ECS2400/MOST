@@ -9,11 +9,26 @@ import type {
 } from '@/types/mediator';
 import { createEmptySessionMemory } from '@/services/mediatorEngine/_internal/skeletonDefaults';
 import {
+  applyParticipantReplyEvent,
+  createDefaultParticipantReplies,
+  normalizeParticipantReplies,
+  participantReplyEventFingerprint,
+  resolveActiveQuestionTurn,
+  resolveEventQuestionTurn,
+} from '@/services/mediatorEngine/clientEvents/participantReplyFlowControl';
+import {
   isAwaitingResolutionDecision,
   isProposalPresentedForEvents,
 } from '@/services/mediatorEngine/clientEvents/proposalFlowHelpers';
 
+const MESSAGE_EVENT_KINDS: ReadonlySet<RuntimeClientEventKind> = new Set([
+  'host_message',
+  'partner_message',
+]);
+
 const INTERPRETED_EVENT_KINDS: ReadonlySet<RuntimeClientEventKind> = new Set([
+  'host_message',
+  'partner_message',
   'continue_session',
   'start_extension',
   'proposal_accepted',
@@ -46,6 +61,7 @@ export function createDefaultRuntimeFlowControl(): RuntimeFlowControlState {
     },
     proposalPhase: 'none',
     sessionResolvedByEvent: false,
+    participantReplies: createDefaultParticipantReplies(),
   };
 }
 
@@ -126,6 +142,48 @@ function resolveMediationState(
       lastUpdatedAt: at,
     },
   };
+}
+
+function applyParticipantMessage(
+  sessionMemory: SessionMemory,
+  event: RuntimeClientEvent
+): { sessionMemory: SessionMemory; changed: boolean } {
+  const flowControl = ensureFlowControl(sessionMemory);
+  const result = applyParticipantReplyEvent(flowControl, event, sessionMemory);
+
+  if (!result.changed) {
+    return { sessionMemory, changed: false };
+  }
+
+  return {
+    sessionMemory: {
+      ...sessionMemory,
+      runtimeFlowControl: result.flowControl,
+    },
+    changed: true,
+  };
+}
+
+function resolveClientEventFingerprint(
+  event: RuntimeClientEvent,
+  sessionMemory: SessionMemory
+): string {
+  if (!MESSAGE_EVENT_KINDS.has(event.kind)) {
+    return clientEventFingerprintDigest(event);
+  }
+
+  const flowControl = ensureFlowControl(sessionMemory);
+  const questionTurn =
+    resolveEventQuestionTurn(event) ?? resolveActiveQuestionTurn(flowControl, sessionMemory);
+  const digest = participantReplyEventFingerprint(event, questionTurn);
+  let hash = 2166136261;
+
+  for (let index = 0; index < digest.length; index += 1) {
+    hash ^= digest.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
 function applyContinueSession(
@@ -366,7 +424,7 @@ export function applyRuntimeClientEvents(
   }
 
   for (const event of input.clientEvents) {
-    const fingerprint = clientEventFingerprintDigest(event);
+    const fingerprint = resolveClientEventFingerprint(event, sessionMemory);
     const flowControl = ensureFlowControl(sessionMemory);
 
     if (flowControl.appliedClientEventFingerprints.includes(fingerprint)) {
@@ -381,7 +439,11 @@ export function applyRuntimeClientEvents(
 
     let changed = false;
 
-    if (event.kind === 'continue_session') {
+    if (event.kind === 'host_message' || event.kind === 'partner_message') {
+      const result = applyParticipantMessage(sessionMemory, event);
+      sessionMemory = result.sessionMemory;
+      changed = result.changed;
+    } else if (event.kind === 'continue_session') {
       const result = applyContinueSession(mediationState, sessionMemory, event);
       mediationState = result.mediationState;
       sessionMemory = result.sessionMemory;
@@ -449,6 +511,7 @@ export function normalizeRuntimeFlowControl(
     },
     proposalPhase: normalizeProposalPhase(raw?.proposalPhase),
     sessionResolvedByEvent: raw?.sessionResolvedByEvent === true,
+    participantReplies: normalizeParticipantReplies(raw?.participantReplies),
   };
 
   return {

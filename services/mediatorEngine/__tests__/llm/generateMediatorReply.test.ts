@@ -113,7 +113,7 @@ describe('generateMediatorReply — LLM Bridge L1', () => {
     assert.equal(result.fallbackUsed, false);
     assert.equal(result.draftReply.source, 'stub');
     assert.equal(result.draftReply.validation.safetyCompliant, true);
-    assert.match(result.draftReply.text, /pause|safety/i);
+    assert.match(result.draftReply.text, /pause|step back/i);
   });
 
   it('safety L3 normal mediation text → fallback', async () => {
@@ -135,15 +135,14 @@ describe('generateMediatorReply — LLM Bridge L1', () => {
 
   it('PL fallback jest po polsku', async () => {
     const draft = createFallbackMediatorReply('pl', 'none', 1);
-    assert.match(draft.text, /Słyszę|Zatrzymajmy|trudne/i);
+    assert.match(draft.text, /karuzel|zatrzymajmy|rozumieć|jedną/i);
     assert.equal(draft.language, 'pl');
   });
 
   it('PL safety fallback L3 jest naturalny i safety-compliant', () => {
     const draft = createFallbackMediatorReply('pl', 'L3_stop', 3);
 
-    assert.match(draft.text, /pauz/i);
-    assert.match(draft.text, /bezpiecze|spokojniej/i);
+    assert.match(draft.text, /pauz|przekórki/i);
     assert.equal(draft.validation.safetyCompliant, true);
     assert.ok(draft.validation.sentenceCount <= 4);
     assert.equal(draft.source, 'fallback');
@@ -151,7 +150,7 @@ describe('generateMediatorReply — LLM Bridge L1', () => {
 
   it('EN fallback jest po angielsku', async () => {
     const draft = createFallbackMediatorReply('en', 'none', 1);
-    assert.match(draft.text, /I hear|moment|time/i);
+    assert.match(draft.text, /both of you|let us|Hold/i);
     assert.equal(draft.language, 'en');
   });
 
@@ -223,7 +222,7 @@ describe('generateMediatorReply — LLM Bridge L1', () => {
 
     assert.equal(result.fallbackUsed, false);
     assert.equal(result.draftReply.source, 'stub');
-    assert.match(result.draftReply.text, /hear|speak/i);
+    assert.match(result.draftReply.text, /share|differently|perspective/i);
   });
 
   it('deterministic stub safety output', async () => {
@@ -238,7 +237,7 @@ describe('generateMediatorReply — LLM Bridge L1', () => {
 
     assert.equal(result.fallbackUsed, false);
     assert.equal(result.draftReply.source, 'stub');
-    assert.match(result.draftReply.text, /pauz|bezpiecze/i);
+    assert.match(result.draftReply.text, /pauz|przekórki/i);
   });
 
   it('generatedAt ISO', async () => {

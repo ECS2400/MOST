@@ -11,6 +11,10 @@ export interface MediatorRuntimeClientErrorDetails {
   status?: number;
   edgeCode?: string;
   retryable: boolean;
+  retryAfterMs?: number;
+  retryCount?: number;
+  validationReasonCodes?: string[];
+  providerSucceeded?: boolean;
   cause?: unknown;
 }
 

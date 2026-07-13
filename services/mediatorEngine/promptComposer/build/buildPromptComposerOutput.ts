@@ -27,7 +27,7 @@ export function buildPromptSections(ctx: SafePromptContext): BuiltPromptSections
   const contextSummary = buildContextSummary(ctx);
 
   return {
-    systemPrompt: buildSystemPrompt(ctx.language),
+    systemPrompt: buildSystemPrompt(ctx),
     developerPrompt: buildDeveloperPrompt(ctx, safetyEnvelope),
     userPrompt: buildUserPrompt(ctx, contextSummary, transcriptEntries, safetyEnvelope),
     contextSummary,

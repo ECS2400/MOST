@@ -127,6 +127,11 @@ export function safeResponseValidationInput(input: unknown): ResponseValidationC
   const draftReply = normalizeDraftReply(raw.draftReply, language, safetyLevel, turnNumber);
   const promptComposerOutput = normalizePromptOutput(raw.promptComposerOutput, language, safetyLevel);
 
+  const currentGoal =
+    typeof promptComposerOutput.promptMetadata?.goal === 'string'
+      ? promptComposerOutput.promptMetadata.goal
+      : undefined;
+
   return {
     text: typeof draftReply.text === 'string' ? draftReply.text : '',
     draftReply,
@@ -135,6 +140,7 @@ export function safeResponseValidationInput(input: unknown): ResponseValidationC
     turnNumber,
     attemptNumber,
     maxAttempts,
+    currentGoal,
     promptComposerOutput,
   };
 }

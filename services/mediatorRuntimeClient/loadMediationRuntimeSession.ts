@@ -15,6 +15,7 @@ import type { RuntimeSession } from '@/types/mediator/runtimeSession';
 export interface LoadMediationRuntimeSessionResult {
   runtimeSession: RuntimeSession | null;
   diagnostics: RuntimeSessionLoadDiagnostics;
+  devDiagnostics?: import('@/services/mediatorEngine/edge/types').MediatorRuntimeEdgeDevDiagnostics | null;
 }
 
 export interface LoadMediationRuntimeSessionOptions {
@@ -66,7 +67,7 @@ export async function loadMediationRuntimeSessionWithDiagnostics(
     await prepareSupabaseRequest();
     const { data, error } = await supabase
       .from('mediations')
-      .select('mediation_state, session_memory, mediator_runtime_session')
+      .select('mediation_state, session_memory, mediator_runtime_session, mediator_runtime_metadata')
       .eq('id', mediationId)
       .maybeSingle();
 
@@ -89,14 +90,27 @@ export async function loadMediationRuntimeSessionWithDiagnostics(
         sessionMemory: null,
         runtimeSession: null,
         diagnostics,
+        devDiagnostics: null,
       };
     }
 
     const parsed = parseLoadedMediationRuntimeRow(data);
+    const meta = (data as { mediator_runtime_metadata?: unknown }).mediator_runtime_metadata as
+      | Record<string, unknown>
+      | null
+      | undefined;
+    const devDiagnostics =
+      __DEV__ && meta && typeof meta === 'object' && 'devDiagnostics' in meta
+        ? ((meta as Record<string, unknown>).devDiagnostics as
+            | import('@/services/mediatorEngine/edge/types').MediatorRuntimeEdgeDevDiagnostics
+            | null
+            | undefined) ?? null
+        : null;
     return {
       ...parsed,
       runtimeSession: resolveRuntimeSessionFromRow(data.mediator_runtime_session) ?? parsed.runtimeSession,
       diagnostics,
+      devDiagnostics,
     };
   } catch (error) {
     const diagnostics = buildRuntimeSessionLoadDiagnostics({
@@ -118,6 +132,7 @@ export async function loadMediationRuntimeSessionWithDiagnostics(
       sessionMemory: null,
       runtimeSession: null,
       diagnostics,
+      devDiagnostics: null,
     };
   }
 }

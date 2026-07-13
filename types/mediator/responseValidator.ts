@@ -55,4 +55,6 @@ export interface ResponseValidationContext {
   turnNumber: TurnNumber;
   attemptNumber: number;
   maxAttempts: number;
+  /** Therapeutic goal from prompt metadata — used for stage-specific validation. */
+  currentGoal?: string;
 }

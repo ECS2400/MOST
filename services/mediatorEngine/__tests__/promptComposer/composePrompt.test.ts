@@ -59,10 +59,10 @@ describe('composePrompt — L1 prompt assembly', () => {
   it('developerPrompt zawiera strategy/decision/intervention constraints', () => {
     const result = composePrompt(createRichPipelineInput());
 
-    assert.match(result.developerPrompt, /validate_emotions/);
-    assert.match(result.developerPrompt, /help_partner_feel_heard/);
-    assert.match(result.developerPrompt, /validate/);
+    assert.match(result.developerPrompt, /reveal_pattern/);
+    assert.match(result.developerPrompt, /compare_perspectives/);
     assert.match(result.developerPrompt, /effect-validate-001/);
+    assert.match(result.developerPrompt, /Mościk voice precedence/i);
   });
 
   it('userPrompt zawiera transcriptWindow', () => {
@@ -195,7 +195,7 @@ describe('composePrompt — L1 prompt assembly', () => {
     const result = composePrompt(createRichPipelineInput('pl'));
 
     assert.match(result.systemPrompt, /polsku|mediator/i);
-    assert.match(result.systemPrompt, /Jesteś mediatorem/);
+    assert.match(result.systemPrompt, /Jesteś Mościkiem/);
     assert.equal(result.promptMetadata.language, 'pl');
   });
 
@@ -307,7 +307,7 @@ describe('composePrompt — continuity hints (Phase 3A)', () => {
     assert.match(result.contextSummary, /Continuity:/);
     assert.match(
       result.contextSummary,
-      /different angle|ineffective|Do not repeat/i
+      /investigation|different entry|Do not repeat|circular argument/i
     );
   });
 

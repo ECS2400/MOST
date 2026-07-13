@@ -11,6 +11,7 @@ import { buildValidatedFallback } from '@/services/mediatorEngine/responseValida
 import { isRetryInstructionSafe } from '@/services/mediatorEngine/responseValidator/retry/buildRetryInstruction';
 import {
   createDraftReply,
+  createFallbackAcceptanceValidationInput,
   createValidationInput,
   RESPONSE_VALIDATION_LIMITS,
 } from '@/services/mediatorEngine/__tests__/responseValidator/fixtures';
@@ -78,6 +79,11 @@ describe('validateMediatorReply — post-LLM validation', () => {
 
     assert.equal(result.action, 'retry');
     assert.ok(result.blockingReasons.some((r) => /questions/i.test(r)));
+    assert.ok(result.retryInstruction);
+    assert.ok(
+      result.retryInstruction!.includes('max_questions') || result.retryInstruction!.includes('Failed rules:'),
+      'retryInstruction should be derived from failedRuleIds'
+    );
   });
 
   it('Too many sentences → retry', () => {
@@ -219,7 +225,7 @@ describe('validateMediatorReply — post-LLM validation', () => {
     assert.equal(result.fallbackReply!.source, 'fallback');
 
     const recheck = validateMediatorReply(
-      createValidationInput({
+      createFallbackAcceptanceValidationInput({
         draftReply: result.fallbackReply!,
         safetyLevel: result.fallbackReply!.safetyLevel,
         language: result.fallbackReply!.language,
@@ -253,7 +259,7 @@ describe('validateMediatorReply — post-LLM validation', () => {
   it('language EN heuristic accepts English fallback', () => {
     const fallback = buildValidatedFallback('en', 'none', 3);
     const result = validateMediatorReply(
-      createValidationInput({
+      createFallbackAcceptanceValidationInput({
         language: 'en',
         draftReply: fallback,
       })
@@ -431,7 +437,7 @@ describe('validateMediatorReply — hardening (2C-fix)', () => {
       for (const safetyLevel of safetyLevels) {
         const fallback = buildValidatedFallback(language, safetyLevel, 3);
         const result = validateMediatorReply(
-          createValidationInput({
+          createFallbackAcceptanceValidationInput({
             language,
             safetyLevel,
             draftReply: fallback,

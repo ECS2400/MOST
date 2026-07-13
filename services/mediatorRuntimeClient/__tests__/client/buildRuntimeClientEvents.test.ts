@@ -54,18 +54,28 @@ describe('buildRuntimeClientEvents', () => {
 });
 
 describe('buildParticipantReplyClientEvents', () => {
-  it('creates host_message for host actor', () => {
-    const events = buildParticipantReplyClientEvents('host', ISO_TIMESTAMP);
+  it('creates host_message for host actor with questionTurn metadata', () => {
+    const events = buildParticipantReplyClientEvents('host', 3, ISO_TIMESTAMP);
     assert.deepEqual(events, [
-      { kind: 'host_message', actor: 'host', at: ISO_TIMESTAMP },
+      {
+        kind: 'host_message',
+        actor: 'host',
+        at: ISO_TIMESTAMP,
+        metadata: { questionTurn: 3 },
+      },
     ]);
     assert.equal(isValidRuntimeClientEvent(events[0]), true);
   });
 
-  it('creates partner_message for partner actor', () => {
-    const events = buildParticipantReplyClientEvents('partner', ISO_TIMESTAMP);
+  it('creates partner_message for partner actor with questionTurn metadata', () => {
+    const events = buildParticipantReplyClientEvents('partner', 4, ISO_TIMESTAMP);
     assert.deepEqual(events, [
-      { kind: 'partner_message', actor: 'partner', at: ISO_TIMESTAMP },
+      {
+        kind: 'partner_message',
+        actor: 'partner',
+        at: ISO_TIMESTAMP,
+        metadata: { questionTurn: 4 },
+      },
     ]);
   });
 });

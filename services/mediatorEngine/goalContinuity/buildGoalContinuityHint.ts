@@ -18,18 +18,18 @@ export function buildGoalContinuityHint(
     ctx.recommendedNextGoal
   ) {
     if (ctx.completionDetected) {
-      return `The current goal appears complete; move toward ${ctx.recommendedNextGoal}.`;
+      return `This thread looks ready — move forward toward ${ctx.recommendedNextGoal}.`;
     }
-    return `Consider advancing toward ${ctx.recommendedNextGoal}.`;
+    return `Consider pushing toward ${ctx.recommendedNextGoal}.`;
   }
 
   if (ctx.recommendedGoalTransition === 'stay' && ctx.goalStagnationDetected) {
-    const reason = ctx.suggestedStayReason ?? 'progress is still needed';
-    return `Stay on ${ctx.currentGoal} because ${reason.toLowerCase()}.`;
+    const reason = ctx.suggestedStayReason ?? 'the real trigger is not clear yet';
+    return `Keep investigating ${ctx.currentGoal} because ${reason.toLowerCase()}.`;
   }
 
   if (ctx.recommendedGoalTransition === 'stay' && ctx.suggestedStayReason) {
-    return `Stay on ${ctx.currentGoal} because ${ctx.suggestedStayReason.toLowerCase()}.`;
+    return `Keep investigating ${ctx.currentGoal} because ${ctx.suggestedStayReason.toLowerCase()}.`;
   }
 
   if (ctx.suggestedAdvanceReason && ctx.recommendedNextGoal) {

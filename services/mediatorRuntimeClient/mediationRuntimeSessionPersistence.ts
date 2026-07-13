@@ -66,7 +66,7 @@ function resolveMediatorLastSafetyLevel(runtime: MediatorRuntimeEdgeSuccess): Sa
 
 /** Supabase update patch for v2.3 runtime state after a successful turn. */
 export function buildMediationRuntimePersistencePatch(runtime: MediatorRuntimeEdgeSuccess) {
-  return {
+  const base = {
     mediation_state: runtime.mediationState,
     session_memory: runtime.sessionMemory,
     mediator_engine_version: runtime.engineVersion ?? MEDIATOR_RUNTIME_ENGINE_VERSION,
@@ -76,6 +76,9 @@ export function buildMediationRuntimePersistencePatch(runtime: MediatorRuntimeEd
       providerId: runtime.runtimeMetadata.providerId,
       fallbackUsed: runtime.fallbackUsed,
       retryCount: runtime.retryCount,
+      ...(typeof __DEV__ !== 'undefined' && __DEV__
+        ? { devDiagnostics: runtime.devDiagnostics ?? null }
+        : {}),
       persistedAt: new Date().toISOString(),
     },
     mediator_last_goal: runtime.mediationState.currentGoal,
@@ -83,4 +86,6 @@ export function buildMediationRuntimePersistencePatch(runtime: MediatorRuntimeEd
     mediator_last_safety_level: resolveMediatorLastSafetyLevel(runtime),
     updated_at: new Date().toISOString(),
   };
+
+  return base;
 }

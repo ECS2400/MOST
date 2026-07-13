@@ -36,6 +36,11 @@ import {
   inferExtensionActive,
   resolveRuntimeDecisionPanel,
 } from '@/services/mediatorEngine/runtimeSession/resolveRuntimeDecisionPanel';
+import {
+  bothParticipantRepliesSatisfied,
+  composeDecisionWhenBothRepliesSatisfied,
+  composePendingWhenBothRepliesSatisfied,
+} from '@/services/mediatorEngine/clientEvents/participantReplyFlowControl';
 
 export interface ComposeRuntimeSessionInput {
   mediationState: MediationState;
@@ -153,6 +158,12 @@ function composeDecision(
   const { mediationState, intervention, finalMediatorMessage } = input;
   const pending = mediationState.pendingAction;
   const safetyHold = isSafetyHold(finalMediatorMessage.safetyLevel, intervention.type);
+
+  if (
+    bothParticipantRepliesSatisfied(input.sessionMemory.runtimeFlowControl?.participantReplies)
+  ) {
+    return composeDecisionWhenBothRepliesSatisfied();
+  }
 
   if (safetyHold) {
     return {
@@ -382,6 +393,12 @@ function composePending(
   }
 
   const { mediationState, intervention } = input;
+
+  if (
+    bothParticipantRepliesSatisfied(input.sessionMemory.runtimeFlowControl?.participantReplies)
+  ) {
+    return composePendingWhenBothRepliesSatisfied();
+  }
 
   if (mediationState.sessionOutcome !== 'in_progress') {
     return {

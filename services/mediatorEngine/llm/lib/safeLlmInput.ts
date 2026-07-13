@@ -43,6 +43,8 @@ export interface SafeLlmContext {
   language: MediatorLang;
   safetyLevel: SafetyLevel;
   turnNumber: TurnNumber;
+  retryInstruction: string | null;
+  attemptNumber: number;
 }
 
 /** Normalizes generateMediatorReply input — never throws. */
@@ -53,6 +55,8 @@ export function safeLlmInput(input: unknown): SafeLlmContext {
   const safetyLevel = normalizeSafetyLevel(raw.safetyLevel);
   const turnNumber = normalizeTurnNumber(raw.turnNumber);
   const promptComposerOutput = normalizePromptOutput(raw.promptComposerOutput, language, safetyLevel);
+  const retryInstruction = typeof raw.retryInstruction === 'string' ? raw.retryInstruction : null;
+  const attemptNumber = typeof raw.attemptNumber === 'number' && raw.attemptNumber > 0 ? raw.attemptNumber : 1;
 
   const provider =
     raw.provider && typeof raw.provider === 'object' && typeof raw.provider.generateText === 'function'
@@ -65,6 +69,8 @@ export function safeLlmInput(input: unknown): SafeLlmContext {
     language,
     safetyLevel,
     turnNumber,
+    retryInstruction,
+    attemptNumber,
   };
 }
 

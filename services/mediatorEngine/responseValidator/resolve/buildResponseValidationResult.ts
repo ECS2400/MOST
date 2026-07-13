@@ -31,13 +31,23 @@ export function buildResponseValidationResult(
   const warningReasons = ruleResults
     .filter((r) => !r.passed && r.severity === 'warn')
     .map((r) => r.reason);
+  const failedRuleIds = ruleResults
+    .filter((r) => !r.passed)
+    .map((r) => r.ruleId)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0);
 
   const hasBlockingFailures = blockingReasons.length > 0;
   const action = resolveAction(hasBlockingFailures, ctx.attemptNumber, ctx.maxAttempts);
   const valid = action === 'accept';
 
   const retryInstruction =
-    action === 'retry' ? buildRetryInstruction(blockingReasons) : null;
+    action === 'retry'
+      ? buildRetryInstruction({
+          failedRuleIds,
+          blockingReasons,
+          currentGoal: ctx.currentGoal,
+        })
+      : null;
 
   const fallbackReply =
     action === 'fallback'

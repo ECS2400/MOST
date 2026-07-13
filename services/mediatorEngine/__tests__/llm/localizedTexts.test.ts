@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { createFallbackMediatorReply } from '@/services/mediatorEngine/llm/fallback/createFallbackMediatorReply';
-import { createDeterministicStubProvider } from '@/services/mediatorEngine/llm/adapters/deterministicStubProvider';
+import { createDeterministicStubProvider, EXPLORATION_STUB_TEXT } from '@/services/mediatorEngine/llm/adapters/deterministicStubProvider';
 import {
   LOCALIZED_NORMAL_TEXT,
   LOCALIZED_SAFETY_TEXT,
@@ -14,13 +14,15 @@ import {
 import type { MediatorLang } from '@/types/mediator';
 
 const SAFETY_MARKERS: Record<MediatorLang, RegExp> = {
-  pl: /pauz|bezpiecze/i,
-  en: /pause|safety/i,
-  es: /pausa|seguridad/i,
-  it: /pausa|sicurezza/i,
-  de: /pause|sicherheit/i,
-  fr: /pause|sécurité/i,
+  pl: /pauz|przekórki|zatrzyma/i,
+  en: /pause|step back|regret/i,
+  es: /detener|pausa|seguridad|razón/i,
+  it: /fermare|pausa|sicurezza|ragione/i,
+  de: /anhalten|pause|sicherheit|recht/i,
+  fr: /pause|mettre|raison/i,
 };
+
+const FORBIDDEN_THERAPEUTIC_MARKERS = /\b(I hear|Słyszę|Rozumiem|To naturalne|Ważne jest)\b/i;
 
 describe('LLM — 6-language localized texts', () => {
   it('createFallbackMediatorReply normal dla 6 języków', () => {
@@ -29,6 +31,7 @@ describe('LLM — 6-language localized texts', () => {
       assert.equal(draft.language, lang);
       assert.equal(draft.text, LOCALIZED_NORMAL_TEXT[lang]);
       assert.ok(draft.text.length > 0);
+      assert.equal(FORBIDDEN_THERAPEUTIC_MARKERS.test(draft.text), false);
     }
   });
 
@@ -37,6 +40,7 @@ describe('LLM — 6-language localized texts', () => {
       const draft = createFallbackMediatorReply(lang, 'L3_stop', 1);
       assert.equal(draft.text, LOCALIZED_SAFETY_TEXT[lang]);
       assert.match(draft.text, SAFETY_MARKERS[lang]);
+      assert.equal(FORBIDDEN_THERAPEUTIC_MARKERS.test(draft.text), false);
     }
   });
 
@@ -56,7 +60,7 @@ describe('LLM — 6-language localized texts', () => {
           goal: 'SAFE_OPENING',
         },
       });
-      assert.equal(response.text, LOCALIZED_NORMAL_TEXT[lang]);
+      assert.equal(response.text, EXPLORATION_STUB_TEXT[lang]);
     }
   });
 

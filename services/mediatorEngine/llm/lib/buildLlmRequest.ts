@@ -1,13 +1,22 @@
 import type { LlmProviderRequest, PromptComposerOutput, SafetyLevel, TurnNumber } from '@/types/mediator';
 import type { SafeLlmContext } from '@/services/mediatorEngine/llm/lib/safeLlmInput';
 
+function appendRetryInstruction(developerPrompt: string, retryInstruction: string, attemptNumber: number): string {
+  const header = '=== Retry fix instruction (post-validation) ===';
+  const attempt = `Attempt: ${attemptNumber}`;
+  return [developerPrompt, '', header, attempt, retryInstruction].filter(Boolean).join('\n');
+}
+
 /** Builds an LLM provider request from normalized context. */
 export function buildLlmRequest(ctx: SafeLlmContext): LlmProviderRequest {
   const output = ctx.promptComposerOutput;
 
   return {
     systemPrompt: output.systemPrompt,
-    developerPrompt: output.developerPrompt,
+    developerPrompt:
+      ctx.retryInstruction && ctx.attemptNumber > 1
+        ? appendRetryInstruction(output.developerPrompt, ctx.retryInstruction, ctx.attemptNumber)
+        : output.developerPrompt,
     userPrompt: output.userPrompt,
     modelHints: output.modelHints,
     metadata: {

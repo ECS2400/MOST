@@ -41,6 +41,9 @@ export function useRuntimeSession(
   const mediationId = normalizeRouteParam(mediationIdInput);
   const role = options.role ?? 'unknown';
   const [runtimeSession, setRuntimeSession] = useState<RuntimeSession | null>(null);
+  const [devDiagnostics, setDevDiagnostics] = useState<
+    import('@/services/mediatorEngine/edge/types').MediatorRuntimeEdgeDevDiagnostics | null
+  >(null);
   const runtimeSessionRef = useRef<RuntimeSession | null>(null);
   const mediationIdRef = useRef<string | undefined>(mediationId);
   const refreshRequestIdRef = useRef(0);
@@ -60,6 +63,7 @@ export function useRuntimeSession(
     refreshRequestIdRef.current += 1;
     setRuntimeSession(null);
     runtimeSessionRef.current = null;
+    setDevDiagnostics(null);
   }, [mediationId]);
 
   const refreshRuntimeSession = useCallback(async (): Promise<RuntimeSession | null> => {
@@ -93,6 +97,7 @@ export function useRuntimeSession(
 
       setRuntimeSession(loaded.runtimeSession);
       runtimeSessionRef.current = loaded.runtimeSession;
+      setDevDiagnostics(loaded.devDiagnostics ?? null);
       if (loaded.runtimeSession) {
         logRuntimeSessionLoaded(activeMediationId, role, loaded.runtimeSession);
       }
@@ -113,6 +118,7 @@ export function useRuntimeSession(
 
   return {
     runtimeSession,
+    devDiagnostics,
     refreshRuntimeSession,
     getCurrentRuntimeSession,
     hasRuntimeSession: useCallback(

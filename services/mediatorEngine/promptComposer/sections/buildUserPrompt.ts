@@ -1,5 +1,10 @@
 import type { SafetyEnvelope } from '@/types/mediator';
 import { USER_PROMPT_PROHIBITIONS } from '@/services/mediatorEngine/promptComposer/config/allowedPromptFields';
+import {
+  mediatorSafetyTaskNote,
+  mediatorUserTaskLines,
+} from '@/services/mediatorEngine/promptComposer/config/mediatorUserTask';
+import { PERSONA_PRECEDENCE_CLAUSE } from '@/services/mediatorEngine/promptComposer/config/personaPrecedence';
 import type { SafePromptContext } from '@/services/mediatorEngine/promptComposer/lib/safePromptInput';
 import { formatTranscriptWindow } from '@/services/mediatorEngine/promptComposer/transcript/formatTranscriptWindow';
 import type { TranscriptWindowEntry } from '@/types/mediator';
@@ -22,7 +27,7 @@ export function buildUserPrompt(
 
   const safetyNote = safetyEnvelope.allowNormalMediation
     ? ''
-    : 'Do NOT continue normal mediation — prioritize safety and pause.';
+    : mediatorSafetyTaskNote(ctx.language);
 
   const lines = [
     '=== Context ===',
@@ -32,12 +37,14 @@ export function buildUserPrompt(
     formatTranscriptWindow(transcriptEntries),
     '',
     '=== Task ===',
-    'Generate one mediator message (1–4 sentences).',
+    ...mediatorUserTaskLines(ctx.language),
     questionRule,
     safetyNote,
     '',
     '=== Prohibitions ===',
     ...USER_PROMPT_PROHIBITIONS,
+    '',
+    ...PERSONA_PRECEDENCE_CLAUSE,
   ].filter(Boolean);
 
   return lines.join('\n');

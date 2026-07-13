@@ -6,6 +6,8 @@ export const MEDIATOR_RUNTIME_ERROR_CODES = {
   UNSUPPORTED_ENGINE_VERSION: 'unsupported_engine_version',
   MISSING_OPENAI_API_KEY: 'missing_openai_api_key',
   INVALID_CLIENT_EVENTS: 'invalid_client_events',
+  LLM_TEMPORARILY_UNAVAILABLE: 'llm_temporarily_unavailable',
+  LLM_VALIDATION_FAILED: 'llm_validation_failed',
   INTERNAL_ERROR: 'internal_error',
 } as const;
 
@@ -17,16 +19,24 @@ export interface MediatorRuntimeErrorBody {
   error: {
     code: MediatorRuntimeErrorCode;
     message: string;
+    /** True when client may retry the same turn safely. */
+    retryable?: boolean;
+    /** Suggested backoff before retry (ms). */
+    retryAfterMs?: number;
+    retryCount?: number;
+    validationReasonCodes?: string[];
+    providerSucceeded?: boolean;
   };
 }
 
 export function createMediatorRuntimeError(
   code: MediatorRuntimeErrorCode,
-  message: string
+  message: string,
+  details: Partial<MediatorRuntimeErrorBody['error']> = {}
 ): MediatorRuntimeErrorBody {
   return {
     ok: false,
-    error: { code, message },
+    error: { code, message, ...details },
   };
 }
 
@@ -40,6 +50,8 @@ export function mediatorRuntimeErrorStatus(code: MediatorRuntimeErrorCode): numb
     case MEDIATOR_RUNTIME_ERROR_CODES.INVALID_CLIENT_EVENTS:
       return 400;
     case MEDIATOR_RUNTIME_ERROR_CODES.MISSING_OPENAI_API_KEY:
+    case MEDIATOR_RUNTIME_ERROR_CODES.LLM_TEMPORARILY_UNAVAILABLE:
+    case MEDIATOR_RUNTIME_ERROR_CODES.LLM_VALIDATION_FAILED:
       return 503;
     default:
       return 500;

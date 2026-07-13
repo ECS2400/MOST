@@ -314,7 +314,9 @@ describe('mapMediationContextToBootstrapState — survey intake audit', () => {
     );
 
     const prompt = composePrompt(promptInput);
-    assert.match(prompt.contextSummary, /Intake:/);
+    assert.match(prompt.contextSummary, /Shared conflict summary:/);
+    assert.match(prompt.contextSummary, /Host perspective:/);
+    assert.match(prompt.contextSummary, /Partner perspective:/);
     assert.match(prompt.contextSummary, /Decyzja podjęta bez konsultacji/);
   });
 });

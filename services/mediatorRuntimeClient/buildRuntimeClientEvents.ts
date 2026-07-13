@@ -31,6 +31,7 @@ export function buildRuntimeClientEvents(
 /** Records a participant chat reply for the next runtime turn. */
 export function buildParticipantReplyClientEvents(
   actor: ParticipantRole,
+  questionTurn: number,
   at: string = new Date().toISOString()
 ): RuntimeClientEvent[] {
   return [
@@ -38,6 +39,7 @@ export function buildParticipantReplyClientEvents(
       kind: actor === 'host' ? 'host_message' : 'partner_message',
       actor,
       at,
+      metadata: { questionTurn },
     },
   ];
 }

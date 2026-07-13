@@ -10,7 +10,7 @@ export function buildModelHints(safetyLevel: SafetyLevel): ModelHints {
     maxOutputTokens: isSafetyActive
       ? PROMPT_LIMITS.safetyMaxOutputTokens
       : PROMPT_LIMITS.defaultMaxOutputTokens,
-    style: 'calm',
+    style: 'concise',
     responseFormat: 'plain_text',
   };
 }

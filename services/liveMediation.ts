@@ -27,6 +27,8 @@ import {
   buildMediationRuntimePersistencePatch,
 } from '@/services/mediatorRuntimeClient/mediationRuntimeSessionPersistence';
 import { loadMediationRuntimeState } from '@/services/mediatorRuntimeClient/loadMediationRuntimeSession';
+import { resolveRuntimeClientEventsForTurn } from '@/services/mediatorRuntimeClient/resolveRuntimeClientEventsForTurn';
+import { deriveParticipantReplyStateFromMessages } from '@/services/mediatorRuntimeClient/deriveParticipantReplyStateFromMessages';
 import { shouldBlockRuntimeMediatorGeneration } from '@/services/mediatorRuntimeClient/shouldBlockRuntimeMediatorGeneration';
 import {
   hasMediatorOpeningDelivered,
@@ -750,7 +752,10 @@ function pickOpeningQuestion(ctx: MediationContext | null, lang: Language = 'pl'
 
 export function getLastQuestionMessage(messages: LiveMessage[]): LiveMessage | null {
   for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].message_type === 'question') return messages[i];
+    const message = messages[i];
+    if (message.message_type === 'question' && message.sender_id === 'ai') {
+      return message;
+    }
   }
   return null;
 }
@@ -773,7 +778,7 @@ export function getLastCheckpointMessage(messages: LiveMessage[]): LiveMessage |
 }
 
 export function countAskedQuestions(messages: LiveMessage[]): number {
-  return messages.filter((m) => m.message_type === 'question').length;
+  return messages.filter((m) => m.message_type === 'question' && m.sender_id === 'ai').length;
 }
 
 export function extractQuestionBare(content: string): string {
@@ -783,7 +788,7 @@ export function extractQuestionBare(content: string): string {
 
 export function getAskedQuestionTexts(messages: LiveMessage[]): string[] {
   return messages
-    .filter((m) => m.message_type === 'question')
+    .filter((m) => m.message_type === 'question' && m.sender_id === 'ai')
     .map((m) => extractQuestionBare(m.content));
 }
 
@@ -936,21 +941,16 @@ export function computeLiveTurnState(
 ): LiveTurnState {
   const lastQuestion = getLastQuestionMessage(messages);
   const questionNumber = countAskedQuestions(messages);
-  const after = getMessagesAfterQuestion(messages, lastQuestion);
+  const derived = deriveParticipantReplyStateFromMessages({
+    messages,
+    currentQuestionTurn: questionNumber > 0 ? questionNumber : null,
+    hostUserId,
+    partnerUserIds,
+  });
 
-  const hostAnswered = lastQuestion
-    ? after.some((m) => m.message_type === 'message' && m.sender_id === hostUserId)
-    : false;
-
-  const partnerAnswered = !lastQuestion
-    ? false
-    : partnerUserIds.length === 0
-      ? false
-      : after.some(
-          (m) =>
-            m.message_type === 'message' &&
-            partnerUserIds.includes(m.sender_id)
-        );
+  const hostAnswered = derived.hostReplied;
+  const partnerAnswered = derived.partnerReplied;
+  const bothAnswered = derived.bothReplied;
 
   const readyIds = getReadyUserIds(messages, lastQuestion?.id ?? null);
 
@@ -959,8 +959,6 @@ export function computeLiveTurnState(
     partnerUserIds.length === 0
       ? false
       : partnerUserIds.some((id) => readyIds.has(id));
-
-  const bothAnswered = lastQuestion ? hostAnswered && partnerAnswered : false;
 
   return {
     lastQuestion,
@@ -4243,7 +4241,13 @@ export async function processMediationTurn(
     isBootstrap: isSessionBootstrap,
     mediationState: mediationStateForTurn,
     sessionMemory: persistedRuntime.sessionMemory,
-    clientEvents,
+    clientEvents: resolveRuntimeClientEventsForTurn({
+      messages: allMessages,
+      hostUserId,
+      partnerUserIds,
+      runtimeSession: persistedRuntime.runtimeSession,
+      inlineClientEvents: clientEvents,
+    }),
   });
 
   let runtimeTurnPersist: MediatorRuntimeParsedSuccess | null = null;
@@ -4376,6 +4380,17 @@ export async function processMediationTurn(
     .filter((m) => m.message_type === 'message' && m.content.trim())
     .map((m) => m.content.trim())
     .slice(-4);
+
+  const bothAnsweredTurn = computeLiveTurnState(allMessages, hostUserId, partnerUserIds);
+  if (
+    bothAnsweredTurn.bothAnswered &&
+    (mode === 'generate_question' || mode === 'extension_question')
+  ) {
+    return {
+      phase: currentPhase,
+      progress: getPhaseProgress(currentPhase),
+    };
+  }
 
   return localGenerateFallback(
     mode,
@@ -4549,3 +4564,5 @@ export async function reportMediationIssue(
     // Non-blocking.
   }
 }
+
+export { processBothParticipantReplies } from '@/services/mediatorRuntimeClient/processBothParticipantReplies';

@@ -29,10 +29,23 @@ function malformedResponseError(message: string): MediatorRuntimeClientError {
 }
 
 function edgeError(body: MediatorRuntimeErrorBody, status: number): MediatorRuntimeClientError {
+  const retryAfterMs =
+    typeof body.error.retryAfterMs === 'number' && Number.isFinite(body.error.retryAfterMs)
+      ? body.error.retryAfterMs
+      : undefined;
+  const retryable = body.error.retryable === true || status >= 500;
   return new MediatorRuntimeClientError('edge_error', body.error.message, {
     status,
     edgeCode: body.error.code,
-    retryable: status >= 500,
+    retryable,
+    ...(retryAfterMs != null ? { retryAfterMs } : {}),
+    ...(Array.isArray(body.error.validationReasonCodes)
+      ? { validationReasonCodes: body.error.validationReasonCodes }
+      : {}),
+    ...(typeof body.error.retryCount === 'number' ? { retryCount: body.error.retryCount } : {}),
+    ...(typeof body.error.providerSucceeded === 'boolean'
+      ? { providerSucceeded: body.error.providerSucceeded }
+      : {}),
   });
 }
 

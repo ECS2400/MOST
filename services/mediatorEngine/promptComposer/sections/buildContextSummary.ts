@@ -1,17 +1,18 @@
 import type { SafePromptContext } from '@/services/mediatorEngine/promptComposer/lib/safePromptInput';
+import { voiceLabelForStrategy } from '@/services/mediatorEngine/promptComposer/config/runtimeVoiceLabels';
 
 /** Builds a short context summary without full state JSON. */
 export function buildContextSummary(ctx: SafePromptContext): string {
   const { currentGoal, priorityOutput, strategyOutput, turnNumber } = ctx;
   const mode = priorityOutput.conversationMode ?? 'NORMAL';
-  const strategy = strategyOutput.primaryStrategy ?? 'build_safety';
+  const strategy = voiceLabelForStrategy(strategyOutput.primaryStrategy ?? 'build_safety');
   const goalTransition = ctx.decisionOutput.goalTransition ?? 'stay';
 
   const parts = [
     `Turn ${turnNumber}.`,
     `Current goal: ${currentGoal}.`,
     `Conversation mode: ${mode}.`,
-    `Strategy: ${strategy}.`,
+    `Strategy (voice): ${strategy}.`,
     `Goal transition: ${goalTransition}.`,
   ];
 
@@ -29,7 +30,9 @@ export function buildContextSummary(ctx: SafePromptContext): string {
   const pre = ctx.mediationState.conflict?.preAnalysisContext;
   if (intakeSummary || pre) {
     const intakeParts: string[] = [];
-    if (intakeSummary) intakeParts.push(`Intake: ${intakeSummary}`);
+    if (intakeSummary) intakeParts.push(`Shared conflict summary: ${intakeSummary}`);
+    if (pre?.hostPerspective) intakeParts.push(`Host perspective: ${pre.hostPerspective}`);
+    if (pre?.partnerPerspective) intakeParts.push(`Partner perspective: ${pre.partnerPerspective}`);
     if (pre?.keyTrigger) intakeParts.push(`Key trigger: ${pre.keyTrigger}`);
     const emotions = [...(pre?.hostEmotions ?? []), ...(pre?.partnerEmotions ?? [])];
     if (emotions.length > 0) intakeParts.push(`Emotions: ${emotions.join(', ')}`);

@@ -5,6 +5,9 @@ import {
   languageInstruction,
   systemRulesForLanguage,
 } from '@/services/mediatorEngine/promptComposer/config/promptTemplates';
+import { mediatorFallbackUserTask } from '@/services/mediatorEngine/promptComposer/config/mediatorUserTask';
+import { PERSONA_PRECEDENCE_CLAUSE } from '@/services/mediatorEngine/promptComposer/config/personaPrecedence';
+import { buildFallbackMostMediatorPersona } from '@/services/mediatorEngine/promptComposer/persona/mostMediatorPersona';
 
 /** Minimal PromptComposerOutput when input is malformed. */
 export function createFallbackPromptOutput(
@@ -15,9 +18,23 @@ export function createFallbackPromptOutput(
   const rules = systemRulesForLanguage(language);
 
   return {
-    systemPrompt: [...rules, languageInstruction(language)].join('\n'),
-    developerPrompt: 'Fallback prompt context.',
-    userPrompt: 'Generate one calm, brief mediator message.',
+    systemPrompt: [
+      buildFallbackMostMediatorPersona(language),
+      '',
+      '=== Core mediator rules ===',
+      ...rules,
+      languageInstruction(language),
+      '',
+      ...PERSONA_PRECEDENCE_CLAUSE,
+    ].join('\n'),
+    developerPrompt: [
+      buildFallbackMostMediatorPersona(language),
+      '',
+      'Fallback prompt context. Primary strategy (voice): slow_conflict.',
+      '',
+      ...PERSONA_PRECEDENCE_CLAUSE,
+    ].join('\n'),
+    userPrompt: [mediatorFallbackUserTask(language), '', ...PERSONA_PRECEDENCE_CLAUSE].join('\n'),
     contextSummary: 'Fallback context.',
     promptMetadata: {
       turnNumber: 1,

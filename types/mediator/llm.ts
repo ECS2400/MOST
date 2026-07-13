@@ -83,6 +83,13 @@ export interface GenerateMediatorReplyInput {
   language: MediatorLang;
   safetyLevel: SafetyLevel;
   turnNumber: TurnNumber;
+  /**
+   * Optional retry guidance after post-LLM validation failed.
+   * Sanitized: must not contain transcript, prompts, or message bodies.
+   */
+  retryInstruction?: string | null;
+  /** 1-based attempt index within the retry loop. */
+  attemptNumber?: number;
 }
 
 /** Output of the LLM bridge. */

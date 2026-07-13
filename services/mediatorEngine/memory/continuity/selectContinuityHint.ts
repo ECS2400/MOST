@@ -15,21 +15,21 @@ export function selectContinuityHint(
 
   if (lastIneffective && partial.suggestedAvoidTypes.includes(lastIneffective)) {
     if (lastIneffective === 'reflect') {
-      return 'The last reflection appeared ineffective; prefer a validating or clarifying move.';
+      return 'The last angle missed — continue the investigation from a different entry point.';
     }
-    return `The last ${lastIneffective} move appeared ineffective; use a different angle.`;
+    return `The last ${lastIneffective} angle missed — dig deeper from a different side.`;
   }
 
   if (partial.repeatedMoveDetected) {
-    return 'Do not repeat the previous mediator move. Use a different angle.';
+    return 'Do not repeat the previous move — break the circular argument with a new angle.';
   }
 
   if (partial.staleTopicDetected) {
-    return 'The current topic may be stuck; try a validating, reframing, or clarifying move.';
+    return 'The conversation may be stuck — challenge assumptions, find the real trigger, focus the thread.';
   }
 
   if (partial.suggestedPreferTypes.length > 0) {
-    return 'Build on what worked recently; vary tone while keeping the same therapeutic direction.';
+    return 'Build on what moved the conversation forward; keep investigating with Mościk directness.';
   }
 
   return null;

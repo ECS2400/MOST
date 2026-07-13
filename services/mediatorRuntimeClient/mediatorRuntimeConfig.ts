@@ -18,10 +18,10 @@ export function getDefaultEnv(): Record<string, string | undefined> {
 export const MEDIATOR_RUNTIME_DEFAULT_TIMEOUT_MS = 60_000;
 
 /** Max automatic retries for transient mediator-runtime failures. */
-export const MEDIATOR_RUNTIME_MAX_RETRIES = 2;
+export const MEDIATOR_RUNTIME_MAX_RETRIES = 4;
 
 /** Backoff delays between retries (ms). */
-export const MEDIATOR_RUNTIME_RETRY_DELAYS_MS = [500, 1_500] as const;
+export const MEDIATOR_RUNTIME_RETRY_DELAYS_MS = [0, 2_000, 5_000, 10_000] as const;
 
 /** Builds full mediator-runtime URL from Supabase project base URL. */
 export function resolveMediatorRuntimeEndpoint(supabaseUrl: string): string {

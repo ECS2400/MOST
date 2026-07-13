@@ -1,8 +1,13 @@
 import type { MediatorRuntimeOutput, ResponseValidationResult } from '@/types/mediator';
 import type {
+  MediatorRuntimeEdgeDevDiagnostics,
   MediatorRuntimeEdgeResponseValidation,
   MediatorRuntimeEdgeSuccess,
 } from '@/services/mediatorEngine/edge/types';
+import {
+  LOCALIZED_NORMAL_TEXT,
+  LOCALIZED_SAFETY_TEXT,
+} from '@/services/mediatorEngine/llm/config/localizedMediatorTexts';
 
 /** Strips draft replies and retry instructions from validation output. */
 export function sanitizeResponseValidation(
@@ -14,6 +19,57 @@ export function sanitizeResponseValidation(
     blockingReasons: [...validation.blockingReasons],
     warningReasons: [...validation.warningReasons],
     validatedAt: validation.validatedAt,
+  };
+}
+
+function computeDevDiagnostics(output: MediatorRuntimeOutput): MediatorRuntimeEdgeDevDiagnostics {
+  const finalSource = output.finalMediatorMessage.source;
+  const responseSource: MediatorRuntimeEdgeDevDiagnostics['responseSource'] =
+    finalSource === 'llm'
+      ? output.retryCount > 0
+        ? 'retry_llm'
+        : 'llm'
+      : finalSource === 'stub'
+        ? 'stub'
+        : 'fallback';
+
+  const providerModel =
+    output.llmOutput.providerResponse?.model && typeof output.llmOutput.providerResponse.model === 'string'
+      ? output.llmOutput.providerResponse.model
+      : null;
+
+  const providerSucceeded = Boolean(output.llmOutput.providerResponse);
+
+  const reasonCodes = (output.responseValidation.ruleResults ?? [])
+    .filter((r) => r && r.passed === false)
+    .map((r) => r.ruleId)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0);
+
+  const uniqueReasonCodes = [...new Set(reasonCodes)];
+
+  const lang = output.finalMediatorMessage.language;
+  const text = output.finalMediatorMessage.text;
+  const isNormalFallback = text === LOCALIZED_NORMAL_TEXT[lang];
+  const isSafetyFallback = text === LOCALIZED_SAFETY_TEXT[lang];
+
+  const finalTextSource: MediatorRuntimeEdgeDevDiagnostics['finalTextSource'] =
+    finalSource === 'llm' || finalSource === 'stub'
+      ? 'provider'
+      : isNormalFallback
+        ? 'localized_fallback_normal'
+        : isSafetyFallback
+          ? 'localized_fallback_safety'
+          : 'other_fallback';
+
+  return {
+    responseSource,
+    fallbackUsed: output.fallbackUsed,
+    validationAction: output.responseValidation.action,
+    validationReasonCodes: uniqueReasonCodes,
+    retryCount: output.retryCount,
+    providerSucceeded,
+    providerModel,
+    finalTextSource,
   };
 }
 
@@ -36,6 +92,7 @@ export function buildMediatorRuntimeEdgeSuccess(
     fallbackUsed: output.fallbackUsed,
     retryCount: output.retryCount,
     runtimeSession: output.runtimeSession,
+    devDiagnostics: computeDevDiagnostics(output),
   };
 }
 

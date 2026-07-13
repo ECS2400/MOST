@@ -36,6 +36,26 @@ export interface MediatorRuntimeEdgeResponseValidation {
   validatedAt: string;
 }
 
+/** DEV-only response diagnostics — no prompts, transcripts, or message content. */
+export interface MediatorRuntimeEdgeDevDiagnostics {
+  responseSource: 'llm' | 'retry_llm' | 'fallback' | 'stub';
+  /** True when any fallback was used at any point. */
+  fallbackUsed: boolean;
+  /** Final response validation action. */
+  validationAction: ResponseValidationAction;
+  /** Deterministic reason codes (ruleIds) for blocks/warnings. */
+  validationReasonCodes: string[];
+  retryCount: number;
+  providerSucceeded: boolean;
+  providerModel: string | null;
+  /** Where the final text came from (without exposing the text). */
+  finalTextSource:
+    | 'provider'
+    | 'localized_fallback_normal'
+    | 'localized_fallback_safety'
+    | 'other_fallback';
+}
+
 /** Successful mediator-runtime Edge response — no raw prompts or provider payloads. */
 export interface MediatorRuntimeEdgeSuccess {
   ok: true;
@@ -50,6 +70,8 @@ export interface MediatorRuntimeEdgeSuccess {
   fallbackUsed: boolean;
   retryCount: number;
   runtimeSession: RuntimeSession;
+  /** DEV-only diagnostics for live badge. Safe to log. */
+  devDiagnostics?: MediatorRuntimeEdgeDevDiagnostics;
 }
 
 export type MediatorRuntimeEdgeResult = MediatorRuntimeEdgeSuccess | import('./errors').MediatorRuntimeErrorBody;

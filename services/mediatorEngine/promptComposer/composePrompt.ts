@@ -12,12 +12,21 @@ import {
   safePromptInput,
 } from '@/services/mediatorEngine/promptComposer/lib/safePromptInput';
 import { USER_PROMPT_PROHIBITIONS } from '@/services/mediatorEngine/promptComposer/config/allowedPromptFields';
+import {
+  mediatorFallbackUserTask,
+  mediatorSafetyTaskNote,
+} from '@/services/mediatorEngine/promptComposer/config/mediatorUserTask';
+import { PERSONA_PRECEDENCE_CLAUSE } from '@/services/mediatorEngine/promptComposer/config/personaPrecedence';
 import { buildModelHints } from '@/services/mediatorEngine/promptComposer/sections/buildModelHints';
 import {
   buildSafetyEnvelope,
   formatSafetyEnvelopeSection,
 } from '@/services/mediatorEngine/promptComposer/sections/buildSafetyEnvelope';
-import { systemRulesForLanguage, languageInstruction } from '@/services/mediatorEngine/promptComposer/config/promptTemplates';
+import { buildFallbackMostMediatorPersona } from '@/services/mediatorEngine/promptComposer/persona/mostMediatorPersona';
+import {
+  languageInstruction,
+  systemRulesForLanguage,
+} from '@/services/mediatorEngine/promptComposer/config/promptTemplates';
 
 function createFallbackOutput(
   language: MediatorLang = 'en',
@@ -27,24 +36,44 @@ function createFallbackOutput(
   const isSafetyBlock = safetyLevel === 'L2_pause' || safetyLevel === 'L3_stop';
 
   const rules = systemRulesForLanguage(language);
-  const systemPrompt = [...rules, languageInstruction(language)].join('\n');
+  const systemPrompt = [
+    buildFallbackMostMediatorPersona(language),
+    '',
+    '=== Core mediator rules ===',
+    ...rules,
+    languageInstruction(language),
+    '',
+    ...PERSONA_PRECEDENCE_CLAUSE,
+  ].join('\n');
   const userPrompt = [
-    'Generate one calm, brief mediator message.',
-    isSafetyBlock ? 'Do NOT continue normal mediation — prioritize safety and pause.' : '',
+    mediatorFallbackUserTask(language),
+    isSafetyBlock ? mediatorSafetyTaskNote(language) : '',
     ...USER_PROMPT_PROHIBITIONS,
+    '',
+    ...PERSONA_PRECEDENCE_CLAUSE,
   ]
     .filter(Boolean)
     .join('\n');
 
   const developerPrompt = isSafetyBlock
     ? [
-        'Fallback mode: use safe defaults. Primary strategy: build_safety.',
+        buildFallbackMostMediatorPersona(language),
+        '',
+        'Fallback mode: use safe defaults. Primary strategy (voice): slow_conflict.',
         'Safety fallback: follow the safety envelope — stop or pause normal mediation.',
         '',
         '=== Safety envelope ===',
         formatSafetyEnvelopeSection(safetyEnvelope),
+        '',
+        ...PERSONA_PRECEDENCE_CLAUSE,
       ].join('\n')
-    : 'Fallback mode: use safe defaults. Primary strategy: build_safety.';
+    : [
+        buildFallbackMostMediatorPersona(language),
+        '',
+        'Fallback mode: use safe defaults. Primary strategy (voice): slow_conflict.',
+        '',
+        ...PERSONA_PRECEDENCE_CLAUSE,
+      ].join('\n');
 
   return {
     systemPrompt,

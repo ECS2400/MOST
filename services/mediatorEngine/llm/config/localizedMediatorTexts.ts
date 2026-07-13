@@ -2,24 +2,24 @@ import type { MediatorLang } from '@/types/mediator';
 
 export type LocalizedTextMode = 'normal' | 'safety';
 
-/** Normal mediator fallback/stub texts for all supported languages. */
+/** Normal mediator fallback/stub texts for all supported languages — Mościk voice. */
 export const LOCALIZED_NORMAL_TEXT: Record<MediatorLang, string> = {
-  en: 'I hear that this is difficult for both of you. Let us take a moment and speak one at a time.',
-  pl: 'Słyszę, że to jest trudne dla was obojga. Zatrzymajmy się na chwilę i mówcie po kolei.',
-  es: 'Escucho que esto es difícil para ambos. Tomemos un momento y hablemos uno a la vez.',
-  it: 'Sento che questo momento è difficile per entrambi. Prendiamoci un momento e parliamo a turno.',
-  de: 'Ich höre, dass das für Sie beide schwierig ist. Lassen Sie uns kurz innehalten und nacheinander sprechen.',
-  fr: 'J\'entends que cela est difficile pour vous deux. Prenons un moment et parlons l\'un après l\'autre.',
+  pl: 'Dobra, zatrzymajmy karuzelę na chwilę — zaraz będziecie odpowiadać już tylko z rozpędu. Chcę zrozumieć jedną rzecz, zanim pójdziemy dalej.',
+  en: 'Hold on — both of you are about to answer on autopilot. Let us get one thing straight before we go any further.',
+  es: 'Para un momento — los dos vais a responder en automático. Necesito aclarar una cosa antes de seguir.',
+  it: 'Aspetta — state per rispondere entrambi in automatico. Voglio chiarire una cosa prima di andare avanti.',
+  de: 'Moment — ihr antwortet gleich beide nur noch aus dem Reflex. Ich will eine Sache klären, bevor wir weitermachen.',
+  fr: 'Stop — vous allez tous les deux répondre en pilote automatique. Laissez-moi clarifier un point avant d\'aller plus loin.',
 };
 
-/** Safety-aware fallback/stub texts for all supported languages. */
+/** Safety-aware fallback/stub texts for all supported languages — Mościk voice. */
 export const LOCALIZED_SAFETY_TEXT: Record<MediatorLang, string> = {
-  en: 'I want to pause here for safety. Please take a slow breath. We can stop and step back before continuing.',
-  pl: 'Chcę tu zrobić pauzę ze względu na bezpieczeństwo. Weźcie proszę spokojny oddech. Możemy zatrzymać rozmowę i wrócić do niej dopiero wtedy, gdy będzie spokojniej.',
-  es: 'Quiero hacer una pausa aquí por seguridad. Por favor, respiren despacio. Podemos detener la conversación y retomarla cuando estén más tranquilos.',
-  it: 'Voglio fare una pausa qui per sicurezza. Per favore, fate un respiro lento. Possiamo fermare la conversazione e riprenderla quando sarà più calmo.',
-  de: 'Ich möchte hier aus Sicherheitsgründen eine Pause machen. Bitte atmet ruhig. Wir können das Gespräch stoppen und fortsetzen, wenn es ruhiger ist.',
-  fr: 'Je veux faire une pause ici pour la sécurité. Prenez une respiration lente, s\'il vous plaît. Nous pouvons arrêter la conversation et la reprendre quand ce sera plus calme.',
+  pl: 'Dobra. Tu już nie chodzi o wygrywanie tej przekórki — robimy pauzę i zatrzymujemy rozmowę na chwilę.',
+  en: 'Stop. This conversation needs to pause before either of you says something you will regret. Let us step back first.',
+  es: 'Para. Esta conversación necesita una pausa antes de que digan algo de lo que se arrepientan. Demos un paso atrás.',
+  it: 'Stop. Questa conversazione ha bisogno di una pausa prima che uno di voi dica qualcosa di cui pentirsi. Facciamo un passo indietro.',
+  de: 'Stopp. Dieses Gespräch braucht eine Pause, bevor einer von euch etwas sagt, das er bereut. Machen wir einen Schritt zurück.',
+  fr: 'Stop. Cette conversation a besoin d\'une pause avant que l\'un de vous ne dise quelque chose de regrettable. Faisons un pas en arrière.',
 };
 
 /** Returns localized mediator text for the given language and mode. */

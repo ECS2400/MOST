@@ -21,6 +21,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useRuntimeSession } from '@/hooks/useRuntimeSession';
 import type { RuntimeSessionParticipantRole } from '@/services/mediatorRuntimeClient/runtimeSessionLoadDiagnostics';
 import { normalizeRouteParam } from '@/utils/normalizeRouteParam';
+import { fmt } from '@/utils/i18nFormat';
 import {
   resolveLivePhaseHeaderLabel,
   resolveLiveProgressPercent,
@@ -60,6 +61,10 @@ import {
 import { resolveRuntimeProposalPanelState } from '@/services/mediatorRuntimeClient/resolveRuntimeProposalPanelState';
 import { resolveRuntimeSessionFlow } from '@/services/mediatorRuntimeClient/resolveRuntimeSessionFlow';
 import { buildRuntimeClientEvents, buildParticipantReplyClientEvents } from '@/services/mediatorRuntimeClient/buildRuntimeClientEvents';
+import { processBothParticipantReplies } from '@/services/mediatorRuntimeClient/processBothParticipantReplies';
+import { deriveParticipantReplyStateFromMessages } from '@/services/mediatorRuntimeClient/deriveParticipantReplyStateFromMessages';
+import { logParticipantReplyGateDev } from '@/services/mediatorRuntimeClient/participantReplyGateDevLog';
+import { resolveRuntimeClientEventsForTurn } from '@/services/mediatorRuntimeClient/resolveRuntimeClientEventsForTurn';
 import { shouldBlockRuntimeMediatorGeneration } from '@/services/mediatorRuntimeClient/shouldBlockRuntimeMediatorGeneration';
 import {
   buildApplyAiTurnDevLogPayload,
@@ -489,7 +494,8 @@ export default function LiveMediationScreen() {
   const runtimeSessionReadonly = useRuntimeSession(mediationId, {
     role: runtimeParticipantRole,
   });
-  const { runtimeSession, refreshRuntimeSession } = runtimeSessionReadonly;
+  const { runtimeSession, refreshRuntimeSession, devDiagnostics: syncedDevDiagnostics } =
+    runtimeSessionReadonly;
   const invalidRuntimeState =
     runtimeSession != null && !isRuntimeSessionShape(runtimeSession);
   const runtimeSessionReadonlyRef = useRef(runtimeSessionReadonly);
@@ -526,6 +532,25 @@ export default function LiveMediationScreen() {
   const generationInProgressRef = useRef(false);
   const pendingClientEventsRef = useRef<RuntimeClientEvent[]>([]);
   const [runtimeFailed, setRuntimeFailed] = useState(false);
+  const [lastEdgeDevDiagnostics, setLastEdgeDevDiagnostics] = useState<
+    import('@/services/mediatorEngine/edge/types').MediatorRuntimeEdgeDevDiagnostics | null
+  >(null);
+  const [mediatorTypingState, setMediatorTypingState] = useState<
+    'idle' | 'requesting' | 'retrying' | 'failed'
+  >('idle');
+  const [typingDots, setTypingDots] = useState('');
+  const lastAtomicRetryRef = useRef<null | (() => Promise<void>)>(null);
+
+  useEffect(() => {
+    if (mediatorTypingState !== 'requesting' && mediatorTypingState !== 'retrying') {
+      setTypingDots('');
+      return;
+    }
+    const id = setInterval(() => {
+      setTypingDots((prev) => (prev.length >= 3 ? '' : `${prev}.`));
+    }, 450);
+    return () => clearInterval(id);
+  }, [mediatorTypingState]);
 
   const enqueueRuntimeClientEvents = useCallback((events: RuntimeClientEvent[]) => {
     if (events.length === 0) return;
@@ -1454,7 +1479,14 @@ export default function LiveMediationScreen() {
         isCurrentUserHost ? 'host' : 'partner'
       );
 
-      const runtimeClientEvents = consumeRuntimeClientEvents(clientEvents);
+      const refEvents = consumeRuntimeClientEvents(clientEvents);
+      const runtimeClientEvents = resolveRuntimeClientEventsForTurn({
+        messages: currentMessages,
+        hostUserId,
+        partnerUserIds,
+        runtimeSession,
+        pendingRefEvents: refEvents,
+      });
 
       const aiResponse = useDirect
         ? await processMediationTurn(
@@ -1693,7 +1725,173 @@ export default function LiveMediationScreen() {
 
         isActiveSendRef.current = true;
         setProcessing(true);
+        setMediatorTypingState('requesting');
         setError('');
+
+        const messagesForTurn = recheck.error ? withLock : dedupeLiveMessages(recheck.messages);
+        const derivedGate = deriveParticipantReplyStateFromMessages({
+          messages: messagesForTurn,
+          hostUserId,
+          partnerUserIds,
+        });
+
+        logParticipantReplyGateDev({
+          lastMediatorQuestionId: derivedGate.lastMediatorQuestionId,
+          hostReplyMessageId: derivedGate.hostReplyMessageId,
+          partnerReplyMessageId: derivedGate.partnerReplyMessageId,
+          hostReplied: derivedGate.hostReplied,
+          partnerReplied: derivedGate.partnerReplied,
+          bothReplied: derivedGate.bothReplied,
+          triggerReason: derivedGate.triggerReason,
+          questionTurn: derivedGate.questionTurn,
+        });
+
+        if (!derivedGate.bothReplied || derivedGate.questionTurn == null) {
+          return;
+        }
+
+        const atomicResult = await processBothParticipantReplies(
+          {
+            mediationId,
+            messages: messagesForTurn,
+            hostUserId,
+            partnerUserIds,
+            language,
+          },
+          {
+            callRuntime: async (runtimeInput) => {
+              const { callMediatorRuntime } = await import(
+                '@/services/mediatorRuntimeClient/mediatorRuntimeClient'
+              );
+              return callMediatorRuntime(runtimeInput, {
+                retry: {
+                  sleep: async (ms) => {
+                    setMediatorTypingState('retrying');
+                    await new Promise<void>((resolve) => setTimeout(resolve, ms));
+                  },
+                },
+              });
+            },
+          }
+        );
+
+        if (atomicResult.success && atomicResult.response) {
+          if (__DEV__) {
+            setLastEdgeDevDiagnostics(atomicResult.runtime?.devDiagnostics ?? null);
+          }
+          setMediatorTypingState('idle');
+          lastAtomicRetryRef.current = null;
+          const aiResponse = atomicResult.response;
+          const localAiMessages = buildLocalAiMessages(
+            mediationId,
+            aiResponse.phase ?? phase,
+            aiResponse,
+            hostUserId,
+            partnerUserId
+          );
+          const nextMessages = dedupeLiveMessages([...messagesForTurn, ...localAiMessages]);
+          setMessagesDebug(nextMessages);
+          await insertAiMessages(
+            mediationId,
+            phase,
+            aiResponse,
+            hostUserId,
+            partnerUserId,
+            sentAiMessagesRef.current
+          );
+          const freshSession = await fetchLiveSession(mediationId, user.id);
+          setSessionDebug(freshSession);
+          await refreshRuntimeSession();
+          return;
+        }
+
+        // Runtime reliability: if runtime responded with a recoverable LLM error, do not fall back to legacy
+        // generation and do not insert any AI messages. Let the user retry the same round.
+        if (
+          atomicResult.requestCount > 0 &&
+          (atomicResult.errorCode === 'llm_temporarily_unavailable' ||
+            atomicResult.errorCode === 'llm_validation_failed')
+        ) {
+          setError('Mościk chwilowo nie może odpowiedzieć.');
+          setMediatorTypingState('failed');
+
+          const retryMessagesForTurn = messagesForTurn;
+
+          lastAtomicRetryRef.current = async () => {
+            if (!mediationId || generationInProgressRef.current) return;
+            generationInProgressRef.current = true;
+            setProcessing(true);
+            setMediatorTypingState('requesting');
+            setError('');
+            try {
+              const retryAtomic = await processBothParticipantReplies(
+                {
+                  mediationId,
+                  messages: retryMessagesForTurn,
+                  hostUserId,
+                  partnerUserIds,
+                  language,
+                },
+                {
+                  callRuntime: async (runtimeInput) => {
+                    const { callMediatorRuntime } = await import(
+                      '@/services/mediatorRuntimeClient/mediatorRuntimeClient'
+                    );
+                    return callMediatorRuntime(runtimeInput, {
+                      retry: {
+                        sleep: async (ms) => {
+                          setMediatorTypingState('retrying');
+                          await new Promise<void>((resolve) => setTimeout(resolve, ms));
+                        },
+                      },
+                    });
+                  },
+                }
+              );
+
+              if (retryAtomic.success && retryAtomic.response) {
+                if (__DEV__) {
+                  setLastEdgeDevDiagnostics(retryAtomic.runtime?.devDiagnostics ?? null);
+                }
+                setMediatorTypingState('idle');
+                const aiResponse = retryAtomic.response;
+                const localAiMessages = buildLocalAiMessages(
+                  mediationId,
+                  aiResponse.phase ?? phase,
+                  aiResponse,
+                  hostUserId,
+                  partnerUserId
+                );
+                const nextMessages = dedupeLiveMessages([...retryMessagesForTurn, ...localAiMessages]);
+                setMessagesDebug(nextMessages);
+                await insertAiMessages(
+                  mediationId,
+                  phase,
+                  aiResponse,
+                  hostUserId,
+                  partnerUserId,
+                  sentAiMessagesRef.current
+                );
+                const freshSession = await fetchLiveSession(mediationId, user.id);
+                setSessionDebug(freshSession);
+                await refreshRuntimeSession();
+                lastAtomicRetryRef.current = null;
+                return;
+              }
+
+              setError('Mościk chwilowo nie może odpowiedzieć.');
+              setMediatorTypingState('failed');
+            } finally {
+              generationInProgressRef.current = false;
+              setProcessing(false);
+            }
+          };
+          return;
+        }
+
+        if (atomicResult.requestCount === 0) {
+          return;
+        }
 
         const { mode: effectiveMode } = resolveRuntimeGenerationFlow({
           runtimeSession,
@@ -1732,11 +1930,13 @@ export default function LiveMediationScreen() {
       } catch (e: unknown) {
         generateLockRef.current = null;
         setError(e instanceof Error ? e.message : liveUi.sendError);
+        setMediatorTypingState('failed');
       } finally {
         endGeneration(mediationId, lastQ.id);
         generationInProgressRef.current = false;
         isActiveSendRef.current = false;
         setProcessing(false);
+        setMediatorTypingState((s) => (s === 'failed' ? 'failed' : 'idle'));
       }
     },
     [
@@ -1752,6 +1952,12 @@ export default function LiveMediationScreen() {
       runtimeSession,
       runtimeFailed,
       invalidRuntimeState,
+      language,
+      phase,
+      partnerUserId,
+      insertAiMessages,
+      setSessionDebug,
+      refreshRuntimeSession,
     ]
   );
 
@@ -1801,21 +2007,14 @@ export default function LiveMediationScreen() {
     setMessagesDebug,
   ]);
 
-  // Gdy oboje gotowi — tylko lider generuje (unikaj podwójnych pytań na 2 urządzeniach).
+  // Gdy oboje gotowi — tylko lider wykonuje atomowy runtime turn (1 request).
   useEffect(() => {
     if (navigatingAwayRef.current) return;
-    if (!user || !turnState?.bothAnswered || !isCurrentUserHost) return;
+    if (!user || !mediationId || !turnState?.bothAnswered || !isCurrentUserHost) return;
     if (!shouldHostLeadGeneration(user.id, hostUserId)) return;
     if (processing || paused || sending || isActiveSendRef.current) return;
     if (generationInProgressRef.current) return;
-    if (
-      shouldBlockRuntimeMediatorGeneration({
-        runtimeSession,
-        mode: 'generate_question',
-      })
-    ) {
-      return;
-    }
+
     const lastQ = turnState.lastQuestion;
     if (!lastQ || questionAdvancedAfter(messages, lastQ.id)) return;
     if (generationLockAfter(messages, lastQ.id)) return;
@@ -1827,7 +2026,9 @@ export default function LiveMediationScreen() {
     });
   }, [
     user,
+    mediationId,
     partnerUserIds,
+    hostUserId,
     turnState?.bothAnswered,
     turnState?.lastQuestion?.id,
     isCurrentUserHost,
@@ -1837,7 +2038,6 @@ export default function LiveMediationScreen() {
     messages.length,
     runGenerateNextQuestion,
     liveUi.sendError,
-    runtimeSession,
   ]);
 
   // Start sesji: podsumowanie → pierwsze pytanie (tylko lider).
@@ -2329,14 +2529,18 @@ export default function LiveMediationScreen() {
         sessionRef.current?.live_phase || 1,
         replyToQuestionId
       );
-      enqueueRuntimeClientEvents(
-        buildParticipantReplyClientEvents(currentUserActor === 'host' ? 'host' : 'partner')
-      );
       const workingMessages = [...messagesRef.current, sent];
       setMessagesDebug(workingMessages);
 
       const beforeTurn = computeLiveTurnState(messagesRef.current, hostUserId, partnerUserIds);
       const afterTurn = computeLiveTurnState(workingMessages, hostUserId, partnerUserIds);
+      const replyQuestionTurn = afterTurn.questionNumber ?? 1;
+      enqueueRuntimeClientEvents(
+        buildParticipantReplyClientEvents(
+          currentUserActor === 'host' ? 'host' : 'partner',
+          replyQuestionTurn
+        )
+      );
 
       // AI reaguje dopiero gdy OBIE strony odpowiedziały — tylko lider wysyła wskazówki.
       const lastQ = afterTurn.lastQuestion;
@@ -2344,12 +2548,11 @@ export default function LiveMediationScreen() {
         afterTurn.bothAnswered &&
         !beforeTurn.bothAnswered &&
         lastQ &&
-        !hintsSentAfterQuestion(workingMessages, lastQ.id) &&
         shouldHostLeadGeneration(user.id, hostUserId)
       ) {
         logSetState('processing:true');
         setProcessing(true);
-        await applyAiTurn(sent, workingMessages, 'answer_ack');
+        await runGenerateNextQuestion(workingMessages);
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : liveUi.sendError);
@@ -2374,6 +2577,9 @@ export default function LiveMediationScreen() {
     liveUi.sendError,
     currentUserActor,
     enqueueRuntimeClientEvents,
+    runGenerateNextQuestion,
+    runtimeSession,
+    language,
   ]);
 
   async function handlePause() {
@@ -2479,6 +2685,7 @@ export default function LiveMediationScreen() {
             runtimeSession={runtimeSession}
             runtimeFailed={runtimeFailed}
             invalidRuntimeState={invalidRuntimeState}
+            devDiagnostics={lastEdgeDevDiagnostics ?? syncedDevDiagnostics}
           />
         ) : null}
         {/* Header */}
@@ -2553,6 +2760,26 @@ export default function LiveMediationScreen() {
         {error ? (
           <View style={styles.errorBanner}>
             <Text style={styles.errorText}>{error}</Text>
+            {lastAtomicRetryRef.current ? (
+              <Pressable
+                onPress={() => void lastAtomicRetryRef.current?.()}
+                style={styles.errorRetryBtn}
+                accessibilityRole="button"
+              >
+                <Text style={styles.errorRetryText}>Spróbuj ponownie</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+
+        {mediatorTypingState === 'requesting' || mediatorTypingState === 'retrying' ? (
+          <View style={styles.processingBar}>
+            <ActivityIndicator size="small" color={Colors.primaryLight} />
+            <Text style={styles.processingText}>
+              {mediatorTypingState === 'retrying'
+                ? `Mościk analizuje rozmowę${typingDots}`
+                : `Mościk pisze${typingDots}`}
+            </Text>
           </View>
         ) : null}
 
@@ -2950,6 +3177,21 @@ const styles = StyleSheet.create({
   errorText: {
     fontFamily: Typography.fontFamily.regular,
     fontSize: 14,
+    color: Colors.error,
+  },
+  errorRetryBtn: {
+    marginTop: Spacing.xs,
+    alignSelf: 'flex-start',
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.error + '12',
+    borderWidth: 1,
+    borderColor: Colors.error + '33',
+  },
+  errorRetryText: {
+    fontFamily: Typography.fontFamily.semiBold,
+    fontSize: 13,
     color: Colors.error,
   },
   historyErrorBanner: {

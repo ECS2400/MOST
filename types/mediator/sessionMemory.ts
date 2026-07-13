@@ -95,6 +95,11 @@ export interface RuntimeFlowControlState {
   };
   proposalPhase: RuntimeProposalPhase;
   sessionResolvedByEvent: boolean;
+  participantReplies: {
+    hostReplied: boolean;
+    partnerReplied: boolean;
+    questionTurn: number | null;
+  };
 }
 
 /** Input to Session Memory update pipeline step. */

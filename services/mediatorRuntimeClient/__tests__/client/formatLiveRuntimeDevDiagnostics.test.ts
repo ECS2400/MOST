@@ -23,6 +23,16 @@ describe('buildLiveRuntimeDevDiagnostics', () => {
       mediationId: 'med-abc',
       runtimeSession,
       runtimeFailed: false,
+      devDiagnostics: {
+        responseSource: 'llm',
+        fallbackUsed: false,
+        validationAction: 'accept',
+        validationReasonCodes: [],
+        retryCount: 0,
+        providerSucceeded: true,
+        providerModel: 'test-model',
+        finalTextSource: 'provider',
+      },
     });
 
     assert.ok(diagnostics);
@@ -34,6 +44,14 @@ describe('buildLiveRuntimeDevDiagnostics', () => {
     assert.equal(diagnostics!.proposalPhase, runtimeSession.proposal.phase);
     assert.equal(diagnostics!.closureDirective, runtimeSession.closure.directive);
     assert.equal(diagnostics!.runtimeFailed, false);
+    assert.equal(diagnostics!.responseSource, 'llm');
+    assert.equal(diagnostics!.fallback, 'false');
+    assert.equal(diagnostics!.validation, 'accept');
+    assert.equal(diagnostics!.reasonCodes, 'unavailable');
+    assert.equal(diagnostics!.retries, '0');
+    assert.equal(diagnostics!.providerSucceeded, 'true');
+    assert.equal(diagnostics!.providerModel, 'test-model');
+    assert.equal(diagnostics!.finalTextSource, 'provider');
   });
 
   it('marks unavailable fields when runtimeSession is missing', () => {
