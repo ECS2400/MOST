@@ -234,4 +234,9 @@ export type {
   LegacyLiveFallbackGate,
 } from '@/services/mediatorRuntimeClient/buildLegacyLiveFallback';
 
+export {
+  buildBootstrapMediationStateFromContext,
+} from '@/services/mediatorRuntimeClient/mapMediationContextToBootstrapState';
+export type { BootstrapMediationContextInput } from '@/services/mediatorRuntimeClient/mapMediationContextToBootstrapState';
+
 export { isRuntimeSessionShape, isRecord } from '@/services/mediatorRuntimeClient/runtimeSessionShape';

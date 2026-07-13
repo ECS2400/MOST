@@ -91,8 +91,9 @@ const SAFETY_INTERVENTION_TYPES: ReadonlySet<InterventionType> = new Set([
 
 /** Builds the full runtime-driven session contract for one completed turn. */
 export function composeRuntimeSession(input: ComposeRuntimeSessionInput): RuntimeSession {
-  const stage = resolveSessionStage(input.mediationState, input.sessionMemory);
-  const outcome = resolveRuntimeOutcome(input.mediationState, input.sessionMemory);
+  const safetyStop = isSafetyStopActive(input);
+  const stage = resolveSessionStage(input.mediationState, input.sessionMemory, safetyStop);
+  const outcome = resolveRuntimeOutcome(input.mediationState, input.sessionMemory, safetyStop);
   const proposalPhase = resolveProposalPhase(
     input.mediationState,
     input.sessionMemory,
@@ -112,10 +113,10 @@ export function composeRuntimeSession(input: ComposeRuntimeSessionInput): Runtim
     decision: composeDecision(input, outcome, decisionPanel),
     session: composeLifecycle(input, stage, outcome),
     progress: composeProgress(input, stage),
-    presentation: composePresentation(input, decisionPanel),
+    presentation: composePresentation(input, decisionPanel, safetyStop),
     proposal: composeProposal(input, proposalPhase),
     closure: composeClosure(input, outcome),
-    pending: composePending(input, decisionPanel),
+    pending: composePending(input, decisionPanel, safetyStop),
     diagnostics: composeDiagnostics(input),
   };
 }
@@ -281,12 +282,13 @@ function composeProgress(
 
 function composePresentation(
   input: ComposeRuntimeSessionInput,
-  decisionPanel: RuntimeDecisionPanelSpec | null
+  decisionPanel: RuntimeDecisionPanelSpec | null,
+  safetyStop: boolean
 ): RuntimeSession['presentation'] {
   const deliverables = buildDeliverables(input);
   const primaryDeliverable = deliverables[0]?.kind ?? 'public_message';
   const hideInput =
-    isSafetyHold(input.finalMediatorMessage.safetyLevel, input.intervention.type) ||
+    safetyStop ||
     input.mediationState.sessionOutcome !== 'in_progress' ||
     decisionPanel !== null;
 
@@ -294,7 +296,7 @@ function composePresentation(
     deliverables,
     primaryDeliverable,
     hideInput,
-    showDecisionPanel: decisionPanel,
+    showDecisionPanel: safetyStop ? null : decisionPanel,
     hostOnlyGeneration: true,
   };
 }
@@ -368,8 +370,17 @@ function composeClosure(
 
 function composePending(
   input: ComposeRuntimeSessionInput,
-  decisionPanel: RuntimeDecisionPanelSpec | null
+  decisionPanel: RuntimeDecisionPanelSpec | null,
+  safetyStop: boolean
 ): RuntimeSession['pending'] {
+  if (safetyStop) {
+    return {
+      awaiting: 'safety_acknowledgment',
+      awaitingFrom: ['host', 'partner'],
+      satisfiedBy: [],
+    };
+  }
+
   const { mediationState, intervention } = input;
 
   if (mediationState.sessionOutcome !== 'in_progress') {
@@ -425,8 +436,13 @@ function composeDiagnostics(input: ComposeRuntimeSessionInput): RuntimeSession['
 
 function resolveSessionStage(
   state: MediationState,
-  sessionMemory: SessionMemory
+  sessionMemory: SessionMemory,
+  safetyStop: boolean
 ): RuntimeSessionStage {
+  if (safetyStop) {
+    return 'safety_hold';
+  }
+
   if (state.dynamics.mode === 'SAFETY' || state.sessionOutcome === 'safety_stopped') {
     return 'safety_hold';
   }
@@ -460,8 +476,13 @@ function resolveSessionStage(
 
 function resolveRuntimeOutcome(
   state: MediationState,
-  sessionMemory: SessionMemory
+  sessionMemory: SessionMemory,
+  safetyStop: boolean
 ): RuntimeSessionOutcome {
+  if (safetyStop) {
+    return 'safety_stopped';
+  }
+
   const flowControl = sessionMemory.runtimeFlowControl;
 
   switch (state.sessionOutcome) {
@@ -790,6 +811,20 @@ function isSafetyHold(
   interventionType: InterventionType
 ): boolean {
   return safetyLevel === 'L3_stop' || SAFETY_INTERVENTION_TYPES.has(interventionType);
+}
+
+/**
+ * Terminal safety stop — takes priority over goal-based stage/outcome mapping.
+ * L1/L2 distress levels do not activate this path.
+ */
+function isSafetyStopActive(input: ComposeRuntimeSessionInput): boolean {
+  const { finalMediatorMessage, intervention, mediationState } = input;
+
+  if (mediationState.sessionOutcome === 'safety_stopped') {
+    return true;
+  }
+
+  return isSafetyHold(finalMediatorMessage.safetyLevel, intervention.type);
 }
 
 function estimateCompletion(

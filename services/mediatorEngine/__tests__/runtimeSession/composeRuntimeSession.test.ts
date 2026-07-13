@@ -242,6 +242,68 @@ describe('composeRuntimeSession', () => {
     assert.equal(result.closure.directive, 'safety_close');
   });
 
+  it('L3_stop overrides SAFE_OPENING intake stage mapping', () => {
+    const result = composeRuntimeSession(
+      buildInput({
+        intervention: {
+          ...createMinimalIntervention(2),
+          type: 'welcome_open',
+          goal: 'SAFE_OPENING',
+        },
+        statePatch: (state) => {
+          state.currentGoal = 'SAFE_OPENING';
+          state.sessionOutcome = 'in_progress';
+          state.dynamics.mode = 'NORMAL';
+        },
+        finalMediatorMessage: {
+          text: 'Let us pause here for safety.',
+          source: 'fallback',
+          safetyLevel: 'L3_stop',
+          language: 'en',
+          turnNumber: 2,
+          accepted: true,
+          validationAction: 'accept',
+        },
+      })
+    );
+
+    assert.equal(result.session.stage, 'safety_hold');
+    assert.equal(result.session.outcome, 'safety_stopped');
+    assert.equal(result.decision.nextBeat, 'safety_intervention');
+    assert.equal(result.decision.mayAutoAdvance, false);
+    assert.equal(result.decision.blockedReason, 'safety_hold');
+    assert.equal(result.presentation.hideInput, true);
+    assert.equal(result.pending.awaiting, 'safety_acknowledgment');
+    assert.equal(result.closure.directive, 'safety_close');
+    assert.equal(result.diagnostics.safetyLevel, 'L3_stop');
+  });
+
+  it('L1/L2 distress does not map to terminal safety_stopped', () => {
+    for (const level of ['L1_gentle', 'L2_pause'] as const) {
+      const result = composeRuntimeSession(
+        buildInput({
+          statePatch: (state) => {
+            state.currentGoal = 'SAFE_OPENING';
+            state.sessionOutcome = 'in_progress';
+          },
+          finalMediatorMessage: {
+            text: 'I hear this is difficult.',
+            source: 'stub',
+            safetyLevel: level,
+            language: 'en',
+            turnNumber: 2,
+            accepted: true,
+            validationAction: 'accept',
+          },
+        })
+      );
+
+      assert.equal(result.session.stage, 'intake', `stage for ${level}`);
+      assert.notEqual(result.session.outcome, 'safety_stopped', `outcome for ${level}`);
+      assert.equal(result.presentation.hideInput, false, `hideInput for ${level}`);
+    }
+  });
+
   it('respects pendingAction awaitingResponseFrom for host-only block', () => {
     const result = composeRuntimeSession(
       buildInput({

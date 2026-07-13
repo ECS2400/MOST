@@ -25,5 +25,20 @@ export function buildContextSummary(ctx: SafePromptContext): string {
     parts.push(`Goal continuity: ${goalHint}`);
   }
 
+  const intakeSummary = ctx.mediationState.conflict?.conflictSummary?.trim();
+  const pre = ctx.mediationState.conflict?.preAnalysisContext;
+  if (intakeSummary || pre) {
+    const intakeParts: string[] = [];
+    if (intakeSummary) intakeParts.push(`Intake: ${intakeSummary}`);
+    if (pre?.keyTrigger) intakeParts.push(`Key trigger: ${pre.keyTrigger}`);
+    const emotions = [...(pre?.hostEmotions ?? []), ...(pre?.partnerEmotions ?? [])];
+    if (emotions.length > 0) intakeParts.push(`Emotions: ${emotions.join(', ')}`);
+    const needs = [...(pre?.hostNeeds ?? []), ...(pre?.partnerNeeds ?? [])];
+    if (needs.length > 0) intakeParts.push(`Needs: ${needs.join(', ')}`);
+    if (intakeParts.length > 0) {
+      parts.push(intakeParts.join(' '));
+    }
+  }
+
   return parts.join(' ');
 }

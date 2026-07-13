@@ -28,6 +28,10 @@ import {
 } from '@/services/mediatorRuntimeClient/mediationRuntimeSessionPersistence';
 import { loadMediationRuntimeState } from '@/services/mediatorRuntimeClient/loadMediationRuntimeSession';
 import type { MediatorRuntimeParsedSuccess } from '@/services/mediatorRuntimeClient/mediatorRuntimeClient';
+import {
+  buildBootstrapMediationStateFromContext,
+} from '@/services/mediatorRuntimeClient/mapMediationContextToBootstrapState';
+import { toRuntimeLanguage } from '@/services/mediatorRuntimeClient/liveMediationBridge';
 import type { RuntimeClientEvent } from '@/types/mediator';
 
 function liveStrings(lang: Language = 'pl') {
@@ -4185,6 +4189,23 @@ export async function processMediationTurn(
 
   const persistedRuntime = await loadMediationRuntimeState(triggerMessage.mediation_id);
 
+  const isSessionBootstrap =
+    triggerMessage.metadata?.bootstrap === true || mode === 'opening_summary';
+
+  const mediationStateForTurn =
+    persistedRuntime.mediationState ??
+    (isSessionBootstrap
+      ? buildBootstrapMediationStateFromContext({
+          mediationId: triggerMessage.mediation_id,
+          sessionId: triggerMessage.mediation_id,
+          language: toRuntimeLanguage(language),
+          combinedDescription: mediationContext?.combinedDescription,
+          partnerCombinedDescription: mediationContext?.partnerCombinedDescription,
+          analysis: mediationContext?.analysis ?? null,
+          partnerAnalysis: mediationContext?.partnerAnalysis ?? null,
+        })
+      : null);
+
   const runtimeTurnInput = buildLiveRuntimeTurnInput({
     mediationId: triggerMessage.mediation_id,
     sessionId: triggerMessage.mediation_id,
@@ -4195,8 +4216,8 @@ export async function processMediationTurn(
     senderRole,
     language,
     turnNumber: Math.max(1, questionNumber + 1),
-    isBootstrap: triggerMessage.metadata?.bootstrap === true,
-    mediationState: persistedRuntime.mediationState,
+    isBootstrap: isSessionBootstrap,
+    mediationState: mediationStateForTurn,
     sessionMemory: persistedRuntime.sessionMemory,
     clientEvents,
   });

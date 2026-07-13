@@ -5850,6 +5850,20 @@ function buildContextSummary(ctx) {
   if (typeof goalHint === "string" && goalHint.length > 0) {
     parts.push(`Goal continuity: ${goalHint}`);
   }
+  const intakeSummary = ctx.mediationState.conflict?.conflictSummary?.trim();
+  const pre = ctx.mediationState.conflict?.preAnalysisContext;
+  if (intakeSummary || pre) {
+    const intakeParts = [];
+    if (intakeSummary) intakeParts.push(`Intake: ${intakeSummary}`);
+    if (pre?.keyTrigger) intakeParts.push(`Key trigger: ${pre.keyTrigger}`);
+    const emotions = [...pre?.hostEmotions ?? [], ...pre?.partnerEmotions ?? []];
+    if (emotions.length > 0) intakeParts.push(`Emotions: ${emotions.join(", ")}`);
+    const needs = [...pre?.hostNeeds ?? [], ...pre?.partnerNeeds ?? []];
+    if (needs.length > 0) intakeParts.push(`Needs: ${needs.join(", ")}`);
+    if (intakeParts.length > 0) {
+      parts.push(intakeParts.join(" "));
+    }
+  }
   return parts.join(" ");
 }
 
@@ -7700,8 +7714,9 @@ var SAFETY_INTERVENTION_TYPES2 = /* @__PURE__ */ new Set([
   "pause_session"
 ]);
 function composeRuntimeSession(input) {
-  const stage = resolveSessionStage(input.mediationState, input.sessionMemory);
-  const outcome = resolveRuntimeOutcome(input.mediationState, input.sessionMemory);
+  const safetyStop = isSafetyStopActive(input);
+  const stage = resolveSessionStage(input.mediationState, input.sessionMemory, safetyStop);
+  const outcome = resolveRuntimeOutcome(input.mediationState, input.sessionMemory, safetyStop);
   const proposalPhase = resolveProposalPhase(
     input.mediationState,
     input.sessionMemory,
@@ -7720,10 +7735,10 @@ function composeRuntimeSession(input) {
     decision: composeDecision(input, outcome, decisionPanel),
     session: composeLifecycle(input, stage, outcome),
     progress: composeProgress(input, stage),
-    presentation: composePresentation(input, decisionPanel),
+    presentation: composePresentation(input, decisionPanel, safetyStop),
     proposal: composeProposal(input, proposalPhase),
     closure: composeClosure(input, outcome),
-    pending: composePending(input, decisionPanel),
+    pending: composePending(input, decisionPanel, safetyStop),
     diagnostics: composeDiagnostics(input)
   };
 }
@@ -7853,15 +7868,15 @@ function composeProgress(input, stage) {
     labelKey: `runtime.stage.${stage}`
   };
 }
-function composePresentation(input, decisionPanel) {
+function composePresentation(input, decisionPanel, safetyStop) {
   const deliverables = buildDeliverables(input);
   const primaryDeliverable = deliverables[0]?.kind ?? "public_message";
-  const hideInput = isSafetyHold2(input.finalMediatorMessage.safetyLevel, input.intervention.type) || input.mediationState.sessionOutcome !== "in_progress" || decisionPanel !== null;
+  const hideInput = safetyStop || input.mediationState.sessionOutcome !== "in_progress" || decisionPanel !== null;
   return {
     deliverables,
     primaryDeliverable,
     hideInput,
-    showDecisionPanel: decisionPanel,
+    showDecisionPanel: safetyStop ? null : decisionPanel,
     hostOnlyGeneration: true
   };
 }
@@ -7903,7 +7918,14 @@ function composeClosure(input, outcome) {
     navigateToClosure: terminal && directive !== "offer_manual_close"
   };
 }
-function composePending(input, decisionPanel) {
+function composePending(input, decisionPanel, safetyStop) {
+  if (safetyStop) {
+    return {
+      awaiting: "safety_acknowledgment",
+      awaitingFrom: ["host", "partner"],
+      satisfiedBy: []
+    };
+  }
   const { mediationState, intervention } = input;
   if (mediationState.sessionOutcome !== "in_progress") {
     return {
@@ -7949,7 +7971,10 @@ function composeDiagnostics(input) {
     validationWarnings: []
   };
 }
-function resolveSessionStage(state, sessionMemory) {
+function resolveSessionStage(state, sessionMemory, safetyStop) {
+  if (safetyStop) {
+    return "safety_hold";
+  }
   if (state.dynamics.mode === "SAFETY" || state.sessionOutcome === "safety_stopped") {
     return "safety_hold";
   }
@@ -7978,7 +8003,10 @@ function resolveSessionStage(state, sessionMemory) {
       return "understanding";
   }
 }
-function resolveRuntimeOutcome(state, sessionMemory) {
+function resolveRuntimeOutcome(state, sessionMemory, safetyStop) {
+  if (safetyStop) {
+    return "safety_stopped";
+  }
   const flowControl = sessionMemory.runtimeFlowControl;
   switch (state.sessionOutcome) {
     case "resolved":
@@ -8228,6 +8256,13 @@ function resolvePendingBlockReason(roles) {
 }
 function isSafetyHold2(safetyLevel, interventionType) {
   return safetyLevel === "L3_stop" || SAFETY_INTERVENTION_TYPES2.has(interventionType);
+}
+function isSafetyStopActive(input) {
+  const { finalMediatorMessage, intervention, mediationState } = input;
+  if (mediationState.sessionOutcome === "safety_stopped") {
+    return true;
+  }
+  return isSafetyHold2(finalMediatorMessage.safetyLevel, intervention.type);
 }
 function estimateCompletion(completedGoals, currentGoal, currentGoalProgressPercent) {
   const total = THERAPEUTIC_GOAL_ORDER.length;

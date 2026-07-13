@@ -259,6 +259,10 @@ describe('mediator-runtime edge — runtime handler', () => {
     assert.equal(result.ok, true);
     if (result.ok) {
       assert.equal(result.finalMediatorMessage.safetyLevel, 'L3_stop');
+      assert.equal(result.runtimeSession.session.stage, 'safety_hold');
+      assert.equal(result.runtimeSession.session.outcome, 'safety_stopped');
+      assert.equal(result.runtimeSession.presentation.hideInput, true);
+      assert.equal(result.runtimeSession.decision.nextBeat, 'safety_intervention');
       assert.match(result.finalMediatorMessage.text, /pause|safety|pauz|bezpiec/i);
     }
   });
