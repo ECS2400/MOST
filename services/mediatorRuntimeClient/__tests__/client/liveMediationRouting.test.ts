@@ -72,6 +72,18 @@ describe('buildLiveRuntimeTurnInput', () => {
     assert.equal(input.trigger, 'session_start');
     assert.deepEqual(input.transcriptDelta, []);
   });
+
+  it('maps runtime generation modes to host_generate trigger', () => {
+    for (const mode of [
+      'extension_offer',
+      'extension_question',
+      'closure',
+      'safety_intervention',
+    ] as const) {
+      const input = buildLiveRuntimeTurnInput({ ...BASE_PARAMS, mode, triggerContent: '' });
+      assert.equal(input.trigger, 'host_generate', mode);
+    }
+  });
 });
 
 describe('routeLiveMediatorTurn', () => {

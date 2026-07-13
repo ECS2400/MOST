@@ -114,6 +114,19 @@ export type {
 export { hasRuntimeSession } from '@/services/mediatorRuntimeClient/hasRuntimeSession';
 
 export {
+  resolveRuntimeGenerationFlow,
+  mapRuntimeBeatToMediatorMode,
+  logRuntimeGenerationFlowResolution,
+  isRuntimeDirectMediatorMode,
+  RUNTIME_DIRECT_MEDIATOR_MODES,
+} from '@/services/mediatorRuntimeClient/resolveRuntimeGenerationFlow';
+export type {
+  ResolveRuntimeGenerationFlowParams,
+  RuntimeGenerationFlowReason,
+  RuntimeGenerationFlowResolution,
+} from '@/services/mediatorRuntimeClient/resolveRuntimeGenerationFlow';
+
+export {
   resolveRuntimeGenerationMode,
   logRuntimeGenerationModeResolution,
   mapRuntimeBeatToLegacyMode,
@@ -179,5 +192,46 @@ export type {
   ResolveRuntimeClosureActionParams,
   RuntimeClosureAction,
 } from '@/services/mediatorRuntimeClient/resolveRuntimeClosureAction';
+
+export {
+  canExecuteRuntimeClientAction,
+  planLiveRuntimeClientAction,
+  resolveRuntimeActionExecution,
+  shouldUseLegacyClosureFallback,
+} from '@/services/mediatorRuntimeClient/resolveRuntimeActionExecution';
+export type {
+  LiveRuntimeClientActionKind,
+  LiveRuntimeClientActionPlan,
+  ResolveRuntimeActionExecutionParams,
+  RuntimeActionExecution,
+  RuntimeActionExecutionReason,
+} from '@/services/mediatorRuntimeClient/resolveRuntimeActionExecution';
+
+export {
+  resolveRuntimeAwaitingProposal,
+  resolveRuntimeProposalPanelState,
+  resolveRuntimeProposalUserDecided,
+} from '@/services/mediatorRuntimeClient/resolveRuntimeProposalPanelState';
+export type { RuntimeProposalPanelState } from '@/services/mediatorRuntimeClient/resolveRuntimeProposalPanelState';
+
+export {
+  mapRuntimeSessionStageForTests,
+  resolveRuntimeSessionFlow,
+} from '@/services/mediatorRuntimeClient/resolveRuntimeSessionFlow';
+export type {
+  ResolveRuntimeSessionFlowParams,
+  RuntimeSessionFlowResolution,
+} from '@/services/mediatorRuntimeClient/resolveRuntimeSessionFlow';
+
+export {
+  buildLegacyGenerateMode,
+  buildLegacySessionFlow,
+  shouldUseLegacyLiveFallback,
+} from '@/services/mediatorRuntimeClient/buildLegacyLiveFallback';
+export type {
+  LegacyGenerateModeContext,
+  LegacyLiveFallbackContext,
+  LegacyLiveFallbackGate,
+} from '@/services/mediatorRuntimeClient/buildLegacyLiveFallback';
 
 export { isRuntimeSessionShape, isRecord } from '@/services/mediatorRuntimeClient/runtimeSessionShape';

@@ -82,6 +82,14 @@ export function mapLegacyGenerateModeToIntent(
       return 'extension_summary';
     case 'proposed_solution':
       return 'proposal';
+    case 'extension_offer':
+      return 'extension_offer';
+    case 'extension_question':
+      return 'extension_question';
+    case 'closure':
+      return 'closure';
+    case 'safety_intervention':
+      return 'safety';
     default:
       return 'unknown';
   }

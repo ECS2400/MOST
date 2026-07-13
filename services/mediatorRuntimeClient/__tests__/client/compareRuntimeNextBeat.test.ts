@@ -16,6 +16,10 @@ describe('mapLegacyGenerateModeToIntent', () => {
     assert.equal(mapLegacyGenerateModeToIntent('final_summary'), 'final_summary');
     assert.equal(mapLegacyGenerateModeToIntent('extension_check'), 'extension_summary');
     assert.equal(mapLegacyGenerateModeToIntent('proposed_solution'), 'proposal');
+    assert.equal(mapLegacyGenerateModeToIntent('extension_offer'), 'extension_offer');
+    assert.equal(mapLegacyGenerateModeToIntent('extension_question'), 'extension_question');
+    assert.equal(mapLegacyGenerateModeToIntent('closure'), 'closure');
+    assert.equal(mapLegacyGenerateModeToIntent('safety_intervention'), 'safety');
     assert.equal(mapLegacyGenerateModeToIntent(null), 'await_user_action');
   });
 });

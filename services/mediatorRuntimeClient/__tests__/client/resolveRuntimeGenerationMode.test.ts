@@ -13,9 +13,10 @@ describe('mapRuntimeBeatToLegacyMode', () => {
     assert.equal(mapRuntimeBeatToLegacyMode('deliver_mid_summary'), 'mid_summary');
     assert.equal(mapRuntimeBeatToLegacyMode('deliver_extension_summary'), 'extension_check');
     assert.equal(mapRuntimeBeatToLegacyMode('present_proposal'), 'proposed_solution');
-    assert.equal(mapRuntimeBeatToLegacyMode('offer_extension'), null);
-    assert.equal(mapRuntimeBeatToLegacyMode('deliver_closure'), null);
-    assert.equal(mapRuntimeBeatToLegacyMode('safety_intervention'), null);
+    assert.equal(mapRuntimeBeatToLegacyMode('offer_extension'), 'extension_offer');
+    assert.equal(mapRuntimeBeatToLegacyMode('deliver_extension_questions'), 'extension_question');
+    assert.equal(mapRuntimeBeatToLegacyMode('deliver_closure'), 'closure');
+    assert.equal(mapRuntimeBeatToLegacyMode('safety_intervention'), 'safety_intervention');
   });
 });
 
@@ -89,7 +90,7 @@ describe('resolveRuntimeGenerationMode', () => {
     assert.equal(resolution.reason, 'runtime_waiting');
   });
 
-  it('falls back when runtime beat has no legacy mode mapping', () => {
+  it('falls back when runtime beat intent mismatches legacy mode', () => {
     const runtime = createMinimalRuntimeSuccess({
       runtimeSession: {
         ...createMinimalRuntimeSuccess().runtimeSession,

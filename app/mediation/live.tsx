@@ -33,17 +33,14 @@ import {
   resolveRuntimeInputState,
 } from '@/services/mediatorRuntimeClient/resolveRuntimeSessionInputState';
 import {
-  compareLiveDecisionPanels,
-  logLiveDecisionPanelComparison,
-} from '@/services/mediatorRuntimeClient/compareLiveDecisionPanels';
+  isRuntimeDirectMediatorMode,
+  resolveRuntimeGenerationFlow,
+} from '@/services/mediatorRuntimeClient/resolveRuntimeGenerationFlow';
 import {
-  compareRuntimeNextBeat,
-  logLiveGenerationIntentComparison,
-} from '@/services/mediatorRuntimeClient/compareRuntimeNextBeat';
-import {
-  logRuntimeGenerationModeResolution,
-  resolveRuntimeGenerationMode,
-} from '@/services/mediatorRuntimeClient/resolveRuntimeGenerationMode';
+  buildLegacyGenerateMode,
+  buildLegacySessionFlow,
+} from '@/services/mediatorRuntimeClient/buildLegacyLiveFallback';
+import { isRuntimeSessionShape } from '@/services/mediatorRuntimeClient/runtimeSessionShape';
 import { resolveLegacyLiveDecisionPanelState } from '@/services/mediatorRuntimeClient/resolveLegacyLiveDecisionPanel';
 import { resolveRuntimeDecisionPanelVisibility } from '@/services/mediatorRuntimeClient/resolveRuntimeDecisionPanelVisibility';
 import {
@@ -52,6 +49,14 @@ import {
   resolveRuntimeClosureAction,
   shouldPerformRuntimeClosureNavigation,
 } from '@/services/mediatorRuntimeClient/resolveRuntimeClosureAction';
+import {
+  canExecuteRuntimeClientAction,
+  planLiveRuntimeClientAction,
+  resolveRuntimeActionExecution,
+  shouldUseLegacyClosureFallback,
+} from '@/services/mediatorRuntimeClient/resolveRuntimeActionExecution';
+import { resolveRuntimeProposalPanelState } from '@/services/mediatorRuntimeClient/resolveRuntimeProposalPanelState';
+import { resolveRuntimeSessionFlow } from '@/services/mediatorRuntimeClient/resolveRuntimeSessionFlow';
 import { buildRuntimeClientEvents } from '@/services/mediatorRuntimeClient/buildRuntimeClientEvents';
 import type { RuntimeClientEvent } from '@/types/mediator';
 import type { RuntimeSession } from '@/types/mediator/runtimeSession';
@@ -68,7 +73,6 @@ import {
   buildLocalAiMessages,
   buildOpeningLiveMessages,
   clearSentAiMessagesRef,
-  computeLiveSessionFlow,
   computeLiveTurnState,
   getSessionDecisionState,
   signalExtensionStart,
@@ -116,7 +120,6 @@ import {
   pauseLiveMediation,
   processGenerateNextTurn,
   processMediationTurn,
-  resolveGenerateMode,
   sendUserMessage,
   signalReadyForNextQuestion,
   subscribeLiveMessages,
@@ -457,6 +460,8 @@ export default function LiveMediationScreen() {
 
   const runtimeSessionReadonly = useRuntimeSession(mediationId);
   const { runtimeSession, refreshRuntimeSession } = runtimeSessionReadonly;
+  const invalidRuntimeState =
+    runtimeSession != null && !isRuntimeSessionShape(runtimeSession);
   const runtimeSessionReadonlyRef = useRef(runtimeSessionReadonly);
   runtimeSessionReadonlyRef.current = runtimeSessionReadonly;
 
@@ -482,8 +487,12 @@ export default function LiveMediationScreen() {
   const proposedSolutionLockRef = useRef(false);
   const proposalAcceptedFinalLockRef = useRef(false);
   const proposalRejectLockRef = useRef(false);
+  const proposalAcceptLockRef = useRef(false);
+  const continueDisputeLockRef = useRef(false);
+  const resolveSessionLockRef = useRef(false);
   const generationInProgressRef = useRef(false);
   const pendingClientEventsRef = useRef<RuntimeClientEvent[]>([]);
+  const [runtimeFailed, setRuntimeFailed] = useState(false);
 
   const enqueueRuntimeClientEvents = useCallback((events: RuntimeClientEvent[]) => {
     if (events.length === 0) return;
@@ -563,6 +572,19 @@ export default function LiveMediationScreen() {
     });
   }, [mediationId, router]);
 
+  const goToClosureIfLegacyFallback = useCallback(() => {
+    if (
+      !shouldUseLegacyClosureFallback({
+        runtimeSession,
+        runtimeFailed,
+        invalidRuntimeState,
+      })
+    ) {
+      return;
+    }
+    goToClosure();
+  }, [runtimeSession, runtimeFailed, invalidRuntimeState, goToClosure]);
+
   const goToClosureFromRuntime = useCallback(
     async (session: RuntimeSession) => {
       if (!mediationId || navigatingAwayRef.current || runtimeClosureNavigatedRef.current) {
@@ -579,6 +601,7 @@ export default function LiveMediationScreen() {
       skipNextFocusRefreshRef.current = true;
       isActiveSendRef.current = false;
       generateLockRef.current = null;
+      setRuntimeFailed(false);
 
       const dbStatus = resolveEffectiveClosureDbStatus(action, session.session.outcome);
       if (dbStatus && sessionRef.current?.status === 'live') {
@@ -679,15 +702,30 @@ export default function LiveMediationScreen() {
     });
   }, [messages, user]);
 
-  const sessionFlow = useMemo(() => {
-    if (!hostUserId) return null;
-    return computeLiveSessionFlow(messages, hostUserId, partnerUserIds);
-  }, [messages, hostUserId, partnerUserIds]);
-
   const turnState = useMemo(() => {
     if (!hostUserId) return null;
     return computeLiveTurnState(messages, hostUserId, partnerUserIds);
   }, [messages, hostUserId, partnerUserIds]);
+
+  const sessionFlow = useMemo(() => {
+    if (!hostUserId) return null;
+    return resolveRuntimeSessionFlow({
+      runtimeSession,
+      runtimeFailed,
+      invalidRuntimeState,
+      questionNumberHint: turnState?.questionNumber,
+      getLegacySessionFlow: () =>
+        buildLegacySessionFlow({ messages, hostUserId, partnerUserIds }),
+    }).flow;
+  }, [
+    runtimeSession,
+    runtimeFailed,
+    invalidRuntimeState,
+    hostUserId,
+    messages,
+    partnerUserIds,
+    turnState?.questionNumber,
+  ]);
 
   const questionCount = turnState?.questionNumber ?? countAskedQuestions(messages);
   const phase = questionCount || session?.live_phase || 1;
@@ -698,6 +736,16 @@ export default function LiveMediationScreen() {
     runtimeSession,
     legacyPhaseLabel,
     language
+  );
+
+  const runtimeActionExecution = useMemo(
+    () =>
+      resolveRuntimeActionExecution({
+        runtimeSession,
+        runtimeFailed,
+        invalidRuntimeState,
+      }),
+    [runtimeSession, runtimeFailed, invalidRuntimeState]
   );
 
   const awaitingDecision =
@@ -741,15 +789,24 @@ export default function LiveMediationScreen() {
     return getProposalDecisionState(messages, hostUserId, partnerUserIds);
   }, [awaitingProposalDecision, messages, hostUserId, partnerUserIds]);
 
-  const userProposalDecided = proposalDecisionState
-    ? isCurrentUserHost
-      ? proposalDecisionState.hostDecided
-      : proposalDecisionState.partnerDecided
-    : false;
-
-  const legacyShowProposalPanel = Boolean(
-    awaitingProposalDecision && proposalDecisionState && !userProposalDecided && !processing
+  const runtimeProposalPanelState = useMemo(
+    () => resolveRuntimeProposalPanelState(runtimeSession, isCurrentUserHost),
+    [runtimeSession, isCurrentUserHost]
   );
+
+  const userProposalDecided = runtimeActionExecution.useRuntime && runtimeProposalPanelState
+    ? runtimeProposalPanelState.userDecided
+    : proposalDecisionState
+      ? isCurrentUserHost
+        ? proposalDecisionState.hostDecided
+        : proposalDecisionState.partnerDecided
+      : false;
+
+  const legacyShowProposalPanel = runtimeActionExecution.useRuntime && runtimeProposalPanelState
+    ? runtimeProposalPanelState.awaitingProposal && !runtimeProposalPanelState.userDecided && !processing
+    : Boolean(
+        awaitingProposalDecision && proposalDecisionState && !userProposalDecided && !processing
+      );
 
   const legacyDecisionPanelState = useMemo(
     () =>
@@ -798,26 +855,20 @@ export default function LiveMediationScreen() {
   const showResolvedConfirmationPanel =
     decisionPanelVisibility.showResolvedConfirmationPanel;
 
-  useEffect(() => {
-    if (!__DEV__) return;
-    logLiveDecisionPanelComparison(
-      compareLiveDecisionPanels(runtimeSession, legacyDecisionPanelState)
-    );
-  }, [runtimeSession, legacyDecisionPanelState]);
-
-  useEffect(() => {
-    if (!__DEV__ || !hostUserId) return;
-    const turn = computeLiveTurnState(messages, hostUserId, partnerUserIds);
-    const legacyMode = resolveGenerateMode(turn, messages, hostUserId, partnerUserIds);
-    logLiveGenerationIntentComparison(
-      compareRuntimeNextBeat({ runtimeSession, legacyMode })
-    );
-    logRuntimeGenerationModeResolution(
-      resolveRuntimeGenerationMode({ runtimeSession, legacyMode })
-    );
-  }, [runtimeSession, messages, hostUserId, partnerUserIds]);
-
   const proposalWaitingHint = useMemo(() => {
+    if (runtimeActionExecution.useRuntime && runtimeProposalPanelState) {
+      if (!runtimeProposalPanelState.awaitingProposal) return '';
+      const hostVote = runtimeProposalPanelState.hostVote;
+      const partnerVote = runtimeProposalPanelState.partnerVote;
+      const userDecided = runtimeProposalPanelState.userDecided;
+      const otherDecided = isCurrentUserHost
+        ? partnerVote === 'accepted' || partnerVote === 'rejected'
+        : hostVote === 'accepted' || hostVote === 'rejected';
+      if (userDecided && !otherDecided) return liveUi.proposalAcceptWaiting;
+      if (!userDecided && otherDecided) return liveUi.proposalAcceptPartner;
+      return '';
+    }
+
     if (!awaitingProposalDecision || !proposalDecisionState) return '';
     const userDecided = isCurrentUserHost
       ? proposalDecisionState.hostDecided
@@ -828,7 +879,14 @@ export default function LiveMediationScreen() {
     if (userDecided && !otherDecided) return liveUi.proposalAcceptWaiting;
     if (!userDecided && otherDecided) return liveUi.proposalAcceptPartner;
     return '';
-  }, [awaitingProposalDecision, proposalDecisionState, isCurrentUserHost, liveUi]);
+  }, [
+    runtimeActionExecution.useRuntime,
+    runtimeProposalPanelState,
+    awaitingProposalDecision,
+    proposalDecisionState,
+    isCurrentUserHost,
+    liveUi,
+  ]);
 
   const legacyWaitingAnswerHint = useMemo(() => {
     if (!turnState?.lastQuestion || turnState.bothAnswered) return '';
@@ -932,6 +990,9 @@ export default function LiveMediationScreen() {
       proposedSolutionLockRef.current = false;
       proposalAcceptedFinalLockRef.current = false;
       proposalRejectLockRef.current = false;
+      proposalAcceptLockRef.current = false;
+      continueDisputeLockRef.current = false;
+      resolveSessionLockRef.current = false;
       generateLockRef.current = null;
       logSetState('loading:true');
       setLoading(true);
@@ -1171,11 +1232,11 @@ export default function LiveMediationScreen() {
 
         const status = (update as { status?: string }).status;
         if (status === 'pending_agreements' || status === 'resolved') {
-          goToClosure();
+          goToClosureIfLegacyFallback();
         }
       }
     );
-  }, [mediationId, setMessagesDebug, setSessionDebug, goToClosure]);
+  }, [mediationId, setMessagesDebug, setSessionDebug, goToClosureIfLegacyFallback]);
 
   // Fallback gdy realtime nie dostarczy wiadomości — cicha sync co 3s, bez blokady UI.
   useEffect(() => {
@@ -1224,7 +1285,7 @@ export default function LiveMediationScreen() {
     ): Promise<LiveMessage[]> => {
       if (!user || !mediationId || !hostUserId) return currentMessages;
 
-      if (mode === 'opening_summary' || mode === 'generate_question') {
+      if (mode === 'opening_summary' || mode === 'generate_question' || mode === 'extension_question') {
         if (!shouldHostLeadGeneration(user.id, hostUserId)) return currentMessages;
       }
 
@@ -1243,7 +1304,7 @@ export default function LiveMediationScreen() {
         }
       }
 
-      if (mode !== 'answer_ack' && !force) {
+      if (mode !== 'answer_ack' && !force && !isRuntimeDirectMediatorMode(mode)) {
         const turn = computeLiveTurnState(currentMessages, hostUserId, partnerUserIds);
         const lastQ = turn.lastQuestion;
         const isBootstrap =
@@ -1275,12 +1336,7 @@ export default function LiveMediationScreen() {
       }
 
       const useDirect =
-        force ||
-        mode === 'opening_summary' ||
-        mode === 'proposed_solution' ||
-        mode === 'final_summary' ||
-        mode === 'extension_check' ||
-        mode === 'mid_summary';
+        force || isRuntimeDirectMediatorMode(mode) || mode === 'opening_summary';
 
       const participantNames = stableParticipantNames;
       const convState = getConversationState(currentMessages);
@@ -1413,6 +1469,52 @@ export default function LiveMediationScreen() {
     [user, mediationId, hostUserId, partnerUserIds, partnerUserId, partner?.name, setMessagesDebug, setSessionDebug, language, couple?.id, questionCount, stableParticipantNames, isCurrentUserHost, logMediatorCall, refreshRuntimeSession, consumeRuntimeClientEvents]
   );
 
+  const applyRuntimeClientActionTurn = useCallback(
+    async (
+      events: RuntimeClientEvent[],
+      mode: MediatorMode = 'answer_ack'
+    ): Promise<boolean> => {
+      if (!user || !mediationId || !hostUserId || events.length === 0) {
+        return false;
+      }
+
+      const senderId =
+        currentUserActor === 'host' ? hostUserId : partnerUserId || user.id;
+      const triggerMessage: LiveMessage = {
+        id: `runtime-client-${events[0].kind}-${Date.now()}`,
+        mediation_id: mediationId,
+        sender_id: senderId,
+        sender_name: user.name || liveUi.you,
+        content: '',
+        message_type: 'system',
+        is_private: false,
+        recipient_id: null,
+        phase,
+        metadata: { runtimeClientAction: events[0].kind },
+        created_at: new Date().toISOString(),
+      };
+
+      try {
+        setRuntimeFailed(false);
+        await applyAiTurn(triggerMessage, messagesRef.current, mode, true, events);
+        return true;
+      } catch {
+        setRuntimeFailed(true);
+        return false;
+      }
+    },
+    [
+      user,
+      mediationId,
+      hostUserId,
+      partnerUserId,
+      currentUserActor,
+      phase,
+      liveUi.you,
+      applyAiTurn,
+    ]
+  );
+
   const runGenerateNextQuestion = useCallback(
     async (currentMessages: LiveMessage[]) => {
       if (navigatingAwayRef.current) return;
@@ -1483,12 +1585,19 @@ export default function LiveMediationScreen() {
         setProcessing(true);
         setError('');
 
-        const legacyMode = resolveGenerateMode(turn, withLock, hostUserId, partnerUserIds);
-        const { mode } = resolveRuntimeGenerationMode({
+        const { mode: effectiveMode } = resolveRuntimeGenerationFlow({
           runtimeSession,
-          legacyMode,
+          runtimeFailed,
+          invalidRuntimeState,
+          getLegacyMode: () =>
+            buildLegacyGenerateMode({
+              turn,
+              messages: withLock,
+              hostUserId,
+              partnerUserIds,
+            }),
         });
-        if (!mode) {
+        if (!effectiveMode) {
           generateLockRef.current = null;
           return;
         }
@@ -1508,7 +1617,7 @@ export default function LiveMediationScreen() {
             created_at: new Date().toISOString(),
           },
           withLock,
-          mode
+          effectiveMode
         );
       } catch (e: unknown) {
         generateLockRef.current = null;
@@ -1531,6 +1640,8 @@ export default function LiveMediationScreen() {
       liveUi.sendError,
       setMessagesDebug,
       runtimeSession,
+      runtimeFailed,
+      invalidRuntimeState,
     ]
   );
 
@@ -1670,12 +1781,42 @@ export default function LiveMediationScreen() {
   const handleContinueDispute = useCallback(async () => {
     if (!user || !mediationId || processing || !awaitingDecision) return;
     if (userDecisionMade) return;
+    if (!canExecuteRuntimeClientAction(continueDisputeLockRef.current, processing)) return;
+    continueDisputeLockRef.current = true;
+
+    const plan = planLiveRuntimeClientAction('continue_session', {
+      runtimeSession,
+      runtimeFailed,
+    });
 
     isActiveSendRef.current = true;
     setProcessing(true);
     setError('');
 
     try {
+      const events = buildRuntimeClientEvents('continue_session', currentUserActor);
+
+      if (plan.callRuntimeTurn) {
+        const ok = await applyRuntimeClientActionTurn(
+          events,
+          decisionSummaryKind === 'extension_check' ? 'extension_check' : 'final_summary'
+        );
+        if (!ok) {
+          continueDisputeLockRef.current = false;
+          setRuntimeFailed(true);
+          const msg = await signalSessionDecision(
+            mediationId,
+            user.id,
+            user.name || liveUi.you,
+            'continue',
+            decisionSummaryKind,
+            phase
+          );
+          setMessagesDebug((prev) => dedupeLiveMessages([...prev, msg]));
+        }
+        return;
+      }
+
       const msg = await signalSessionDecision(
         mediationId,
         user.id,
@@ -1684,11 +1825,9 @@ export default function LiveMediationScreen() {
         decisionSummaryKind,
         phase
       );
-      enqueueRuntimeClientEvents(
-        buildRuntimeClientEvents('continue_session', currentUserActor)
-      );
       setMessagesDebug((prev) => dedupeLiveMessages([...prev, msg]));
     } catch (e: unknown) {
+      continueDisputeLockRef.current = false;
       setError(e instanceof Error ? e.message : liveUi.sendError);
     } finally {
       isActiveSendRef.current = false;
@@ -1705,12 +1844,15 @@ export default function LiveMediationScreen() {
     liveUi.you,
     liveUi.sendError,
     setMessagesDebug,
-    enqueueRuntimeClientEvents,
     currentUserActor,
+    runtimeSession,
+    runtimeFailed,
+    applyRuntimeClientActionTurn,
   ]);
 
   // Oboje potwierdzili kontynuację po podsumowaniu → start 5 dodatkowych pytań.
   useEffect(() => {
+    if (runtimeActionExecution.useRuntime) return;
     if (navigatingAwayRef.current) return;
     if (!user || !mediationId || processing) return;
     if (sessionFlow?.stage !== 'questions' || isExtensionActive(messages)) return;
@@ -1771,10 +1913,12 @@ export default function LiveMediationScreen() {
     applyAiTurn,
     liveUi.sendError,
     setMessagesDebug,
+    runtimeActionExecution.useRuntime,
   ]);
 
   // Oboje potwierdzili kontynuację po rundzie dodatkowej → propozycja rozwiązania AI.
   useEffect(() => {
+    if (runtimeActionExecution.useRuntime) return;
     if (navigatingAwayRef.current) return;
     if (!user || !mediationId || processing) return;
     if (!hasSummaryKind(messages, 'extension_check')) return;
@@ -1828,17 +1972,44 @@ export default function LiveMediationScreen() {
     phase,
     applyAiTurn,
     liveUi.sendError,
+    runtimeActionExecution.useRuntime,
   ]);
 
   const handleProposalAccept = useCallback(async () => {
     if (!user || !mediationId || processing || !awaitingProposalDecision) return;
     if (userProposalDecided) return;
+    if (!canExecuteRuntimeClientAction(proposalAcceptLockRef.current, processing)) return;
+    proposalAcceptLockRef.current = true;
+
+    const plan = planLiveRuntimeClientAction('proposal_accepted', {
+      runtimeSession,
+      runtimeFailed,
+    });
 
     isActiveSendRef.current = true;
     setProcessing(true);
     setError('');
 
     try {
+      const events = buildRuntimeClientEvents('proposal_accepted', currentUserActor);
+
+      if (plan.callRuntimeTurn) {
+        const ok = await applyRuntimeClientActionTurn(events, 'proposed_solution');
+        if (!ok) {
+          proposalAcceptLockRef.current = false;
+          setRuntimeFailed(true);
+          const msg = await signalProposalDecision(
+            mediationId,
+            user.id,
+            user.name || liveUi.you,
+            'accepted',
+            phase
+          );
+          setMessagesDebug((prev) => dedupeLiveMessages([...prev, msg]));
+        }
+        return;
+      }
+
       const msg = await signalProposalDecision(
         mediationId,
         user.id,
@@ -1846,11 +2017,9 @@ export default function LiveMediationScreen() {
         'accepted',
         phase
       );
-      enqueueRuntimeClientEvents(
-        buildRuntimeClientEvents('proposal_accepted', currentUserActor)
-      );
       setMessagesDebug((prev) => dedupeLiveMessages([...prev, msg]));
     } catch (e: unknown) {
+      proposalAcceptLockRef.current = false;
       setError(e instanceof Error ? e.message : liveUi.sendError);
     } finally {
       isActiveSendRef.current = false;
@@ -1866,29 +2035,60 @@ export default function LiveMediationScreen() {
     liveUi.you,
     liveUi.sendError,
     setMessagesDebug,
-    enqueueRuntimeClientEvents,
     currentUserActor,
+    runtimeSession,
+    runtimeFailed,
+    applyRuntimeClientActionTurn,
   ]);
 
   const handleProposalReject = useCallback(async () => {
     if (!user || !mediationId || processing || !awaitingProposalDecision) return;
-    if (proposalRejectLockRef.current) return;
+    if (!canExecuteRuntimeClientAction(proposalRejectLockRef.current, processing)) return;
     proposalRejectLockRef.current = true;
+
+    const plan = planLiveRuntimeClientAction('proposal_rejected', {
+      runtimeSession,
+      runtimeFailed,
+    });
 
     isActiveSendRef.current = true;
     setProcessing(true);
     setError('');
 
     try {
+      const events = buildRuntimeClientEvents('proposal_rejected', currentUserActor);
+
+      if (plan.callRuntimeTurn) {
+        const ok = await applyRuntimeClientActionTurn(events, 'proposed_solution');
+        if (!ok) {
+          proposalRejectLockRef.current = false;
+          setRuntimeFailed(true);
+          const decisionMsg = await signalProposalDecision(
+            mediationId,
+            user.id,
+            user.name || liveUi.you,
+            'rejected',
+            phase
+          );
+          const altMsg = await insertProposalClosureSummary(
+            mediationId,
+            buildAlternativeProposalMessage(language),
+            ALTERNATIVE_SOLUTION_KIND,
+            phase,
+            'unresolved_but_closed'
+          );
+          setMessagesDebug((prev) => dedupeLiveMessages([...prev, decisionMsg, altMsg]));
+          goToClosureIfLegacyFallback();
+        }
+        return;
+      }
+
       const decisionMsg = await signalProposalDecision(
         mediationId,
         user.id,
         user.name || liveUi.you,
         'rejected',
         phase
-      );
-      enqueueRuntimeClientEvents(
-        buildRuntimeClientEvents('proposal_rejected', currentUserActor)
       );
       const altMsg = await insertProposalClosureSummary(
         mediationId,
@@ -1898,7 +2098,7 @@ export default function LiveMediationScreen() {
         'unresolved_but_closed'
       );
       setMessagesDebug((prev) => dedupeLiveMessages([...prev, decisionMsg, altMsg]));
-      goToClosure();
+      goToClosureIfLegacyFallback();
     } catch (e: unknown) {
       proposalRejectLockRef.current = false;
       setError(e instanceof Error ? e.message : liveUi.sendError);
@@ -1916,13 +2116,16 @@ export default function LiveMediationScreen() {
     liveUi.you,
     liveUi.sendError,
     setMessagesDebug,
-    goToClosure,
-    enqueueRuntimeClientEvents,
+    goToClosureIfLegacyFallback,
     currentUserActor,
+    runtimeSession,
+    runtimeFailed,
+    applyRuntimeClientActionTurn,
   ]);
 
   // Oboje zaakceptowali propozycję → final summary i zamknięcie.
   useEffect(() => {
+    if (runtimeActionExecution.useRuntime) return;
     if (navigatingAwayRef.current) return;
     if (!user || !mediationId || processing) return;
     if (!hasSummaryKind(messages, 'proposed_solution')) return;
@@ -1946,7 +2149,7 @@ export default function LiveMediationScreen() {
           'accepted'
         );
         setMessagesDebug((prev) => dedupeLiveMessages([...prev, finalMsg]));
-        goToClosure();
+        goToClosureIfLegacyFallback();
       } catch (e: unknown) {
         proposalAcceptedFinalLockRef.current = false;
         setError(e instanceof Error ? e.message : liveUi.sendError);
@@ -1963,9 +2166,10 @@ export default function LiveMediationScreen() {
     partnerUserIds,
     phase,
     language,
-    goToClosure,
+    goToClosureIfLegacyFallback,
     liveUi.sendError,
     setMessagesDebug,
+    runtimeActionExecution.useRuntime,
   ]);
 
   const handleSend = useCallback(async () => {
@@ -2043,11 +2247,45 @@ export default function LiveMediationScreen() {
   }
 
   function confirmDisputeResolved() {
-    if (!mediationId) return;
-    enqueueRuntimeClientEvents(
-      buildRuntimeClientEvents('resolve_session', currentUserActor)
-    );
+    if (!mediationId || resolveSessionLockRef.current) return;
+
+    const plan = planLiveRuntimeClientAction('resolve_session', {
+      runtimeSession,
+      runtimeFailed,
+    });
+
+    resolveSessionLockRef.current = true;
     setShowDisputeResolvedConfirm(false);
+
+    if (plan.callRuntimeTurn) {
+      void (async () => {
+        isActiveSendRef.current = true;
+        setProcessing(true);
+        setError('');
+        try {
+          const events = buildRuntimeClientEvents('resolve_session', currentUserActor);
+          const ok = await applyRuntimeClientActionTurn(
+            events,
+            decisionSummaryKind === 'extension_check' ? 'extension_check' : 'final_summary'
+          );
+          if (!ok) {
+            resolveSessionLockRef.current = false;
+            setRuntimeFailed(true);
+            goToClosureIfLegacyFallback();
+          }
+        } catch (e: unknown) {
+          resolveSessionLockRef.current = false;
+          setRuntimeFailed(true);
+          setError(e instanceof Error ? e.message : liveUi.sendError);
+          goToClosureIfLegacyFallback();
+        } finally {
+          isActiveSendRef.current = false;
+          setProcessing(false);
+        }
+      })();
+      return;
+    }
+
     goToClosure();
   }
 
@@ -2184,7 +2422,10 @@ export default function LiveMediationScreen() {
           </View>
         ) : null}
 
-        {proposalWaitingHint && awaitingProposalDecision ? (
+        {proposalWaitingHint &&
+        (runtimeActionExecution.useRuntime
+          ? runtimeProposalPanelState?.awaitingProposal
+          : awaitingProposalDecision) ? (
           <View style={styles.waitingBar}>
             <MaterialIcons name="hourglass-empty" size={16} color={Colors.textMuted} />
             <Text style={styles.waitingText}>{proposalWaitingDisplay.label}</Text>

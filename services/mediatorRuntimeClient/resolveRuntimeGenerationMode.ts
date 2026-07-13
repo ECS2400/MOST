@@ -7,6 +7,9 @@
  */
 
 import {
+  mapRuntimeBeatToMediatorMode,
+} from '@/services/mediatorRuntimeClient/resolveRuntimeGenerationFlow';
+import {
   compareRuntimeNextBeat,
   type LiveGenerationIntent,
 } from '@/services/mediatorRuntimeClient/compareRuntimeNextBeat';
@@ -50,26 +53,9 @@ const RUNTIME_ONLY_INTENTS: ReadonlySet<LiveGenerationIntent> = new Set([
   'safety',
 ]);
 
-/** Beats that map to a legacy MediatorMode used by applyAiTurn / processMediationTurn. */
+/** @deprecated Diagnostic only — use resolveRuntimeGenerationFlow for live decisions. */
 export function mapRuntimeBeatToLegacyMode(beat: MediatorBeat): MediatorMode | null {
-  switch (beat) {
-    case 'deliver_opening':
-      return 'opening_summary';
-    case 'deliver_question':
-      return 'generate_question';
-    case 'deliver_answer_ack':
-      return 'answer_ack';
-    case 'deliver_mid_summary':
-      return 'mid_summary';
-    case 'deliver_final_summary':
-      return 'final_summary';
-    case 'deliver_extension_summary':
-      return 'extension_check';
-    case 'present_proposal':
-      return 'proposed_solution';
-    default:
-      return null;
-  }
+  return mapRuntimeBeatToMediatorMode(beat);
 }
 
 function resolveReason(
@@ -124,10 +110,9 @@ function resolveReason(
 }
 
 /**
- * Resolves the MediatorMode to use for host-led generation.
+ * @deprecated Diagnostic only — use resolveRuntimeGenerationFlow for live decisions.
  *
- * Returns legacy mode on any ambiguity or mismatch. Runtime confirms only when
- * mapped intents agree and the beat is representable as legacy (or both wait).
+ * Resolves the MediatorMode to use for host-led generation.
  */
 export function resolveRuntimeGenerationMode(
   params: ResolveRuntimeGenerationModeParams

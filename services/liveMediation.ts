@@ -264,7 +264,7 @@ export interface LiveMediatorResponse {
   progress?: number;
   nextQuestionIndex?: number;
   metaComment?: boolean;
-  summaryType?: 'opening' | 'mid' | 'final' | 'extension_check' | 'proposed_solution';
+  summaryType?: 'opening' | 'mid' | 'final' | 'extension_check' | 'proposed_solution' | 'closure';
   state?: ConversationState;
 }
 
@@ -275,7 +275,11 @@ export type MediatorMode =
   | 'mid_summary'
   | 'final_summary'
   | 'extension_check'
-  | 'proposed_solution';
+  | 'proposed_solution'
+  | 'extension_offer'
+  | 'extension_question'
+  | 'closure'
+  | 'safety_intervention';
 
 export type LiveQuestionPhase = 'opening' | 'deepening' | 'resolution' | 'extension';
 
@@ -2797,7 +2801,8 @@ export async function insertAiMessages(
     response.summaryType === 'mid' ||
     response.summaryType === 'final' ||
     response.summaryType === 'extension_check' ||
-    response.summaryType === 'proposed_solution'
+    response.summaryType === 'proposed_solution' ||
+    response.summaryType === 'closure'
   ) {
     const kindMap: Record<string, string> = {
       opening: 'opening_summary',
@@ -2805,6 +2810,7 @@ export async function insertAiMessages(
       final: 'final_summary',
       extension_check: 'extension_check',
       proposed_solution: 'proposed_solution',
+      closure: 'closure_summary',
     };
     const kind = kindMap[response.summaryType] || response.summaryType;
     const content = coerceMediatorText(response.publicMessage);
@@ -3092,7 +3098,8 @@ export function buildLocalAiMessages(
     response.summaryType === 'mid' ||
     response.summaryType === 'final' ||
     response.summaryType === 'extension_check' ||
-    response.summaryType === 'proposed_solution'
+    response.summaryType === 'proposed_solution' ||
+    response.summaryType === 'closure'
   ) {
     const kindMap: Record<string, string> = {
       opening: 'opening_summary',
@@ -3100,6 +3107,7 @@ export function buildLocalAiMessages(
       final: 'final_summary',
       extension_check: 'extension_check',
       proposed_solution: 'proposed_solution',
+      closure: 'closure_summary',
     };
     const kind = kindMap[response.summaryType] || response.summaryType;
     const content = coerceMediatorText(response.publicMessage);
@@ -4026,6 +4034,56 @@ function localGenerateFallback(
     };
   }
 
+  if (mode === 'extension_offer') {
+    return {
+      publicMessage: `${ui.finalSummaryHeader}\n\n${ui.finalSummaryBody}`,
+      summaryType: 'final',
+      phase: questionNumber,
+      progress: 100,
+      nextQuestionIndex: questionNumber,
+    };
+  }
+
+  if (mode === 'closure') {
+    return {
+      publicMessage: `${ui.finalSummaryHeader}\n\n${ui.finalSummaryBody}`,
+      summaryType: 'closure',
+      phase: questionNumber,
+      progress: 100,
+      nextQuestionIndex: questionNumber,
+    };
+  }
+
+  if (mode === 'safety_intervention') {
+    return {
+      publicMessage: ui.escalation,
+      escalationDetected: true,
+      escalationMessage: ui.escalation,
+      phase: questionNumber,
+      progress: getPhaseProgress(questionNumber, undefined, maxQ),
+      nextQuestionIndex: questionNumber,
+    };
+  }
+
+  if (mode === 'extension_question') {
+    const rawQ = buildContextualQuestion(
+      mediationContext,
+      recentAnswers,
+      askedQuestions,
+      questionNumber + 1,
+      lang,
+      'extension'
+    );
+    return {
+      publicMessage: undefined,
+      aiQuestion: formatQuestionWithTarget(rawQ, 'oboje', lang),
+      questionTarget: 'oboje',
+      phase: questionNumber + 1,
+      progress: getPhaseProgress(questionNumber + 1, undefined, maxQ),
+      nextQuestionIndex: questionNumber + 1,
+    };
+  }
+
   const qPhase = getQuestionPhase(
     extensionActive ? Math.max(questionNumber + 1, LIVE_QUESTIONS_TARGET + 1) : questionNumber + 1,
     extensionActive
@@ -4121,7 +4179,7 @@ export async function processMediationTurn(
   const askedQuestions = getAskedQuestionTexts(allMessages);
   const extensionActive = isExtensionActive(allMessages);
   const questionNumber =
-    mode === 'generate_question'
+    mode === 'generate_question' || mode === 'extension_question'
       ? currentQuestionIndex
       : countAskedQuestions(allMessages);
 

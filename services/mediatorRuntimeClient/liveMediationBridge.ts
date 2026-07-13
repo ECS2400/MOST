@@ -6,6 +6,7 @@ import type {
   SessionMemory,
   TranscriptMessage,
 } from '@/types/mediator';
+import type { MediatorMode } from '@/services/liveMediation';
 import type { MediatorRuntimeClientInput } from '@/services/mediatorRuntimeClient/buildMediatorRuntimeRequest';
 import {
   isMediatorRuntimeClientError,
@@ -13,15 +14,6 @@ import {
 } from '@/services/mediatorRuntimeClient/errors';
 
 const SUPPORTED_RUNTIME_LANGUAGES: MediatorLang[] = ['pl', 'en', 'es', 'it', 'de', 'fr'];
-
-export type LiveMediatorTurnMode =
-  | 'opening_summary'
-  | 'generate_question'
-  | 'answer_ack'
-  | 'mid_summary'
-  | 'final_summary'
-  | 'extension_check'
-  | 'proposed_solution';
 
 export type LiveSenderRole = 'user' | 'partner' | 'ai';
 
@@ -32,7 +24,7 @@ export interface LiveRuntimeTurnParams {
   triggerMessageId: string;
   triggerContent: string;
   triggerCreatedAt: string;
-  mode: LiveMediatorTurnMode;
+  mode: MediatorMode;
   senderRole: LiveSenderRole;
   language: unknown;
   turnNumber: number;
@@ -52,20 +44,26 @@ export function toRuntimeLanguage(raw: unknown): MediatorLang {
   return 'en';
 }
 
+const HOST_GENERATE_MODES: ReadonlySet<MediatorMode> = new Set([
+  'generate_question',
+  'mid_summary',
+  'final_summary',
+  'extension_check',
+  'proposed_solution',
+  'extension_offer',
+  'extension_question',
+  'closure',
+  'safety_intervention',
+]);
+
 /** Maps live mediator mode + sender to orchestrate_turn trigger. */
 export function resolveRuntimeTrigger(
-  mode: LiveMediatorTurnMode,
+  mode: MediatorMode,
   senderRole: LiveSenderRole,
   isBootstrap?: boolean
 ): OrchestrateTurnTrigger {
   if (mode === 'opening_summary' || isBootstrap) return 'session_start';
-  if (
-    mode === 'generate_question' ||
-    mode === 'mid_summary' ||
-    mode === 'final_summary' ||
-    mode === 'extension_check' ||
-    mode === 'proposed_solution'
-  ) {
+  if (HOST_GENERATE_MODES.has(mode)) {
     return 'host_generate';
   }
   if (senderRole === 'partner') return 'partner_message';
