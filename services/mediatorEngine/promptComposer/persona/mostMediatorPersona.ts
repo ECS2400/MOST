@@ -5,6 +5,7 @@ import {
   voiceLabelForIntervention,
   voiceLabelForStrategy,
 } from '@/services/mediatorEngine/promptComposer/config/runtimeVoiceLabels';
+import { resolveParticipantDisplayName } from '@/services/mediatorEngine/participants/resolveParticipantDisplayName';
 import MOST_MEDIATOR_PERSONA_MARKDOWN from '@/services/mediatorEngine/promptComposer/persona/mostMediatorPersona.md';
 
 export { MOST_MEDIATOR_PERSONA_MARKDOWN };
@@ -15,24 +16,12 @@ export interface MostMediatorPersonaVariables {
   currentState: string;
 }
 
-const ROLE_LABELS: Record<MediatorLang, { host: string; partner: string }> = {
-  pl: { host: 'Host', partner: 'Partner' },
-  en: { host: 'Host', partner: 'Partner' },
-  es: { host: 'Anfitrión', partner: 'Pareja' },
-  it: { host: 'Host', partner: 'Partner' },
-  de: { host: 'Host', partner: 'Partner' },
-  fr: { host: 'Hôte', partner: 'Partenaire' },
-};
-
 function resolveDisplayName(
   ctx: SafePromptContext,
   role: 'host' | 'partner'
 ): string {
-  const fromState = ctx.mediationState.participants?.[role]?.profile?.displayName?.trim();
-  if (fromState) {
-    return fromState;
-  }
-  return ROLE_LABELS[ctx.language][role];
+  const fromState = ctx.mediationState.participants?.[role]?.profile?.displayName;
+  return resolveParticipantDisplayName(role, fromState, ctx.language);
 }
 
 /** Builds runtime state for {{CURRENT_STATE}} substitution — voice labels only, no raw IDs. */
@@ -91,10 +80,9 @@ export function buildMostMediatorPersonaSection(ctx: SafePromptContext): string 
 
 /** Fallback persona when composePrompt fails before context is available. */
 export function buildFallbackMostMediatorPersona(language: MediatorLang): string {
-  const labels = ROLE_LABELS[language];
   return renderMostMediatorPersona(MOST_MEDIATOR_PERSONA_MARKDOWN, {
-    userName: labels.host,
-    partnerName: labels.partner,
+    userName: resolveParticipantDisplayName('host', null, language),
+    partnerName: resolveParticipantDisplayName('partner', null, language),
     currentState: 'goal=SAFE_OPENING; turn=1; mode=NORMAL; strategy=slow_conflict; move=reveal_pattern',
   });
 }

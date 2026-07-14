@@ -41,6 +41,8 @@ export interface PromptComposerInput {
   continuityContext?: ContinuityContext;
   /** Structural goal-stage hints for prompt — no transcript or PII. */
   goalContinuityContext?: GoalContinuityContext;
+  /** Optional participant display names from live client — not persisted. */
+  participantNames?: { hostName?: string; partnerName?: string };
 }
 
 /** Safety constraints embedded in the composed prompt. */
@@ -59,6 +61,10 @@ export interface PromptMetadata {
   goal: string;
   composedAt: string;
   transcriptMessageCount: number;
+  /** Last mediator message texts for cross-turn repetition validation. */
+  recentMediatorMessages?: string[];
+  /** Transcript ids aligned with recent mediator messages for diagnostics. */
+  recentMediatorMessageRefs?: Array<{ id: string; content: string }>;
 }
 
 /** LLM generation hints for downstream bridge. */

@@ -12,7 +12,7 @@ import {
 import {
   compareRuntimeNextBeat,
   type LiveGenerationIntent,
-} from '@/services/mediatorRuntimeClient/compareRuntimeNextBeat';
+} from '@/tests/runtimeComparison/compareRuntimeNextBeat';
 import { hasRuntimeSession } from '@/services/mediatorRuntimeClient/hasRuntimeSession';
 import type { MediatorMode } from '@/services/liveMediation';
 import type { MediatorBeat } from '@/types/mediator/runtimeSession';

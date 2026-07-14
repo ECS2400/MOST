@@ -28,8 +28,8 @@ describe('buildContextSummary', () => {
       },
     } as unknown as Parameters<typeof buildContextSummary>[0]);
 
-    assert.ok(summary.includes('Host perspective:'), 'should include host perspective');
-    assert.ok(summary.includes('Partner perspective:'), 'should include partner perspective');
+    assert.ok(summary.includes('You perspective:'), 'should include host perspective with neutral label');
+    assert.ok(summary.includes('the other person perspective:'), 'should include partner perspective with neutral label');
     assert.ok(summary.includes('Shared conflict summary:'), 'should include shared summary');
   });
 });

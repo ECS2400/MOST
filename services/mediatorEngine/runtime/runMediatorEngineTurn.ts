@@ -1,4 +1,5 @@
 import type { MediatorRuntimeInput, MediatorRuntimeOutput } from '@/types/mediator';
+import { hydrateMediationParticipantNames } from '@/services/mediatorEngine/participants/hydrateMediationParticipantNames';
 import { orchestrateTurn } from '@/services/mediatorEngine/orchestrator/orchestrateTurn';
 import { composePrompt } from '@/services/mediatorEngine/promptComposer/composePrompt';
 import { createFallbackMediatorReply } from '@/services/mediatorEngine/llm/fallback/createFallbackMediatorReply';
@@ -11,6 +12,7 @@ import {
   resolveFinalDraftReply,
 } from '@/services/mediatorEngine/runtime/final/buildFinalMediatorMessage';
 import { buildRuntimeOutput } from '@/services/mediatorEngine/runtime/resolve/buildRuntimeOutput';
+import { logRuntimeTurnContext, previewText } from '@/services/mediatorEngine/edge/runtimeTurnTraceDevLog';
 import { RUNTIME_LIMITS } from '@/services/mediatorEngine/runtime/config/runtimeLimits';
 import {
   createEmptyMediationState,
@@ -41,10 +43,18 @@ export async function runMediatorEngineTurn(
       clientEvents: ctx.turnInput.clientEvents ?? [],
     });
 
+    const hydratedState = clientEventResult.mediationState
+      ? hydrateMediationParticipantNames(
+          clientEventResult.mediationState,
+          ctx.turnInput.participantNames,
+          ctx.language
+        )
+      : null;
+
     const turnInput = {
       ...ctx.turnInput,
       language: ctx.language,
-      mediationState: clientEventResult.mediationState,
+      mediationState: hydratedState,
     };
 
     const orchestratedTurn = orchestrateTurn({
@@ -61,6 +71,30 @@ export async function runMediatorEngineTurn(
 
     const safetyLevel = promptInput.safetyOutput?.level ?? 'none';
     const promptComposerOutput = composePrompt(promptInput);
+
+    const recentRefs = promptComposerOutput.promptMetadata.recentMediatorMessageRefs ?? [];
+    logRuntimeTurnContext({
+      mediationId: ctx.turnInput.mediationId,
+      turnNumber: ctx.turnInput.turnNumber,
+      trigger: ctx.turnInput.trigger,
+      participantReplyCount: (ctx.turnInput.transcriptDelta ?? []).filter(
+        (entry) => entry.authorRole === 'host' || entry.authorRole === 'partner'
+      ).length,
+      participantReplies: (ctx.turnInput.transcriptDelta ?? [])
+        .filter((entry) => entry.authorRole === 'host' || entry.authorRole === 'partner')
+        .map((entry) => ({
+          role: entry.authorRole,
+          messageId: entry.id,
+          contentPreview: previewText(entry.content, 120),
+        })),
+      transcriptDeltaCount: ctx.turnInput.transcriptDelta?.length ?? 0,
+      transcriptWindowCount: promptInput.transcriptWindow?.length ?? 0,
+      recentMediatorMessageCount: recentRefs.length,
+      recentMediatorMessages: recentRefs.map((entry) => ({
+        messageId: entry.id,
+        contentPreview: previewText(entry.content, 120),
+      })),
+    });
 
     const retryResult = await runReplyRetryLoop({
       promptComposerOutput,

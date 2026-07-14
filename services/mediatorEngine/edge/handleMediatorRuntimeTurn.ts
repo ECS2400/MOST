@@ -7,6 +7,8 @@ import {
   type MediatorRuntimeErrorBody,
 } from '@/services/mediatorEngine/edge/errors';
 import { parseMediatorRuntimeRequest, toOrchestrateTurnRequest } from '@/services/mediatorEngine/edge/request';
+import { logLlmValidationFailed } from '@/services/mediatorEngine/edge/llmValidationDevLog';
+import { MEDIATOR_RUNTIME_BUILD_ID } from '@/services/mediatorEngine/edge/mediatorRuntimeBuild';
 import { buildMediatorRuntimeEdgeSuccess } from '@/services/mediatorEngine/edge/response';
 import type {
   MediatorRuntimeEdgeEnv,
@@ -39,6 +41,7 @@ function logDevResponseSource(runtimeOutput: Awaited<ReturnType<typeof runMediat
       : finalSource;
 
   console.info('[mediatorResponseSource]', {
+    runtimeBuild: MEDIATOR_RUNTIME_BUILD_ID,
     source,
     fallbackUsed: runtimeOutput.fallbackUsed,
     validationAction: runtimeOutput.responseValidation.action,
@@ -129,6 +132,31 @@ export async function handleMediatorRuntimeTurn(
         code === MEDIATOR_RUNTIME_ERROR_CODES.LLM_TEMPORARILY_UNAVAILABLE
           ? 'LLM temporarily unavailable'
           : 'LLM reply failed validation';
+
+      logLlmValidationFailed({
+        mediationId: parsed.value.mediationId,
+        engineVersion: parsed.value.engineVersion,
+        model:
+          runtimeOutput.llmOutput.providerResponse?.model ??
+          runtimeOutput.finalMediatorMessage.source,
+        originalProviderText:
+          runtimeOutput.llmOutput.originalProviderText ??
+          runtimeOutput.llmOutput.providerResponse?.text ??
+          null,
+        effectiveValidatedText: runtimeOutput.llmOutput.draftReply.text,
+        draftValidationReasons:
+          runtimeOutput.llmOutput.draftValidationReasons ??
+          runtimeOutput.llmOutput.draftReply.validation?.reasons ??
+          [],
+        fallbackSubstituted: runtimeOutput.llmOutput.fallbackSubstituted ?? false,
+        validation: runtimeOutput.responseValidation,
+        trigger: parsed.value.trigger,
+        turnNumber: parsed.value.turnNumber,
+        attemptNumber: runtimeOutput.retryCount + 1,
+        providerSucceeded,
+        finalSource: runtimeOutput.finalMediatorMessage.source,
+        retryInstruction: runtimeOutput.responseValidation.retryInstruction,
+      });
 
       return {
         ok: false,

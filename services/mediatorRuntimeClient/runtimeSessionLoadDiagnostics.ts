@@ -12,6 +12,8 @@ export interface RuntimeSessionLoadDiagnostics {
   mediationId: string;
   loadAttempted: boolean;
   rowFound: boolean;
+  mediationStatePresent: boolean;
+  sessionMemoryPresent: boolean;
   runtimeSessionPresent: boolean;
   runtimeMetadataPresent: boolean;
   shapeValid: boolean;
@@ -27,6 +29,8 @@ export function buildRuntimeSessionLoadDiagnostics(params: {
   rowFound: boolean;
   rawRuntimeSession: unknown;
   rawRuntimeMetadata?: unknown;
+  rawMediationState?: unknown;
+  rawSessionMemory?: unknown;
   supabaseErrorCode?: string | null;
   supabaseErrorMessage?: string | null;
 }): RuntimeSessionLoadDiagnostics {
@@ -37,6 +41,8 @@ export function buildRuntimeSessionLoadDiagnostics(params: {
     mediationId: params.mediationId,
     loadAttempted: params.loadAttempted,
     rowFound: params.rowFound,
+    mediationStatePresent: params.rawMediationState != null,
+    sessionMemoryPresent: params.rawSessionMemory != null,
     runtimeSessionPresent: params.rawRuntimeSession != null,
     runtimeMetadataPresent: params.rawRuntimeMetadata != null,
     shapeValid,

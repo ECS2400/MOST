@@ -27,13 +27,17 @@ import { resolveRuntimeSessionFlow } from '@/services/mediatorRuntimeClient/reso
 import { buildRuntimeClientEvents, buildParticipantReplyClientEvents } from '@/services/mediatorRuntimeClient/buildRuntimeClientEvents';
 import type {
   MediationState,
-  MediatorRuntimeEdgeSuccess,
   OrchestrateTurnTrigger,
   RuntimeClientEvent,
   RuntimeSession,
   SessionMemory,
   TranscriptMessage,
 } from '@/types/mediator';
+import type { MediatorRuntimeEdgeSuccess } from '@/services/mediatorEngine/edge/types';
+import {
+  createRuntimeSessionFixture,
+  type RuntimeSessionFixtureOverrides,
+} from '@/services/mediatorRuntimeClient/__tests__/client/runtimeSessionFixtures';
 
 const MEDIATION_ID = 'e2e-mediation-1';
 const SESSION_ID = 'e2e-session-1';
@@ -119,7 +123,9 @@ function closureState(): MediationState {
     turnNumber: 12,
     trigger: 'host_generate',
     transcriptDelta: [],
+    language: 'pl',
     engineVersion: 'v2.3',
+    mediationState: null,
   });
   state.currentGoal = 'CLOSURE';
   return state;
@@ -131,8 +137,8 @@ function withClosureSummary(memory: SessionMemory, count = 1): SessionMemory {
     turnNumber: 10 + index,
     type: 'summarize_close' as const,
     goal: 'CLOSURE' as const,
-    intent: 'close_session' as const,
-    strategy: 'integrate' as const,
+    intent: 'close_with_dignity' as const,
+    strategy: 'close_topic' as const,
     expectedEffectId: 'effect-close',
     signature: `sig-${index + 1}`,
     compliance: {
@@ -156,7 +162,9 @@ function proposalState(): MediationState {
     turnNumber: 15,
     trigger: 'host_generate',
     transcriptDelta: [],
+    language: 'pl',
     engineVersion: 'v2.3',
+    mediationState: null,
   });
   state.currentGoal = 'AGREEMENT';
   state.agreements.sharedRule = 'Take turns speaking';
@@ -172,8 +180,8 @@ function withProposalHistory(memory: SessionMemory): SessionMemory {
         turnNumber: 10,
         type: 'propose_rule',
         goal: 'AGREEMENT',
-        intent: 'propose_agreement',
-        strategy: 'integrate',
+        intent: 'prepare_shared_agreement',
+        strategy: 'prepare_agreement',
         expectedEffectId: 'effect-proposal',
         signature: 'sig-prop',
         compliance: {
@@ -190,22 +198,24 @@ function withProposalHistory(memory: SessionMemory): SessionMemory {
   };
 }
 
-function runtimeWith(overrides: Partial<RuntimeSession>): RuntimeSession {
-  const base = {
+function runtimeWith(overrides: RuntimeSessionFixtureOverrides = {}): RuntimeSession {
+  return createRuntimeSessionFixture({
     decision: {
-      nextBeat: 'await_user_action' as const,
+      nextBeat: 'await_user_action',
       mayAutoAdvance: false,
       blockedReason: null,
       triggerHint: null,
+      ...overrides.decision,
     },
     session: {
-      stage: 'closing' as const,
-      outcome: 'ongoing' as const,
-      currentGoal: 'CLOSURE' as const,
+      stage: 'closing',
+      outcome: 'ongoing',
+      currentGoal: 'CLOSURE',
       activeStrategy: null,
       turnOrdinal: 12,
       isExtensionActive: false,
       participantPresence: { hostActive: true, partnerActive: true, partnerRequired: true },
+      ...overrides.session,
     },
     progress: {
       completionEstimate: 80,
@@ -217,44 +227,44 @@ function runtimeWith(overrides: Partial<RuntimeSession>): RuntimeSession {
         estimatedRemainingGoals: 1,
       },
       labelKey: 'runtime.stage.closing',
+      ...overrides.progress,
     },
     presentation: {
       deliverables: [],
-      primaryDeliverable: 'public_message' as const,
+      primaryDeliverable: 'public_message',
       hideInput: false,
       showDecisionPanel: null,
       hostOnlyGeneration: false,
+      ...overrides.presentation,
     },
     proposal: {
-      phase: 'none' as const,
+      phase: 'none',
       content: null,
       votes: { host: null, partner: null },
       requiresBothAcceptance: true,
+      ...overrides.proposal,
     },
     closure: {
-      directive: 'none' as const,
+      directive: 'none',
       suggestedDbStatus: null,
       closureMessage: null,
       navigateToClosure: false,
+      ...overrides.closure,
     },
-    pending: { awaiting: 'nothing' as const, awaitingFrom: [], satisfiedBy: [] },
+    pending: {
+      awaiting: 'nothing',
+      awaitingFrom: [],
+      satisfiedBy: [],
+      ...overrides.pending,
+    },
     diagnostics: {
       explainabilityId: null,
-      safetyLevel: 'none' as const,
+      safetyLevel: 'none',
       fallbackUsed: false,
       validationWarnings: [],
+      ...overrides.diagnostics,
     },
-  };
-
-  return {
-    ...base,
-    ...overrides,
-    session: { ...base.session, ...overrides.session },
-    proposal: { ...base.proposal, ...overrides.proposal },
-    closure: { ...base.closure, ...overrides.closure },
-    pending: { ...base.pending, ...overrides.pending },
-    decision: { ...base.decision, ...overrides.decision },
-  };
+  });
 }
 
 describe('mapMediationContextToBootstrapState — survey intake audit', () => {
@@ -315,8 +325,8 @@ describe('mapMediationContextToBootstrapState — survey intake audit', () => {
 
     const prompt = composePrompt(promptInput);
     assert.match(prompt.contextSummary, /Shared conflict summary:/);
-    assert.match(prompt.contextSummary, /Host perspective:/);
-    assert.match(prompt.contextSummary, /Partner perspective:/);
+    assert.match(prompt.contextSummary, /Ty perspective:/);
+    assert.match(prompt.contextSummary, /druga strona perspective:/);
     assert.match(prompt.contextSummary, /Decyzja podjęta bez konsultacji/);
   });
 });
@@ -384,7 +394,6 @@ describe('liveFlowE2E — standard participant turns', () => {
     assert.equal(
       resolveRuntimeGenerationFlow({
         runtimeSession: opening.runtimeSession,
-        legacyMode: 'generate_question',
       }).mode,
       null
     );
@@ -442,7 +451,7 @@ describe('liveFlowE2E — standard participant turns', () => {
     assert.deepEqual(executedTurns, [1, 2, 3, 4]);
     assert.ok(mediationState);
     assert.ok(sessionMemory);
-    assert.equal(resolveRuntimeActionExecution({ runtimeSession }).useLegacyFallback, false);
+    assert.equal(resolveRuntimeActionExecution({ runtimeSession }).useRuntime, true);
   });
 });
 
@@ -486,7 +495,7 @@ describe('liveFlowE2E — continue / extension clientEvents', () => {
 
     const generation = resolveRuntimeGenerationFlow({ runtimeSession: session });
     assert.equal(generation.mode, 'extension_question');
-    assert.equal(generation.source, 'runtime');
+    assert.equal(generation.source, 'runtime_available');
   });
 });
 
@@ -518,7 +527,7 @@ describe('liveFlowE2E — proposal votes and closure', () => {
     const closure = resolveRuntimeClosureAction({ runtimeSession: resolvedSession });
     assert.equal(closure.shouldNavigate, true);
     assert.equal(closure.suggestedDbStatus, 'resolved');
-    assert.equal(closure.source, 'runtime');
+    assert.equal(closure.source, 'runtime_available');
   });
 
   it('proposal reject keeps mediation open', () => {
@@ -531,7 +540,7 @@ describe('liveFlowE2E — proposal votes and closure', () => {
     assert.equal(rejected.sessionMemory.runtimeFlowControl.proposalPhase, 'rejected');
     const session = runtimeWith({
       proposal: { phase: 'rejected', content: null, votes: { host: 'rejected', partner: null }, requiresBothAcceptance: true },
-      session: { stage: 'proposal', outcome: 'ongoing', currentGoal: 'AGREEMENT_BUILDING', activeStrategy: null, turnOrdinal: 15, isExtensionActive: false, participantPresence: { hostActive: true, partnerActive: true, partnerRequired: true } },
+      session: { stage: 'proposal', outcome: 'ongoing', currentGoal: 'AGREEMENT', activeStrategy: null, turnOrdinal: 15, isExtensionActive: false, participantPresence: { hostActive: true, partnerActive: true, partnerRequired: true } },
     });
     const flow = resolveRuntimeSessionFlow({ runtimeSession: session }).flow;
     assert.equal(flow.stage, 'unresolved_but_closed');
@@ -571,7 +580,7 @@ describe('liveFlowE2E — safety intervention', () => {
 
     const generation = resolveRuntimeGenerationFlow({ runtimeSession: output.runtimeSession });
     assert.equal(generation.mode, 'safety_intervention');
-    assert.equal(generation.source, 'runtime');
+    assert.equal(generation.source, 'runtime_available');
   });
 });
 
@@ -643,40 +652,28 @@ describe('liveFlowE2E — persistence reload', () => {
   });
 });
 
-describe('liveFlowE2E — legacy fallback only on runtime failure', () => {
-  it('healthy runtime does not invoke legacy generate getter', () => {
-    let legacyCalled = false;
+describe('liveFlowE2E — runtime-only generation flow', () => {
+  it('healthy runtime resolves generation mode from runtime beat', () => {
     const session = runtimeWith({
       decision: { nextBeat: 'deliver_question', mayAutoAdvance: true, blockedReason: null, triggerHint: 'host_generate' },
     });
 
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession: session,
-      getLegacyMode: () => {
-        legacyCalled = true;
-        return 'generate_question';
-      },
     });
 
-    assert.equal(legacyCalled, false);
-    assert.equal(resolution.source, 'runtime');
+    assert.equal(resolution.source, 'runtime_available');
     assert.equal(resolution.mode, 'generate_question');
   });
 
-  it('runtime failure does not invoke legacy generate getter in production default', () => {
-    let legacyCalled = false;
+  it('runtime failure returns unavailable without generation mode', () => {
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession: runtimeWith({
         decision: { nextBeat: 'deliver_question', mayAutoAdvance: true, blockedReason: null, triggerHint: 'host_generate' },
       }),
       runtimeFailed: true,
-      getLegacyMode: () => {
-        legacyCalled = true;
-        return 'generate_question';
-      },
     });
 
-    assert.equal(legacyCalled, false);
     assert.equal(resolution.source, 'runtime_unavailable');
     assert.equal(resolution.reason, 'runtime_failed');
     assert.equal(resolution.mode, null);

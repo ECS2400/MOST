@@ -86,6 +86,8 @@ export function createInitialMediationState(input: CreateInitialMediationStateIn
         partnerEmotions: [],
         partnerNeeds: [],
         keyTrigger: null,
+        hostPerspective: null,
+        partnerPerspective: null,
       },
     },
     dynamics: {

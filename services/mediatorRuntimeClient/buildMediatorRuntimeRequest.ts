@@ -21,6 +21,8 @@ export interface MediatorRuntimeClientInput {
   mediationId: string;
   engineVersion?: typeof MEDIATOR_RUNTIME_ENGINE_VERSION;
   clientEvents?: RuntimeClientEvent[];
+  transcriptWindow?: TranscriptMessage[];
+  participantNames?: { hostName?: string; partnerName?: string };
 }
 
 /** Builds the JSON body accepted by mediator-runtime Edge Function. */
@@ -38,5 +40,7 @@ export function buildMediatorRuntimeRequest(
     language: input.language,
     engineVersion: input.engineVersion ?? MEDIATOR_RUNTIME_ENGINE_VERSION,
     clientEvents: input.clientEvents ?? [],
+    transcriptWindow: input.transcriptWindow,
+    participantNames: input.participantNames,
   };
 }

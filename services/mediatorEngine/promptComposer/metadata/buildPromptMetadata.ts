@@ -7,6 +7,8 @@ export function buildPromptMetadata(input: {
   interventionType: string;
   goal: string;
   transcriptMessageCount: number;
+  recentMediatorMessages?: string[];
+  recentMediatorMessageRefs?: Array<{ id: string; content: string }>;
 }): PromptMetadata {
   return {
     turnNumber: input.turnNumber,
@@ -15,5 +17,7 @@ export function buildPromptMetadata(input: {
     goal: input.goal,
     composedAt: new Date().toISOString(),
     transcriptMessageCount: input.transcriptMessageCount,
+    recentMediatorMessages: input.recentMediatorMessages,
+    recentMediatorMessageRefs: input.recentMediatorMessageRefs,
   };
 }

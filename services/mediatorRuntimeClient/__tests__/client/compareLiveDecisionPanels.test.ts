@@ -4,11 +4,11 @@ import { createMinimalRuntimeSuccess } from '@/services/mediatorRuntimeClient/__
 import {
   compareLiveDecisionPanels,
   resolveRuntimeLiveDecisionPanelKind,
-} from '@/services/mediatorRuntimeClient/compareLiveDecisionPanels';
+} from '@/tests/runtimeComparison/compareLiveDecisionPanels';
 import {
   resolveLegacyLiveDecisionPanelState,
   type LiveLegacyDecisionPanelInput,
-} from '@/services/mediatorRuntimeClient/resolveLegacyLiveDecisionPanel';
+} from '@/tests/runtimeComparison/resolveLegacyLiveDecisionPanel';
 
 function legacyInput(
   overrides: Partial<LiveLegacyDecisionPanelInput> = {}

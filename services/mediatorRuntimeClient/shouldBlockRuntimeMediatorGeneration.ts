@@ -1,6 +1,6 @@
 import { hasRuntimeSession } from '@/services/mediatorRuntimeClient/hasRuntimeSession';
 import { isRuntimeDirectMediatorMode } from '@/services/mediatorRuntimeClient/resolveRuntimeGenerationFlow';
-import type { MediatorMode } from '@/services/liveMediation';
+import type { MediatorMode } from '@/services/liveMediation.types';
 import type { RuntimeClientEvent, RuntimeSession } from '@/types/mediator/runtimeSession';
 
 const FLOW_CONTROL_CLIENT_EVENT_KINDS: ReadonlySet<RuntimeClientEvent['kind']> = new Set([
@@ -29,8 +29,6 @@ export interface ShouldBlockRuntimeMediatorGenerationParams {
   mode: MediatorMode;
   force?: boolean;
   clientEvents?: RuntimeClientEvent[];
-  /** Opening bootstrap on a fresh session — only bypass when explicitly allowed. */
-  allowOpeningBootstrap?: boolean;
 }
 
 function hasFlowControlClientEvents(clientEvents?: RuntimeClientEvent[]): boolean {
@@ -50,9 +48,12 @@ function isPublicMediatorMode(mode: MediatorMode): boolean {
 export function shouldBlockRuntimeMediatorGeneration(
   params: ShouldBlockRuntimeMediatorGenerationParams
 ): boolean {
-  const { runtimeSession, mode, force, clientEvents, allowOpeningBootstrap } = params;
+  const { runtimeSession, mode, force, clientEvents } = params;
 
   if (!hasRuntimeSession(runtimeSession)) {
+    if (force && mode === 'opening_summary') {
+      return false;
+    }
     return isPublicMediatorMode(mode);
   }
 
@@ -60,7 +61,7 @@ export function shouldBlockRuntimeMediatorGeneration(
     return false;
   }
 
-  if (mode === 'opening_summary' && allowOpeningBootstrap) {
+  if (force && mode === 'opening_summary') {
     if (runtimeSession.decision.nextBeat === 'deliver_opening') {
       return false;
     }

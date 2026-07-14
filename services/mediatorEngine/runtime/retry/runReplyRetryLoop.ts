@@ -10,6 +10,12 @@ import type {
 } from '@/types/mediator';
 import { generateMediatorReply } from '@/services/mediatorEngine/llm/generateMediatorReply';
 import { validateMediatorReply } from '@/services/mediatorEngine/responseValidator/validateMediatorReply';
+import { logLlmValidationFailed } from '@/services/mediatorEngine/edge/llmValidationDevLog';
+import {
+  failedRuleIds,
+  logRuntimeAttemptResult,
+  logRuntimeAttemptStart,
+} from '@/services/mediatorEngine/edge/runtimeTurnTraceDevLog';
 import { tryTargetedRewrite } from '@/services/mediatorEngine/runtime/retry/targetedRewrite';
 
 function uniqueFailedRuleIds(validation: ResponseValidationResult): string[] {
@@ -55,6 +61,13 @@ export async function runReplyRetryLoop(input: ReplyRetryLoopInput): Promise<Rep
   let retryInstruction: string | null = null;
 
   while (attemptNumber <= ctx.maxReplyAttempts) {
+    logRuntimeAttemptStart({
+      mediationId: ctx.turnInput.mediationId,
+      turnNumber: ctx.turnInput.turnNumber,
+      attemptNumber,
+      trigger: ctx.turnInput.trigger,
+    });
+
     llmOutput = await generateMediatorReply({
       promptComposerOutput,
       provider: ctx.llmProvider,
@@ -75,12 +88,26 @@ export async function runReplyRetryLoop(input: ReplyRetryLoopInput): Promise<Rep
       maxAttempts: ctx.maxReplyAttempts,
     });
 
-    const failedRuleIds = uniqueFailedRuleIds(responseValidation);
+    const failedRuleIdsList = uniqueFailedRuleIds(responseValidation);
     const providerSucceeded = Boolean(llmOutput.providerResponse);
+    logRuntimeAttemptResult({
+      mediationId: ctx.turnInput.mediationId,
+      turnNumber: ctx.turnInput.turnNumber,
+      attemptNumber,
+      originalProviderText: llmOutput.originalProviderText ?? llmOutput.providerResponse?.text ?? null,
+      effectiveValidatedText: llmOutput.draftReply.text,
+      draftValidationReasons:
+        llmOutput.draftValidationReasons ?? llmOutput.draftReply.validation?.reasons ?? [],
+      fallbackSubstituted: llmOutput.fallbackSubstituted ?? false,
+      validationAction: responseValidation.action,
+      validationReasonCodes: failedRuleIdsList,
+      finalSource: llmOutput.draftReply.source,
+      retryInstruction: responseValidation.retryInstruction,
+    });
     logAttemptDev({
       attempt: attemptNumber,
       validationAction: responseValidation.action,
-      failedRuleIds,
+      failedRuleIds: failedRuleIdsList,
       currentGoal: String(promptComposerOutput.promptMetadata?.goal ?? '') || null,
       stage: String(promptComposerOutput.promptMetadata?.goal ?? '') || null,
       interventionType: String(promptComposerOutput.promptMetadata?.interventionType ?? '') || null,
@@ -88,6 +115,26 @@ export async function runReplyRetryLoop(input: ReplyRetryLoopInput): Promise<Rep
       questionCount: llmOutput.draftReply.validation?.questionCount ?? 0,
       providerSucceeded,
     });
+
+    if (responseValidation.action !== 'accept') {
+      logLlmValidationFailed({
+        mediationId: ctx.turnInput.mediationId,
+        engineVersion: ctx.turnInput.engineVersion,
+        model: llmOutput.providerResponse?.model ?? llmOutput.draftReply.metadata?.model ?? null,
+        originalProviderText: llmOutput.originalProviderText ?? llmOutput.providerResponse?.text ?? null,
+        effectiveValidatedText: llmOutput.draftReply.text,
+        draftValidationReasons:
+          llmOutput.draftValidationReasons ?? llmOutput.draftReply.validation?.reasons ?? [],
+        fallbackSubstituted: llmOutput.fallbackSubstituted ?? false,
+        validation: responseValidation,
+        trigger: ctx.turnInput.trigger,
+        turnNumber: ctx.turnInput.turnNumber,
+        attemptNumber,
+        providerSucceeded,
+        finalSource: llmOutput.draftReply.source,
+        retryInstruction: responseValidation.retryInstruction,
+      });
+    }
 
     if (responseValidation.action === 'accept') {
       return {
@@ -111,7 +158,7 @@ export async function runReplyRetryLoop(input: ReplyRetryLoopInput): Promise<Rep
     // do a deterministic targeted rewrite before burning another provider call.
     const rewrite = tryTargetedRewrite({
       draftReply: llmOutput.draftReply,
-      failedRuleIds,
+      failedRuleIds: failedRuleIdsList,
       language: ctx.language,
       safetyLevel,
       turnNumber,

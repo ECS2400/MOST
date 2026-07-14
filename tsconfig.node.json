@@ -1,0 +1,45 @@
+/**
+ * Node: mediator engine, runtime client tests, liveMediation service, scripts.
+ * Does not include Expo app screens or Supabase Edge Functions.
+ */
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "types": [],
+    "paths": {
+      "@/*": ["./*"],
+      "@/services/supabase": ["./services/mediatorRuntimeClient/typecheck/supabase.stub.ts"]
+    }
+  },
+  "include": [
+    "services/mediatorEngine/**/*.ts",
+    "services/mediatorRuntimeClient/**/*.ts",
+    "services/liveMediation.types.ts",
+    "types/mediator/**/*.ts",
+    "types/node-runtime.d.ts",
+    "types/runtime-globals.d.ts",
+    "legacyMigration/**/*.ts",
+    "tests/runtimeComparison/**/*.ts",
+    "hooks/useRuntimeSession.ts",
+    "services/*_test.ts",
+    "scripts/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "supabase/**",
+    "app/**",
+    "components/**",
+    "services/mediatorEngine/__tests__/architecture.runtime.test.ts",
+    "services/ocrShared_test.ts"
+  ]
+}

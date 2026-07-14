@@ -17,6 +17,7 @@ import {
 import { safePromptInput } from '@/services/mediatorEngine/promptComposer/lib/safePromptInput';
 import { createRichPipelineInput, createPromptComposerInput } from '@/services/mediatorEngine/__tests__/promptComposer/fixtures';
 import { createBaselineMediationState } from '@/services/mediatorEngine/__tests__/decision/fixtures';
+import { hydrateMediationParticipantNames } from '@/services/mediatorEngine/participants/hydrateMediationParticipantNames';
 
 describe('Mościk persona — PERSONA-1 / PERSONA-2', () => {
   it('loads canonical markdown verbatim from mostMediatorPersona.md', () => {
@@ -44,25 +45,29 @@ describe('Mościk persona — PERSONA-1 / PERSONA-2', () => {
   });
 
   it('substitutes participant display names from mediationState', () => {
-    const state = createBaselineMediationState({
-      participants: {
-        ...createBaselineMediationState().participants,
-        host: {
-          ...createBaselineMediationState().participants.host,
-          profile: {
-            ...createBaselineMediationState().participants.host.profile,
-            displayName: 'Daniel',
+    const state = hydrateMediationParticipantNames(
+      createBaselineMediationState({
+        participants: {
+          ...createBaselineMediationState().participants,
+          host: {
+            ...createBaselineMediationState().participants.host,
+            profile: {
+              ...createBaselineMediationState().participants.host.profile,
+              displayName: 'Host',
+            },
+          },
+          partner: {
+            ...createBaselineMediationState().participants.partner,
+            profile: {
+              ...createBaselineMediationState().participants.partner.profile,
+              displayName: 'Partner',
+            },
           },
         },
-        partner: {
-          ...createBaselineMediationState().participants.partner,
-          profile: {
-            ...createBaselineMediationState().participants.partner.profile,
-            displayName: 'Patrycja',
-          },
-        },
-      },
-    });
+      }),
+      { hostName: 'Daniel', partnerName: 'Patrycja' },
+      'pl'
+    );
 
     const ctx = safePromptInput(
       createPromptComposerInput({

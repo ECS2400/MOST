@@ -27,7 +27,7 @@ export interface ApplyAiTurnDevLogPayload {
 
 export function resolveApplyAiTurnTriggerSource(
   mode: string,
-  triggerMessage: { metadata?: Record<string, unknown> }
+  triggerMessage: { metadata?: Record<string, unknown> | null }
 ): ApplyAiTurnTriggerSource {
   if (triggerMessage.metadata?.bootstrap === true || mode === 'opening_summary') {
     return 'bootstrap';

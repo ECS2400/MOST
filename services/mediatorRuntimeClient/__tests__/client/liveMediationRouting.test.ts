@@ -105,30 +105,33 @@ describe('routeLiveMediatorTurn', () => {
       {
         callRuntime: async () => {
           runtimeCalls += 1;
-          return { source: 'runtime' };
+          return { source: 'runtime_available' };
         },
         onRuntimeFailure: () => {},
       }
     );
 
-    assert.deepEqual(result, { source: 'runtime' });
+    assert.deepEqual(result, { source: 'runtime_available' });
     assert.equal(runtimeCalls, 1);
   });
 
-  it('returns null and invokes onRuntimeFailure when runtime throws', async () => {
+  it('throws and invokes onRuntimeFailure when runtime throws', async () => {
     const failures: unknown[] = [];
 
-    const result = await routeLiveMediatorTurn(
-      buildLiveRuntimeTurnInput(BASE_PARAMS),
-      {
-        callRuntime: async () => {
-          throw new MediatorRuntimeClientError('network', 'offline', { retryable: true });
-        },
-        onRuntimeFailure: (error) => failures.push(error),
-      }
+    await assert.rejects(
+      () =>
+        routeLiveMediatorTurn(
+          buildLiveRuntimeTurnInput(BASE_PARAMS),
+          {
+            callRuntime: async () => {
+              throw new MediatorRuntimeClientError('network', 'offline', { retryable: true });
+            },
+            onRuntimeFailure: (error) => failures.push(error),
+          }
+        ),
+      MediatorRuntimeClientError
     );
 
-    assert.equal(result, null);
     assert.equal(failures.length, 1);
   });
 });

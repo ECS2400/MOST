@@ -1,6 +1,7 @@
 import { buildMediatorRuntimeRequest } from '@/services/mediatorRuntimeClient/buildMediatorRuntimeRequest';
 import type { MediatorRuntimeClientInput } from '@/services/mediatorRuntimeClient/buildMediatorRuntimeRequest';
 import { buildBothRepliesTranscriptDelta } from '@/services/mediatorRuntimeClient/buildBothRepliesTranscriptDelta';
+import { buildLiveTranscriptWindow } from '@/services/mediatorRuntimeClient/buildLiveTranscriptWindow';
 import { buildParticipantReplyClientEventsFromMessages } from '@/services/mediatorRuntimeClient/buildParticipantReplyClientEventsFromMessages';
 import {
   deriveParticipantReplyStateFromMessages,
@@ -24,6 +25,7 @@ export interface ProcessBothParticipantRepliesInput {
   partnerUserIds: string[];
   language?: Language;
   questionTurn?: number | null;
+  participantNames?: { hostName?: string; partnerName?: string };
 }
 
 export interface ProcessBothParticipantRepliesResult {
@@ -207,8 +209,14 @@ export async function processBothParticipantReplies(
       input.partnerUserIds,
       questionTurn
     ),
+    transcriptWindow: buildLiveTranscriptWindow(
+      input.messages as Array<ParticipantReplyMessage & { content: string; created_at: string; message_type: string; sender_id: string; id: string }>,
+      input.hostUserId,
+      input.partnerUserIds
+    ),
     language: toRuntimeLanguage(input.language ?? 'pl'),
     clientEvents: replyClientEvents,
+    participantNames: input.participantNames,
   };
 
   logAtomicTurnPipelineDev({
@@ -366,8 +374,14 @@ export function buildBothParticipantRepliesRuntimeRequest(
       input.partnerUserIds,
       questionTurn
     ),
+    transcriptWindow: buildLiveTranscriptWindow(
+      input.messages as Array<ParticipantReplyMessage & { content: string; created_at: string; message_type: string; sender_id: string; id: string }>,
+      input.hostUserId,
+      input.partnerUserIds
+    ),
     language: toRuntimeLanguage(input.language ?? 'pl'),
     clientEvents: buildParticipantReplyClientEventsFromMessages(derived),
+    participantNames: input.participantNames,
   };
 }
 

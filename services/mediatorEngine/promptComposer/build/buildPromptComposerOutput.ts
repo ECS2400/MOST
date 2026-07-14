@@ -1,6 +1,10 @@
 import type { PromptComposerOutput } from '@/types/mediator';
 import { buildPromptMetadata } from '@/services/mediatorEngine/promptComposer/metadata/buildPromptMetadata';
 import { estimatePromptTokens } from '@/services/mediatorEngine/promptComposer/metadata/estimateTokens';
+import {
+  extractRepetitionComparisonMessageRefs,
+  extractRepetitionComparisonMessages,
+} from '@/services/mediatorEngine/promptComposer/transcript/extractRecentMediatorMessages';
 import { buildContextSummary } from '@/services/mediatorEngine/promptComposer/sections/buildContextSummary';
 import { buildDeveloperPrompt } from '@/services/mediatorEngine/promptComposer/sections/buildDeveloperPrompt';
 import { buildModelHints } from '@/services/mediatorEngine/promptComposer/sections/buildModelHints';
@@ -39,6 +43,8 @@ export function buildPromptComposerOutput(ctx: SafePromptContext): PromptCompose
   const safetyLevel = ctx.safetyOutput?.level ?? 'none';
   const safetyEnvelope = buildSafetyEnvelope(safetyLevel);
   const transcriptEntries = sanitizeTranscriptWindow(ctx.transcriptWindow);
+  const recentMediatorMessages = extractRepetitionComparisonMessages(ctx.transcriptWindow);
+  const recentMediatorMessageRefs = extractRepetitionComparisonMessageRefs(ctx.transcriptWindow);
   const sections = buildPromptSections(ctx);
 
   const tokenEstimate = estimatePromptTokens([
@@ -58,6 +64,8 @@ export function buildPromptComposerOutput(ctx: SafePromptContext): PromptCompose
       interventionType: ctx.intervention.type ?? 'validate',
       goal: ctx.currentGoal,
       transcriptMessageCount: transcriptEntries.length,
+      recentMediatorMessages,
+      recentMediatorMessageRefs,
     }),
     safetyEnvelope,
     tokenEstimate,

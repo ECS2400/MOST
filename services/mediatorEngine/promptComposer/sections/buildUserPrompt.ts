@@ -6,6 +6,7 @@ import {
 } from '@/services/mediatorEngine/promptComposer/config/mediatorUserTask';
 import { PERSONA_PRECEDENCE_CLAUSE } from '@/services/mediatorEngine/promptComposer/config/personaPrecedence';
 import type { SafePromptContext } from '@/services/mediatorEngine/promptComposer/lib/safePromptInput';
+import { resolveParticipantDisplayNames } from '@/services/mediatorEngine/participants/resolveParticipantDisplayName';
 import { formatTranscriptWindow } from '@/services/mediatorEngine/promptComposer/transcript/formatTranscriptWindow';
 import type { TranscriptWindowEntry } from '@/types/mediator';
 
@@ -34,7 +35,14 @@ export function buildUserPrompt(
     contextSummary,
     '',
     '=== Recent conversation ===',
-    formatTranscriptWindow(transcriptEntries),
+    formatTranscriptWindow(
+      transcriptEntries,
+      resolveParticipantDisplayNames(
+        ctx.mediationState.participants?.host?.profile?.displayName,
+        ctx.mediationState.participants?.partner?.profile?.displayName,
+        ctx.language
+      )
+    ),
     '',
     '=== Task ===',
     ...mediatorUserTaskLines(ctx.language),

@@ -7,6 +7,7 @@ import type {
   SessionMemory,
   StrategyEngineStateContext,
 } from '@/types/mediator';
+import { hydrateMediationParticipantNames } from '@/services/mediatorEngine/participants/hydrateMediationParticipantNames';
 import { makeDecision } from '@/services/mediatorEngine/decision/makeDecision';
 import { buildContinuityContext } from '@/services/mediatorEngine/memory/continuity';
 import { buildGoalContinuityContext } from '@/services/mediatorEngine/goalContinuity';
@@ -74,6 +75,17 @@ export function buildPromptComposerInputFromTurn(
   const stateBefore = request.mediationState ?? createEmptyMediationState(request);
   const state = orchestrated.mediationState;
   const turnNumber = request.turnNumber;
+  const transcriptWindow =
+    Array.isArray(request.transcriptWindow) && request.transcriptWindow.length > 0
+      ? request.transcriptWindow
+      : Array.isArray(request.transcriptDelta)
+        ? request.transcriptDelta
+        : [];
+  const hydratedState = hydrateMediationParticipantNames(
+    state,
+    request.participantNames,
+    language
+  );
 
   const safetyOutput = evaluateSafety({
     state,
@@ -111,6 +123,8 @@ export function buildPromptComposerInputFromTurn(
     safety: safetyOutput,
     strategy: strategyOutput,
     turnNumber,
+    transcriptDelta: request.transcriptDelta,
+    transcriptWindow,
   });
 
   const continuityContext = buildContinuityContext({
@@ -131,7 +145,7 @@ export function buildPromptComposerInputFromTurn(
   });
 
   return {
-    mediationState: state,
+    mediationState: hydratedState,
     sessionMemory: orchestrated.sessionMemory,
     safetyOutput,
     reflectionOutput,
@@ -140,11 +154,12 @@ export function buildPromptComposerInputFromTurn(
     decisionOutput,
     intervention: orchestrated.intervention,
     complianceResult: orchestrated.complianceResult,
-    transcriptWindow: Array.isArray(request.transcriptDelta) ? request.transcriptDelta : [],
+    transcriptWindow,
     language,
     turnNumber,
     continuityContext,
     goalContinuityContext,
+    participantNames: request.participantNames,
   };
 }
 

@@ -162,6 +162,8 @@ export function orchestrateTurn(input: MediatorEngineTurnInput): OrchestrateTurn
     safety: safetyOutput,
     strategy: strategyOutput,
     turnNumber: request.turnNumber,
+    transcriptDelta: request.transcriptDelta,
+    transcriptWindow: request.transcriptWindow,
   });
 
   const continuityContext = buildContinuityContext({

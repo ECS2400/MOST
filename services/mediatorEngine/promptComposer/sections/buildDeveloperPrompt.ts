@@ -8,6 +8,7 @@ import {
   voiceLabelForStrategy,
 } from '@/services/mediatorEngine/promptComposer/config/runtimeVoiceLabels';
 import { buildMostMediatorPersonaSection } from '@/services/mediatorEngine/promptComposer/persona/mostMediatorPersona';
+import { buildRepairVoiceConstraints } from '@/services/mediatorEngine/promptComposer/sections/buildRepairVoiceConstraints';
 import { formatSafetyEnvelopeSection } from '@/services/mediatorEngine/promptComposer/sections/buildSafetyEnvelope';
 import type { SafePromptContext } from '@/services/mediatorEngine/promptComposer/lib/safePromptInput';
 
@@ -41,7 +42,10 @@ export function buildDeveloperPrompt(
     ctx.currentGoal as TherapeuticGoal,
     ctx.language
   );
-  if (stageConstraints.length > 0) {
+  const isRepairVoice = priorityOutput.conversationMode === 'REPAIR_VOICE';
+  if (isRepairVoice) {
+    lines.push('', ...buildRepairVoiceConstraints(ctx.language));
+  } else if (stageConstraints.length > 0) {
     lines.push('', ...stageConstraints);
   }
 

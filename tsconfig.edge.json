@@ -1,0 +1,27 @@
+/**
+ * Supabase Edge Functions (Deno-style URL imports).
+ * Prebundled mediator-runtime/_generated is excluded; deploy uses npm run build:mediator:edge.
+ */
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "types": []
+  },
+  "include": [
+    "supabase/functions/**/*.ts",
+    "supabase/functions/deno-globals.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "supabase/functions/mediator-runtime/_generated/**",
+    "supabase/functions/.env"
+  ]
+}

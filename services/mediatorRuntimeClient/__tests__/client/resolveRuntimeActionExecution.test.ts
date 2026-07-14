@@ -5,7 +5,6 @@ import {
   canExecuteRuntimeClientAction,
   planLiveRuntimeClientAction,
   resolveRuntimeActionExecution,
-  shouldUseLegacyClosureFallback,
 } from '@/services/mediatorRuntimeClient/resolveRuntimeActionExecution';
 import {
   resolveRuntimeAwaitingProposal,
@@ -61,49 +60,37 @@ describe('resolveRuntimeActionExecution', () => {
     });
 
     assert.equal(execution.useRuntime, true);
-    assert.equal(execution.useLegacyFallback, false);
+    assert.equal(execution.runtimeUnavailable, false);
     assert.equal(execution.reason, 'runtime_available');
   });
 
-  it('does not legacy-fallback when runtimeSession is unavailable (production default)', () => {
+  it('marks runtime unavailable when runtimeSession is missing', () => {
     const execution = resolveRuntimeActionExecution({ runtimeSession: null });
 
     assert.equal(execution.useRuntime, false);
-    assert.equal(execution.useLegacyFallback, false);
     assert.equal(execution.runtimeUnavailable, true);
     assert.equal(execution.reason, 'runtime_unavailable');
   });
 
-  it('legacy-fallback only when explicitly allowed (migration/tests)', () => {
-    const execution = resolveRuntimeActionExecution({
-      runtimeSession: null,
-      allowLegacyFallback: true,
-    });
-
-    assert.equal(execution.useLegacyFallback, true);
-  });
-
-  it('falls back when runtime request failed only with allowLegacyFallback', () => {
+  it('marks runtime unavailable when runtime request failed', () => {
     const execution = resolveRuntimeActionExecution({
       runtimeSession: createMinimalRuntimeSuccess().runtimeSession,
       runtimeFailed: true,
-      allowLegacyFallback: true,
     });
 
     assert.equal(execution.useRuntime, false);
-    assert.equal(execution.useLegacyFallback, true);
+    assert.equal(execution.runtimeUnavailable, true);
     assert.equal(execution.reason, 'runtime_failed');
   });
 
-  it('falls back on invalid runtime state flag only with allowLegacyFallback', () => {
+  it('marks runtime unavailable on invalid runtime state flag', () => {
     const execution = resolveRuntimeActionExecution({
       runtimeSession: createMinimalRuntimeSuccess().runtimeSession,
       invalidRuntimeState: true,
-      allowLegacyFallback: true,
     });
 
     assert.equal(execution.reason, 'invalid_runtime_state');
-    assert.equal(execution.useLegacyFallback, true);
+    assert.equal(execution.runtimeUnavailable, true);
   });
 });
 
@@ -115,102 +102,32 @@ describe('planLiveRuntimeClientAction', () => {
 
     assert.equal(plan.emitClientEvent, true);
     assert.equal(plan.callRuntimeTurn, true);
-    assert.equal(plan.legacySteps.signalProposalDecision, false);
-    assert.equal(plan.legacySteps.insertProposalClosureSummary, false);
-    assert.equal(plan.legacySteps.immediateGoToClosure, false);
   });
 
-  it('runtime unavailable → legacy fallback for proposal accept only when allowed', () => {
+  it('runtime unavailable → no runtime turn', () => {
     const plan = planLiveRuntimeClientAction('proposal_accepted', {
       runtimeSession: null,
-      allowLegacyFallback: true,
     });
 
     assert.equal(plan.emitClientEvent, false);
     assert.equal(plan.callRuntimeTurn, false);
-    assert.equal(plan.legacySteps.signalProposalDecision, true);
   });
 
-  it('runtime unavailable → no legacy side effects in production default', () => {
-    const plan = planLiveRuntimeClientAction('proposal_accepted', {
-      runtimeSession: null,
-    });
-
-    assert.equal(plan.legacySteps.signalProposalDecision, false);
-  });
-
-  it('runtime available → proposal reject skips legacy closure summary', () => {
-    const plan = planLiveRuntimeClientAction('proposal_rejected', {
-      runtimeSession: createMinimalRuntimeSuccess().runtimeSession,
-    });
-
-    assert.equal(plan.legacySteps.insertProposalClosureSummary, false);
-    assert.equal(plan.legacySteps.immediateGoToClosure, false);
-  });
-
-  it('runtime unavailable → proposal reject keeps legacy closure side effects when allowed', () => {
-    const plan = planLiveRuntimeClientAction('proposal_rejected', {
-      runtimeSession: null,
-      allowLegacyFallback: true,
-    });
-
-    assert.equal(plan.legacySteps.signalProposalDecision, true);
-    assert.equal(plan.legacySteps.insertProposalClosureSummary, true);
-    assert.equal(plan.legacySteps.immediateGoToClosure, true);
-  });
-
-  it('runtime available → resolve skips immediate legacy closure', () => {
+  it('runtime available → resolve uses runtime turn', () => {
     const plan = planLiveRuntimeClientAction('resolve_session', {
       runtimeSession: createMinimalRuntimeSuccess().runtimeSession,
     });
 
     assert.equal(plan.emitClientEvent, true);
-    assert.equal(plan.legacySteps.immediateGoToClosure, false);
-    assert.equal(plan.legacySteps.signalSessionDecision, false);
+    assert.equal(plan.callRuntimeTurn, true);
   });
 
-  it('runtime unavailable → resolve uses legacy session decision and closure when allowed', () => {
+  it('runtime unavailable → resolve does not call runtime', () => {
     const plan = planLiveRuntimeClientAction('resolve_session', {
       runtimeSession: null,
-      allowLegacyFallback: true,
     });
 
-    assert.equal(plan.legacySteps.signalSessionDecision, true);
-    assert.equal(plan.legacySteps.immediateGoToClosure, true);
-  });
-});
-
-describe('shouldUseLegacyClosureFallback', () => {
-  it('uses legacy closure only when explicitly allowed', () => {
-    assert.equal(
-      shouldUseLegacyClosureFallback({
-        runtimeSession: null,
-        allowLegacyFallback: true,
-      }),
-      true
-    );
-    assert.equal(shouldUseLegacyClosureFallback({ runtimeSession: null }), false);
-  });
-
-  it('skips legacy auto-closure when runtime terminal closure is ready', () => {
-    const runtimeSession = {
-      ...createMinimalRuntimeSuccess().runtimeSession,
-      session: {
-        ...createMinimalRuntimeSuccess().runtimeSession.session,
-        outcome: 'resolved' as const,
-      },
-      closure: {
-        directive: 'close_on_accept' as const,
-        suggestedDbStatus: 'resolved' as const,
-        closureMessage: 'Done',
-        navigateToClosure: true,
-      },
-    };
-
-    assert.equal(
-      shouldUseLegacyClosureFallback({ runtimeSession }),
-      false
-    );
+    assert.equal(plan.callRuntimeTurn, false);
   });
 });
 
@@ -239,7 +156,7 @@ describe('resolveRuntimeProposalPanelState', () => {
     });
 
     const state = resolveRuntimeProposalPanelState(runtimeSession, true);
-    assert.equal(state?.source, 'runtime');
+    assert.equal(state?.source, 'runtime_available');
     assert.equal(state?.userDecided, true);
     assert.equal(state?.hostVote, 'accepted');
     assert.equal(state?.partnerVote, null);

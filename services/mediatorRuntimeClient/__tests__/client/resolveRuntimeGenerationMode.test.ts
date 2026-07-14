@@ -4,7 +4,7 @@ import { createMinimalRuntimeSuccess } from '@/services/mediatorRuntimeClient/__
 import {
   mapRuntimeBeatToLegacyMode,
   resolveRuntimeGenerationMode,
-} from '@/services/mediatorRuntimeClient/resolveRuntimeGenerationMode';
+} from '@/tests/runtimeComparison/resolveRuntimeGenerationMode';
 
 describe('mapRuntimeBeatToLegacyMode', () => {
   it('maps beats with legacy MediatorMode equivalents', () => {

@@ -1,7 +1,7 @@
 import {
   resolveRuntimeActionExecution,
 } from '@/services/mediatorRuntimeClient/resolveRuntimeActionExecution';
-import type { MediatorMode } from '@/services/liveMediation';
+import type { MediatorMode } from '@/services/liveMediation.types';
 import type { MediatorBeat } from '@/types/mediator/runtimeSession';
 import type { RuntimeSession } from '@/types/mediator/runtimeSession';
 
@@ -14,23 +14,17 @@ export type RuntimeGenerationFlowReason =
 
 export interface ResolveRuntimeGenerationFlowParams {
   runtimeSession: RuntimeSession | null | undefined;
-  /** Precomputed legacy mode — prefer {@link getLegacyMode} for lazy fallback. */
-  legacyMode?: MediatorMode | null;
-  /** Invoked only when legacy fallback is required. */
-  getLegacyMode?: () => MediatorMode | null;
   runtimeFailed?: boolean;
   invalidRuntimeState?: boolean;
-  /** Test/migration diagnostics only — production live mediation must keep false. */
-  allowLegacyFallback?: boolean;
 }
 
 export interface RuntimeGenerationFlowResolution {
   mode: MediatorMode | null;
-  source: 'runtime' | 'legacy_fallback' | 'runtime_unavailable';
+  source: 'runtime_available' | 'runtime_unavailable';
   reason: RuntimeGenerationFlowReason;
 }
 
-/** Modes routed directly to processMediationTurn (not processGenerateNextTurn). */
+/** Modes routed directly to processMediationTurn. */
 export const RUNTIME_DIRECT_MEDIATOR_MODES: ReadonlySet<MediatorMode> = new Set([
   'opening_summary',
   'proposed_solution',
@@ -115,16 +109,6 @@ function isRuntimeQuestionGenerationBlocked(
   }
 }
 
-function resolveLegacyMode(params: ResolveRuntimeGenerationFlowParams): MediatorMode | null {
-  if (params.legacyMode !== undefined) {
-    return params.legacyMode;
-  }
-  if (params.getLegacyMode) {
-    return params.getLegacyMode();
-  }
-  return null;
-}
-
 /**
  * Resolves host-led generation mode from runtimeSession.decision.nextBeat.
  *
@@ -138,16 +122,7 @@ export function resolveRuntimeGenerationFlow(
     runtimeSession: params.runtimeSession,
     runtimeFailed: params.runtimeFailed,
     invalidRuntimeState: params.invalidRuntimeState,
-    allowLegacyFallback: params.allowLegacyFallback,
   });
-
-  if (execution.useLegacyFallback) {
-    return {
-      mode: resolveLegacyMode(params),
-      source: 'legacy_fallback',
-      reason: execution.reason,
-    };
-  }
 
   if (execution.runtimeUnavailable) {
     return {
@@ -163,20 +138,13 @@ export function resolveRuntimeGenerationFlow(
   if (RUNTIME_WAIT_BEATS.has(nextBeat)) {
     return {
       mode: null,
-      source: 'runtime',
+      source: 'runtime_available',
       reason: 'runtime_available',
     };
   }
 
   const mappedMode = mapRuntimeBeatToMediatorMode(nextBeat);
   if (mappedMode === null) {
-    if (params.allowLegacyFallback) {
-      return {
-        mode: resolveLegacyMode(params),
-        source: 'legacy_fallback',
-        reason: 'invalid_runtime_state',
-      };
-    }
     return {
       mode: null,
       source: 'runtime_unavailable',
@@ -187,7 +155,7 @@ export function resolveRuntimeGenerationFlow(
   if (mappedMode === 'answer_ack') {
     return {
       mode: null,
-      source: 'runtime',
+      source: 'runtime_available',
       reason: 'runtime_available',
     };
   }
@@ -195,14 +163,14 @@ export function resolveRuntimeGenerationFlow(
   if (isRuntimeQuestionGenerationBlocked(runtimeSession, mappedMode)) {
     return {
       mode: null,
-      source: 'runtime',
+      source: 'runtime_available',
       reason: 'runtime_available',
     };
   }
 
   return {
     mode: mappedMode,
-    source: 'runtime',
+    source: 'runtime_available',
     reason: 'runtime_available',
   };
 }
@@ -210,7 +178,6 @@ export function resolveRuntimeGenerationFlow(
 /** DEV-only log for generation flow resolution. */
 export function logRuntimeGenerationFlowResolution(
   resolution: RuntimeGenerationFlowResolution,
-  legacyMode: MediatorMode | null,
   runtimeBeat: MediatorBeat | null
 ): void {
   if (!__DEV__) return;
@@ -219,14 +186,13 @@ export function logRuntimeGenerationFlowResolution(
     mode: resolution.mode,
     source: resolution.source,
     reason: resolution.reason,
-    legacyMode,
     runtimeBeat,
   };
 
-  if (resolution.source === 'runtime') {
+  if (resolution.source === 'runtime_available') {
     console.log('[RuntimeSession] generationFlow runtime', payload);
     return;
   }
 
-  console.warn('[RuntimeSession] generationFlow legacy_fallback', payload);
+  console.warn('[RuntimeSession] generationFlow unavailable', payload);
 }

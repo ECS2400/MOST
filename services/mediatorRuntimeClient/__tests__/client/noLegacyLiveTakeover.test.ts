@@ -4,7 +4,6 @@ import { createMinimalRuntimeSuccess } from '@/services/mediatorRuntimeClient/__
 import {
   planLiveRuntimeClientAction,
   resolveRuntimeActionExecution,
-  shouldUseLegacyClosureFallback,
 } from '@/services/mediatorRuntimeClient/resolveRuntimeActionExecution';
 import {
   resolveLivePhaseHeaderLabel,
@@ -13,60 +12,37 @@ import {
 import { resolveRuntimeDecisionPanelVisibility } from '@/services/mediatorRuntimeClient/resolveRuntimeDecisionPanelVisibility';
 import { resolveRuntimeGenerationFlow } from '@/services/mediatorRuntimeClient/resolveRuntimeGenerationFlow';
 import { resolveRuntimeSessionFlow } from '@/services/mediatorRuntimeClient/resolveRuntimeSessionFlow';
-import { RUNTIME_UNAVAILABLE_SESSION_FLOW } from '@/services/mediatorRuntimeClient/runtimeUnavailableRecoveryFlow';
 import { shouldBlockRuntimeMediatorGeneration } from '@/services/mediatorRuntimeClient/shouldBlockRuntimeMediatorGeneration';
 
 describe('production live — no silent legacy takeover', () => {
-  it('runtime unavailable does not enable useLegacyFallback by default', () => {
+  it('runtime unavailable marks runtimeUnavailable without legacy fallback', () => {
     const execution = resolveRuntimeActionExecution({ runtimeSession: null });
-    assert.equal(execution.useLegacyFallback, false);
+    assert.equal(execution.useRuntime, false);
     assert.equal(execution.runtimeUnavailable, true);
     assert.equal(execution.reason, 'runtime_unavailable');
   });
 
-  it('shouldUseLegacyLiveFallback is false when runtime unavailable', () => {
-    const execution = resolveRuntimeActionExecution({ runtimeSession: null });
-    assert.equal(execution.useLegacyFallback, false);
-  });
-
-  it('runtime unavailable does not call computeLiveSessionFlow via lazy getter', () => {
-    let called = false;
+  it('runtime unavailable returns recovery flow without legacy getters', () => {
     const resolution = resolveRuntimeSessionFlow({
       runtimeSession: null,
-      getLegacySessionFlow: () => {
-        called = true;
-        return {
-          stage: 'questions',
-          questionNumber: 1,
-          maxQuestions: 15,
-          questionPhase: 'opening',
-          extensionActive: false,
-        };
-      },
     });
 
-    assert.equal(called, false);
     assert.equal(resolution.source, 'runtime_unavailable');
-    assert.deepEqual(resolution.flow, RUNTIME_UNAVAILABLE_SESSION_FLOW);
+    assert.equal(resolution.flow.maxQuestions, 0);
+    assert.equal(resolution.flow.questionNumber, 0);
   });
 
-  it('runtime unavailable does not call resolveGenerateMode via lazy getter', () => {
-    let called = false;
+  it('runtime unavailable returns null generation mode', () => {
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession: null,
-      getLegacyMode: () => {
-        called = true;
-        return 'opening_summary';
-      },
     });
 
-    assert.equal(called, false);
     assert.equal(resolution.mode, null);
     assert.equal(resolution.source, 'runtime_unavailable');
   });
 
   it('runtime unavailable does not render question X of 15 in header', () => {
-    const label = resolveLivePhaseHeaderLabel(null, 'Pytanie 1 z 15', 'pl', {
+    const label = resolveLivePhaseHeaderLabel(null, 'pl', {
       runtimeUnavailable: true,
       recoveryLabel: 'Mościk chwilowo utracił stan mediacji.',
     });
@@ -74,24 +50,14 @@ describe('production live — no silent legacy takeover', () => {
     assert.doesNotMatch(label, /z 15/);
   });
 
-  it('runtime unavailable progress is zero — no legacy maxQuestions fallback', () => {
-    assert.equal(resolveLiveProgressPercent(null, 42, true), 0);
+  it('runtime unavailable progress is zero', () => {
+    assert.equal(resolveLiveProgressPercent(null, true), 0);
   });
 
   it('runtime unavailable hides decision panels', () => {
     const visibility = resolveRuntimeDecisionPanelVisibility({
       runtimeSession: null,
       runtimeUnavailable: true,
-      legacy: {
-        flowKind: 'continue_after_summary',
-        visibleKind: 'continue_after_summary',
-      },
-      legacyVisibility: {
-        showDecisionPanel: true,
-        showProposalPanel: true,
-        sessionUnresolvedClosed: true,
-      },
-      sessionFlowStage: 'awaiting_main_decision',
     });
 
     assert.equal(visibility.showMainDecisionPanel, false);
@@ -105,27 +71,33 @@ describe('production live — no silent legacy takeover', () => {
     });
 
     assert.equal(plan.callRuntimeTurn, false);
-    assert.equal(plan.legacySteps.signalSessionDecision, false);
-    assert.equal(plan.legacySteps.signalExtensionStart, false);
+    assert.equal(plan.emitClientEvent, false);
   });
 
-  it('shouldBlockRuntimeMediatorGeneration blocks opening_summary without runtime session', () => {
+  it('allows opening_summary bootstrap when runtime session not yet persisted', () => {
     assert.equal(
       shouldBlockRuntimeMediatorGeneration({
         runtimeSession: null,
         mode: 'opening_summary',
-        allowOpeningBootstrap: true,
+        force: true,
+      }),
+      false
+    );
+    assert.equal(
+      shouldBlockRuntimeMediatorGeneration({
+        runtimeSession: null,
+        mode: 'opening_summary',
       }),
       true
     );
   });
 
-  it('invalid runtimeSession never activates legacy flow without allowLegacyFallback', () => {
+  it('invalid runtimeSession marks runtime unavailable', () => {
     const execution = resolveRuntimeActionExecution({
       runtimeSession: createMinimalRuntimeSuccess().runtimeSession,
       invalidRuntimeState: true,
     });
-    assert.equal(execution.useLegacyFallback, false);
+    assert.equal(execution.useRuntime, false);
     assert.equal(execution.runtimeUnavailable, true);
   });
 
@@ -134,13 +106,9 @@ describe('production live — no silent legacy takeover', () => {
       runtimeSession: createMinimalRuntimeSuccess().runtimeSession,
       questionNumberHint: 3,
     });
-    assert.equal(resolution.source, 'runtime');
+    assert.equal(resolution.source, 'runtime_available');
     assert.equal(resolution.flow.questionNumber, 3);
     assert.notEqual(resolution.flow.maxQuestions, 0);
-  });
-
-  it('shouldUseLegacyClosureFallback is false when runtime unavailable and legacy disabled', () => {
-    assert.equal(shouldUseLegacyClosureFallback({ runtimeSession: null }), false);
   });
 
   it('duplicate legacy summary messages render once after dedupe by id', () => {
@@ -164,27 +132,5 @@ describe('production live — no silent legacy takeover', () => {
     const merged = Array.from(byId.values());
     assert.equal(merged.length, 1);
     assert.equal(merged[0]!.id, 'msg-1');
-  });
-
-  it('legacy path remains available for migration tests when explicitly allowed', () => {
-    let called = false;
-    const resolution = resolveRuntimeSessionFlow({
-      runtimeSession: null,
-      allowLegacyFallback: true,
-      getLegacySessionFlow: () => {
-        called = true;
-        return {
-          stage: 'questions',
-          questionNumber: 1,
-          maxQuestions: 15,
-          questionPhase: 'opening',
-          extensionActive: false,
-        };
-      },
-    });
-
-    assert.equal(called, true);
-    assert.equal(resolution.source, 'legacy_fallback');
-    assert.equal(resolution.flow.maxQuestions, 15);
   });
 });

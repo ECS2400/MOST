@@ -6,12 +6,13 @@ import type {
   SessionMemory,
   TranscriptMessage,
 } from '@/types/mediator';
-import type { MediatorMode } from '@/services/liveMediation';
+import type { MediatorMode } from '@/services/liveMediation.types';
 import type { MediatorRuntimeClientInput } from '@/services/mediatorRuntimeClient/buildMediatorRuntimeRequest';
 import {
   isMediatorRuntimeClientError,
   type MediatorRuntimeClientErrorKind,
 } from '@/services/mediatorRuntimeClient/errors';
+import { logRuntimeExceptionSwallowed } from '@/services/mediatorRuntimeClient/runtimeCallTraceDevLog';
 
 const SUPPORTED_RUNTIME_LANGUAGES: MediatorLang[] = ['pl', 'en', 'es', 'it', 'de', 'fr'];
 
@@ -32,6 +33,8 @@ export interface LiveRuntimeTurnParams {
   mediationState?: MediationState | null;
   sessionMemory?: SessionMemory | null;
   clientEvents?: RuntimeClientEvent[];
+  participantNames?: { hostName?: string; partnerName?: string };
+  transcriptWindow?: TranscriptMessage[];
 }
 
 /** Maps app language to mediator-runtime language with en fallback (not pl). */
@@ -111,6 +114,8 @@ export function buildLiveRuntimeTurnInput(
     transcriptDelta: buildTranscriptDelta(params),
     language: toRuntimeLanguage(params.language),
     clientEvents: params.clientEvents,
+    participantNames: params.participantNames,
+    transcriptWindow: params.transcriptWindow,
   };
 }
 
@@ -119,16 +124,22 @@ export interface LiveMediatorRoutingDeps<T> {
   onRuntimeFailure: (error: unknown) => void;
 }
 
-/** Routes a live turn to mediator-runtime; failures return null for local fallback. */
+/** Routes a live turn to mediator-runtime; failures propagate to the caller. */
 export async function routeLiveMediatorTurn<T>(
   runtimeInput: MediatorRuntimeClientInput,
   deps: LiveMediatorRoutingDeps<T>
-): Promise<T | null> {
+): Promise<T> {
   try {
     return await deps.callRuntime(runtimeInput);
   } catch (error) {
+    logRuntimeExceptionSwallowed({
+      mediationId: runtimeInput.mediationId,
+      mode: runtimeInput.trigger,
+      error,
+      swallowSite: 'routeLiveMediatorTurn:rethrow',
+    });
     deps.onRuntimeFailure(error);
-    return null;
+    throw error;
   }
 }
 

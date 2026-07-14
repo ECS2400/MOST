@@ -25,6 +25,10 @@ export interface MediatorRuntimeEdgeRequest {
   language: MediatorLang;
   engineVersion: 'v2.3';
   clientEvents: RuntimeClientEvent[];
+  /** Optional full transcript window for prompt composition — not persisted. */
+  transcriptWindow?: TranscriptMessage[];
+  /** Optional participant display names from live client — not persisted. */
+  participantNames?: { hostName?: string; partnerName?: string };
 }
 
 /** Sanitized post-LLM validation summary — no prompts or draft replies. */

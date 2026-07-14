@@ -10,8 +10,6 @@ export interface RuntimeUnavailableDevDiagnostics {
   runtimeSessionShapeValid: boolean;
   runtimeFailed: boolean;
   invalidRuntimeState: boolean;
-  legacyFlowActivated: boolean;
-  legacyActivationReason: string | null;
 }
 
 export interface BuildRuntimeUnavailableDevDiagnosticsParams {
@@ -20,8 +18,6 @@ export interface BuildRuntimeUnavailableDevDiagnosticsParams {
   runtimeSessionShapeValid: boolean;
   runtimeFailed: boolean;
   invalidRuntimeState: boolean;
-  legacyFlowActivated: boolean;
-  legacyActivationReason?: string | null;
   loadDiagnostics?: RuntimeSessionLoadDiagnostics | null;
   edgeResponseOk?: boolean | null;
   runtimeSessionPresentInResponse?: boolean | null;
@@ -42,8 +38,6 @@ export function buildRuntimeUnavailableDevDiagnostics(
     runtimeSessionShapeValid: params.runtimeSessionShapeValid,
     runtimeFailed: params.runtimeFailed,
     invalidRuntimeState: params.invalidRuntimeState,
-    legacyFlowActivated: params.legacyFlowActivated,
-    legacyActivationReason: params.legacyActivationReason ?? null,
   };
 }
 

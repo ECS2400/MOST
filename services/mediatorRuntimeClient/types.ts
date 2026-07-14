@@ -1,1 +1,1 @@
-export type { QuestionTarget } from '@/services/liveMediation';
+export type { QuestionTarget } from '@/services/liveMediation.types';

@@ -3,6 +3,7 @@ import type { PrioritySignalType } from '@/types/mediator';
 /** Lower number = higher urgency (P0 safety = 0). */
 export const PRIORITY_RANKS: Record<PrioritySignalType, number> = {
   safety: 0,
+  repair_voice: 1,
   escalation: 1,
   recovery: 2,
   blame_loop: 3,

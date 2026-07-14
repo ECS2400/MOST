@@ -55,36 +55,34 @@ export function resolveRuntimeStageLabel(
   return labels[stage] ?? null;
 }
 
-/** Progress bar percent — runtime completionEstimate when available, else legacy or zero when unavailable. */
+/** Progress bar percent from runtime completionEstimate; zero when unavailable. */
 export function resolveLiveProgressPercent(
   runtimeSession: RuntimeSession | null | undefined,
-  legacyProgress: number,
   runtimeUnavailable = false
 ): number {
   if (runtimeUnavailable || !hasRuntimeSession(runtimeSession)) {
-    return runtimeUnavailable ? 0 : clampProgressPercent(legacyProgress);
+    return 0;
   }
   return clampProgressPercent(runtimeSession.progress.completionEstimate);
 }
 
-/** Header phase label — runtime goal-driven label when available, else recovery or legacy label. */
+/** Header phase label from runtime progress; recovery label when unavailable. */
 export function resolveLivePhaseHeaderLabel(
   runtimeSession: RuntimeSession | null | undefined,
-  legacyLabel: string,
   lang: Language,
   options: { runtimeUnavailable?: boolean; recoveryLabel?: string } = {}
 ): string {
   if (options.runtimeUnavailable) {
-    return options.recoveryLabel ?? legacyLabel;
+    return options.recoveryLabel ?? '';
   }
 
   if (!hasRuntimeSession(runtimeSession)) {
-    return legacyLabel;
+    return '';
   }
 
   const stageLabel = resolveRuntimeStageLabel(runtimeSession.progress.labelKey, lang);
   if (!stageLabel) {
-    return legacyLabel;
+    return '';
   }
 
   const template = RUNTIME_PROGRESS_LABEL_BY_LANG[lang] ?? RUNTIME_PROGRESS_LABEL_BY_LANG.en;

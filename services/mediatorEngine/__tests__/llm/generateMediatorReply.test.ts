@@ -68,36 +68,45 @@ describe('generateMediatorReply — LLM Bridge L1', () => {
     assert.ok(!result.draftReply.text.startsWith('{'));
   });
 
-  it('output z zakazanym terminem pipeline → fallback', async () => {
-    const provider = createFakeLlmProvider({
-      fixedText: 'The pipeline suggests we validate emotions now.',
-    });
+  it('output z zakazanym terminem pipeline → przekazuje invalid draft bez fallbacku', async () => {
+    const providerText = 'The pipeline suggests we validate emotions now.';
+    const provider = createFakeLlmProvider({ fixedText: providerText });
     const result = await generateMediatorReply(createGenerateInputWithProvider(provider));
 
-    assert.equal(result.fallbackUsed, true);
-    assert.equal(result.draftReply.source, 'fallback');
-    assert.ok(!result.draftReply.text.toLowerCase().includes('pipeline'));
+    assert.equal(result.fallbackUsed, false);
+    assert.equal(result.fallbackSubstituted, false);
+    assert.equal(result.draftReply.source, 'llm');
+    assert.equal(result.draftReply.text, providerText);
+    assert.equal(result.draftReply.validation.valid, false);
+    assert.equal(result.originalProviderText, providerText);
+    assert.ok(result.draftValidationReasons?.some((reason) => reason.includes('Forbidden terms')));
   });
 
-  it('więcej niż 1 pytanie → fallback', async () => {
-    const provider = createFakeLlmProvider({
-      fixedText: 'How do you feel? What do you need? Can we pause?',
-    });
+  it('więcej niż 1 pytanie → przekazuje invalid draft bez fallbacku', async () => {
+    const providerText = 'How do you feel? What do you need? Can we pause?';
+    const provider = createFakeLlmProvider({ fixedText: providerText });
     const result = await generateMediatorReply(createGenerateInputWithProvider(provider));
 
-    assert.equal(result.fallbackUsed, true);
-    assert.equal(result.draftReply.source, 'fallback');
+    assert.equal(result.fallbackUsed, false);
+    assert.equal(result.fallbackSubstituted, false);
+    assert.equal(result.draftReply.source, 'llm');
+    assert.equal(result.draftReply.text, providerText);
+    assert.equal(result.draftReply.validation.valid, false);
+    assert.ok(result.draftValidationReasons?.some((reason) => reason.includes('Too many questions')));
   });
 
-  it('więcej niż 4 zdania → fallback', async () => {
-    const provider = createFakeLlmProvider({
-      fixedText:
-        'One sentence here. Two sentence here. Three sentence here. Four sentence here. Five sentence here.',
-    });
+  it('więcej niż 4 zdania → przekazuje invalid draft bez fallbacku', async () => {
+    const providerText =
+      'One sentence here. Two sentence here. Three sentence here. Four sentence here. Five sentence here.';
+    const provider = createFakeLlmProvider({ fixedText: providerText });
     const result = await generateMediatorReply(createGenerateInputWithProvider(provider));
 
-    assert.equal(result.fallbackUsed, true);
-    assert.equal(result.draftReply.source, 'fallback');
+    assert.equal(result.fallbackUsed, false);
+    assert.equal(result.fallbackSubstituted, false);
+    assert.equal(result.draftReply.source, 'llm');
+    assert.equal(result.draftReply.text, providerText);
+    assert.equal(result.draftReply.validation.valid, false);
+    assert.ok(result.draftValidationReasons?.some((reason) => reason.includes('Too many sentences')));
   });
 
   it('safety L3 wymusza safety-compliant reply (stub)', async () => {
@@ -116,10 +125,9 @@ describe('generateMediatorReply — LLM Bridge L1', () => {
     assert.match(result.draftReply.text, /pause|step back/i);
   });
 
-  it('safety L3 normal mediation text → fallback', async () => {
-    const provider = createFakeLlmProvider({
-      fixedText: "Let's explore what happened between you and move forward with the mediation.",
-    });
+  it('safety L3 normal mediation text → przekazuje invalid draft bez fallbacku', async () => {
+    const providerText = "Let's explore what happened between you and move forward with the mediation.";
+    const provider = createFakeLlmProvider({ fixedText: providerText });
     const result = await generateMediatorReply(
       createGenerateInputWithProvider(provider, {
         safetyLevel: 'L3_stop',
@@ -128,8 +136,11 @@ describe('generateMediatorReply — LLM Bridge L1', () => {
       })
     );
 
-    assert.equal(result.fallbackUsed, true);
-    assert.equal(result.draftReply.source, 'fallback');
+    assert.equal(result.fallbackUsed, false);
+    assert.equal(result.fallbackSubstituted, false);
+    assert.equal(result.draftReply.source, 'llm');
+    assert.equal(result.draftReply.text, providerText);
+    assert.equal(result.draftReply.validation.valid, false);
     assert.equal(result.draftReply.safetyLevel, 'L3_stop');
   });
 

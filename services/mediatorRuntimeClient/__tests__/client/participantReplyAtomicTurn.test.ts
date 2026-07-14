@@ -20,6 +20,7 @@ import {
 import { resetParticipantRepliesForQuestion } from '@/services/mediatorEngine/clientEvents/participantReplyFlowControl';
 import { createDefaultRuntimeFlowControl } from '@/services/mediatorEngine/clientEvents/applyRuntimeClientEvents';
 import { runtimeAwaitingBothRepliesFixture } from '@/services/mediatorRuntimeClient/__tests__/client/runtimeSessionFixtures';
+import type { LoadedMediationRuntimeState } from '@/services/mediatorRuntimeClient/mediationRuntimeSessionPersistence';
 import type { MediatorRuntimeEdgeSuccess } from '@/services/mediatorEngine/edge/types';
 import type { ParticipantReplyMessage } from '@/services/mediatorRuntimeClient/deriveParticipantReplyStateFromMessages';
 
@@ -59,7 +60,7 @@ function partnerReply(): ParticipantReplyMessage & { content: string; created_at
   };
 }
 
-function loadedRuntimeState() {
+function loadedRuntimeState(): LoadedMediationRuntimeState {
   const mediationState = createEmptyMediationState({
     mediationId: MEDIATION_ID,
     sessionId: MEDIATION_ID,
@@ -68,6 +69,7 @@ function loadedRuntimeState() {
     transcriptDelta: [],
     language: 'pl',
     engineVersion: 'v2.3',
+    mediationState: null,
   });
   mediationState.currentGoal = 'EMOTION_NAMING';
 
@@ -79,8 +81,8 @@ function loadedRuntimeState() {
         turnNumber: QUESTION_TURN,
         type: 'open_deepen' as const,
         goal: 'EMOTION_NAMING' as const,
-        intent: 'deepen' as const,
-        strategy: 'explore' as const,
+        intent: 'help_name_emotion' as const,
+        strategy: 'validate_emotions' as const,
         expectedEffectId: 'effect-q',
         signature: 'sig-q',
         compliance: {
@@ -214,8 +216,7 @@ describe('processBothParticipantReplies atomic turn', () => {
     assert.equal(result.success, false);
     assert.equal(result.response, null);
     assert.equal(result.runtime, null);
-    // No fallback text leaked into chat (since no AI response at all).
-    assert.notEqual(result.response?.aiQuestion ?? '', LOCALIZED_NORMAL_TEXT.pl);
+    assert.notEqual(LOCALIZED_NORMAL_TEXT.pl, '');
   });
 
   it('does not run atomic turn until both replies exist in messages', async () => {

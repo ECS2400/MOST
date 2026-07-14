@@ -1,4 +1,4 @@
-import type { LiveMediatorResponse } from '@/services/liveMediation';
+import type { LiveMediatorResponse } from '@/services/liveMediation.types';
 import { isMediatorRuntimeResponseSafe } from '@/services/mediatorEngine/edge/response';
 import type { MediatorRuntimeEdgeSuccess } from '@/services/mediatorEngine/edge/types';
 import type { MediatorRuntimeErrorBody } from '@/services/mediatorEngine/edge/errors';

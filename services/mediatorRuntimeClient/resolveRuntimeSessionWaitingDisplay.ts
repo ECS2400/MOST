@@ -14,10 +14,12 @@ export type RuntimeWaitingDisplayKind =
   | 'ready_to_advance'
   | 'finished';
 
+export type RuntimeWaitingDisplaySource = 'runtime_available' | 'runtime_unavailable';
+
 export interface RuntimeWaitingDisplay {
   kind: RuntimeWaitingDisplayKind;
   label: string;
-  source: 'runtime' | 'legacy';
+  source: RuntimeWaitingDisplaySource;
 }
 
 interface RuntimeWaitingLabelSet {
@@ -75,13 +77,13 @@ const RUNTIME_WAITING_LABELS: Record<Language, RuntimeWaitingLabelSet> = {
     finished: 'Sitzung beendet',
   },
   fr: {
-    waitingHost: 'En attente de la réponse de l\'hôte',
+    waitingHost: "En attente de la réponse de l'hôte",
     waitingPartner: 'En attente de la réponse du partenaire',
     waitingBoth: 'Répondez tous les deux à la question en cours',
     waitingYourTurn: 'Le partenaire a répondu — à votre tour',
     waitingContinueDecision: 'En attente de la décision de continuer',
-    waitingExtensionDecision: 'En attente de la décision d\'extension',
-    waitingProposalDecision: 'En attente de l\'acceptation de la proposition',
+    waitingExtensionDecision: "En attente de la décision d'extension",
+    waitingProposalDecision: "En attente de l'acceptation de la proposition",
     waitingProposalPartner: 'Le partenaire a accepté — à vous de décider',
     waitingSafetyAcknowledgment: 'Session en pause pour raisons de sécurité',
     readyToAdvance: 'Le médiateur peut avancer',
@@ -101,13 +103,13 @@ const RUNTIME_WAITING_LABELS: Record<Language, RuntimeWaitingLabelSet> = {
     finished: 'Sesión finalizada',
   },
   it: {
-    waitingHost: 'In attesa della risposta dell\'host',
+    waitingHost: "In attesa della risposta dell'host",
     waitingPartner: 'In attesa della risposta del partner',
     waitingBoth: 'Rispondete entrambi alla domanda corrente',
     waitingYourTurn: 'Il partner ha risposto — tocca a te',
     waitingContinueDecision: 'In attesa della decisione di continuare',
-    waitingExtensionDecision: 'In attesa della decisione di estensione',
-    waitingProposalDecision: 'In attesa dell\'accettazione della proposta',
+    waitingExtensionDecision: "In attesa della decisione di estensione",
+    waitingProposalDecision: "In attesa dell'accettazione della proposta",
     waitingProposalPartner: 'Il partner ha accettato — tocca a te decidere',
     waitingSafetyAcknowledgment: 'Sessione in pausa per sicurezza',
     readyToAdvance: 'Il mediatore può procedere',
@@ -121,23 +123,21 @@ const REPLY_KINDS: ReadonlySet<RuntimeWaitingDisplayKind> = new Set([
   'waiting_both',
 ]);
 
+const NONE: RuntimeWaitingDisplay = {
+  kind: 'none',
+  label: '',
+  source: 'runtime_unavailable',
+};
+
 function labelsFor(lang: Language): RuntimeWaitingLabelSet {
   return RUNTIME_WAITING_LABELS[lang] ?? RUNTIME_WAITING_LABELS.en;
-}
-
-function legacyDisplay(legacyLabel: string): RuntimeWaitingDisplay {
-  return {
-    kind: legacyLabel.trim() ? 'waiting_both' : 'none',
-    label: legacyLabel,
-    source: 'legacy',
-  };
 }
 
 function runtimeDisplay(
   kind: RuntimeWaitingDisplayKind,
   label: string
 ): RuntimeWaitingDisplay {
-  return { kind, label, source: 'runtime' };
+  return { kind, label, source: 'runtime_available' };
 }
 
 /** Maps runtimeSession.pending (+ lifecycle) to a waiting display kind. */
@@ -245,42 +245,39 @@ function resolveLabelForKind(
   }
 }
 
-/** Waiting-for-answer bar label — runtime pending when available, else legacy hint. */
+/** Waiting-for-answer bar label from runtime pending state only. */
 export function resolveLiveWaitingAnswerDisplay(
   runtimeSession: RuntimeSession | null | undefined,
-  legacyLabel: string,
   lang: Language,
-  isCurrentUserHost: boolean
+  isCurrentUserHost: boolean,
+  runtimeUnavailable = false
 ): RuntimeWaitingDisplay {
-  if (!hasRuntimeSession(runtimeSession)) {
-    return legacyDisplay(legacyLabel);
+  if (runtimeUnavailable || !hasRuntimeSession(runtimeSession)) {
+    return NONE;
   }
 
   const kind = mapRuntimeSessionToWaitingKind(runtimeSession);
   if (!REPLY_KINDS.has(kind)) {
-    return legacyDisplay(legacyLabel);
+    return NONE;
   }
 
-  return runtimeDisplay(
-    kind,
-    resolveReplyLabel(kind, lang, isCurrentUserHost)
-  );
+  return runtimeDisplay(kind, resolveReplyLabel(kind, lang, isCurrentUserHost));
 }
 
-/** Proposal waiting hint — runtime pending.proposal_decision when available. */
+/** Proposal waiting hint from runtime pending.proposal_decision only. */
 export function resolveLiveProposalWaitingDisplay(
   runtimeSession: RuntimeSession | null | undefined,
-  legacyLabel: string,
   lang: Language,
-  isCurrentUserHost: boolean
+  isCurrentUserHost: boolean,
+  runtimeUnavailable = false
 ): RuntimeWaitingDisplay {
-  if (!hasRuntimeSession(runtimeSession)) {
-    return legacyDisplay(legacyLabel);
+  if (runtimeUnavailable || !hasRuntimeSession(runtimeSession)) {
+    return NONE;
   }
 
   const kind = mapRuntimeSessionToWaitingKind(runtimeSession);
   if (kind !== 'waiting_proposal_decision') {
-    return legacyDisplay(legacyLabel);
+    return NONE;
   }
 
   return runtimeDisplay(
@@ -289,19 +286,19 @@ export function resolveLiveProposalWaitingDisplay(
   );
 }
 
-/** Continue / extension decision hint — runtime pending when available. */
+/** Continue / extension decision hint from runtime pending only. */
 export function resolveLiveContinueWaitingDisplay(
   runtimeSession: RuntimeSession | null | undefined,
-  legacyLabel: string,
-  lang: Language
+  lang: Language,
+  runtimeUnavailable = false
 ): RuntimeWaitingDisplay {
-  if (!hasRuntimeSession(runtimeSession)) {
-    return legacyDisplay(legacyLabel);
+  if (runtimeUnavailable || !hasRuntimeSession(runtimeSession)) {
+    return NONE;
   }
 
   const kind = mapRuntimeSessionToWaitingKind(runtimeSession);
   if (kind !== 'waiting_continue_decision' && kind !== 'waiting_extension_decision') {
-    return legacyDisplay(legacyLabel);
+    return NONE;
   }
 
   return runtimeDisplay(kind, resolveLabelForKind(kind, lang, false));
@@ -310,9 +307,10 @@ export function resolveLiveContinueWaitingDisplay(
 /** Optional session-level status (finished / safety) for waiting surfaces. */
 export function resolveLiveSessionWaitingStatusDisplay(
   runtimeSession: RuntimeSession | null | undefined,
-  lang: Language
+  lang: Language,
+  runtimeUnavailable = false
 ): RuntimeWaitingDisplay | null {
-  if (!hasRuntimeSession(runtimeSession)) {
+  if (runtimeUnavailable || !hasRuntimeSession(runtimeSession)) {
     return null;
   }
 

@@ -19,33 +19,30 @@ export interface ResolveRuntimeClosureActionParams {
   runtimeSession: RuntimeSession | null | undefined;
 }
 
+export type RuntimeClosureSource = 'runtime_available' | 'runtime_unavailable';
+
 export interface RuntimeClosureAction {
   shouldNavigate: boolean;
   directive: ClosureDirective;
   suggestedDbStatus: MediationDbStatus | null;
-  source: 'runtime' | 'legacy_fallback';
+  source: RuntimeClosureSource;
 }
 
-const LEGACY_FALLBACK_ACTION: RuntimeClosureAction = {
+const UNAVAILABLE_ACTION: RuntimeClosureAction = {
   shouldNavigate: false,
   directive: 'none',
   suggestedDbStatus: null,
-  source: 'legacy_fallback',
+  source: 'runtime_unavailable',
 };
 
-/**
- * Resolves whether live UI should navigate to closure from runtimeSession.
- *
- * Runtime takes precedence only for terminal outcomes with an explicit closure directive.
- * Otherwise legacy closure handlers remain responsible for navigation.
- */
+/** Resolves whether live UI should navigate to closure from runtimeSession. */
 export function resolveRuntimeClosureAction(
   params: ResolveRuntimeClosureActionParams
 ): RuntimeClosureAction {
   const { runtimeSession } = params;
 
   if (!hasRuntimeSession(runtimeSession)) {
-    return LEGACY_FALLBACK_ACTION;
+    return UNAVAILABLE_ACTION;
   }
 
   const { closure, session } = runtimeSession;
@@ -56,7 +53,7 @@ export function resolveRuntimeClosureAction(
       shouldNavigate: false,
       directive,
       suggestedDbStatus: closure.suggestedDbStatus,
-      source: 'legacy_fallback',
+      source: 'runtime_available',
     };
   }
 
@@ -65,7 +62,7 @@ export function resolveRuntimeClosureAction(
       shouldNavigate: false,
       directive,
       suggestedDbStatus: closure.suggestedDbStatus,
-      source: 'legacy_fallback',
+      source: 'runtime_available',
     };
   }
 
@@ -73,7 +70,7 @@ export function resolveRuntimeClosureAction(
     shouldNavigate: true,
     directive,
     suggestedDbStatus: closure.suggestedDbStatus,
-    source: 'runtime',
+    source: 'runtime_available',
   };
 }
 
@@ -82,7 +79,11 @@ export function shouldPerformRuntimeClosureNavigation(
   action: RuntimeClosureAction,
   alreadyNavigated: boolean
 ): boolean {
-  return !alreadyNavigated && action.shouldNavigate && action.source === 'runtime';
+  return (
+    !alreadyNavigated &&
+    action.shouldNavigate &&
+    action.source === 'runtime_available'
+  );
 }
 
 /** Maps runtime closure to dispute-closure navigation outcome param. */

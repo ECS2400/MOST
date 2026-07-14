@@ -1,58 +1,21 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { createMinimalRuntimeSuccess } from '@/services/mediatorRuntimeClient/__tests__/client/fixtures';
-import {
-  resolveLegacyLiveDecisionPanelState,
-} from '@/services/mediatorRuntimeClient/resolveLegacyLiveDecisionPanel';
 import { resolveRuntimeDecisionPanelVisibility } from '@/services/mediatorRuntimeClient/resolveRuntimeDecisionPanelVisibility';
 
-function buildParams(overrides: {
-  runtimeSession?: ReturnType<typeof createMinimalRuntimeSuccess>['runtimeSession'] | null;
-  sessionFlowStage?: 'awaiting_main_decision' | 'awaiting_extension_decision' | 'awaiting_proposal_decision';
-  showDecisionPanel?: boolean;
-  showProposalPanel?: boolean;
-  sessionUnresolvedClosed?: boolean;
-} = {}) {
-  const sessionFlowStage = overrides.sessionFlowStage;
-  const showDecisionPanel = overrides.showDecisionPanel ?? false;
-  const showProposalPanel = overrides.showProposalPanel ?? false;
-  const sessionUnresolvedClosed = overrides.sessionUnresolvedClosed ?? false;
-
-  const legacy = resolveLegacyLiveDecisionPanelState({
-    sessionFlowStage,
-    showDecisionPanel,
-    showProposalPanel,
-    sessionUnresolvedClosed,
-    sessionFinished: false,
-  });
-
-  return {
-    runtimeSession: overrides.runtimeSession ?? null,
-    legacy,
-    legacyVisibility: {
-      showDecisionPanel,
-      showProposalPanel,
-      sessionUnresolvedClosed,
-    },
-    sessionFlowStage,
-  };
-}
-
 describe('resolveRuntimeDecisionPanelVisibility', () => {
-  it('uses legacy_fallback when runtimeSession is missing', () => {
-    const visibility = resolveRuntimeDecisionPanelVisibility(
-      buildParams({
-        sessionFlowStage: 'awaiting_main_decision',
-        showDecisionPanel: true,
-      })
-    );
+  it('returns runtime_unavailable when runtimeSession is missing', () => {
+    const visibility = resolveRuntimeDecisionPanelVisibility({
+      runtimeSession: null,
+      runtimeUnavailable: true,
+    });
 
-    assert.equal(visibility.source, 'legacy_fallback');
-    assert.equal(visibility.showMainDecisionPanel, true);
+    assert.equal(visibility.source, 'runtime_unavailable');
+    assert.equal(visibility.showMainDecisionPanel, false);
     assert.equal(visibility.showExtensionDecisionPanel, false);
   });
 
-  it('uses runtime_confirmed when flow kinds match for proposal', () => {
+  it('shows proposal panel from runtime presentation', () => {
     const runtime = createMinimalRuntimeSuccess({
       runtimeSession: {
         ...createMinimalRuntimeSuccess().runtimeSession,
@@ -67,89 +30,28 @@ describe('resolveRuntimeDecisionPanelVisibility', () => {
       },
     });
 
-    const visibility = resolveRuntimeDecisionPanelVisibility(
-      buildParams({
-        runtimeSession: runtime.runtimeSession,
-        sessionFlowStage: 'awaiting_proposal_decision',
-        showProposalPanel: true,
-      })
-    );
+    const visibility = resolveRuntimeDecisionPanelVisibility({
+      runtimeSession: runtime.runtimeSession,
+    });
 
-    assert.equal(visibility.source, 'runtime_confirmed');
+    assert.equal(visibility.source, 'runtime_available');
     assert.equal(visibility.kind, 'proposal_accept_reject');
     assert.equal(visibility.showProposalPanel, true);
     assert.equal(visibility.showMainDecisionPanel, false);
   });
 
-  it('falls back to legacy on kind_mismatch', () => {
+  it('returns hidden when runtime has no decision panel', () => {
     const runtime = createMinimalRuntimeSuccess();
 
-    const visibility = resolveRuntimeDecisionPanelVisibility(
-      buildParams({
-        runtimeSession: runtime.runtimeSession,
-        sessionFlowStage: 'awaiting_main_decision',
-        showDecisionPanel: true,
-      })
-    );
-
-    assert.equal(visibility.source, 'legacy_fallback');
-    assert.equal(visibility.showMainDecisionPanel, true);
-  });
-
-  it('falls back to legacy on runtime_only panel', () => {
-    const runtime = createMinimalRuntimeSuccess({
-      runtimeSession: {
-        ...createMinimalRuntimeSuccess().runtimeSession,
-        presentation: {
-          ...createMinimalRuntimeSuccess().runtimeSession.presentation,
-          showDecisionPanel: {
-            kind: 'proposal_accept_reject',
-            options: ['accept', 'reject'],
-            copyKey: 'runtime.decision.proposal_accept_reject',
-          },
-        },
-      },
+    const visibility = resolveRuntimeDecisionPanelVisibility({
+      runtimeSession: runtime.runtimeSession,
     });
 
-    const visibility = resolveRuntimeDecisionPanelVisibility(
-      buildParams({
-        runtimeSession: runtime.runtimeSession,
-        sessionFlowStage: 'questions',
-      })
-    );
-
-    assert.equal(visibility.source, 'legacy_fallback');
+    assert.equal(visibility.source, 'hidden');
     assert.equal(visibility.showProposalPanel, false);
   });
 
-  it('hides proposal panel under runtime_confirmed when user already decided', () => {
-    const runtime = createMinimalRuntimeSuccess({
-      runtimeSession: {
-        ...createMinimalRuntimeSuccess().runtimeSession,
-        presentation: {
-          ...createMinimalRuntimeSuccess().runtimeSession.presentation,
-          showDecisionPanel: {
-            kind: 'proposal_accept_reject',
-            options: ['accept', 'reject'],
-            copyKey: 'runtime.decision.proposal_accept_reject',
-          },
-        },
-      },
-    });
-
-    const visibility = resolveRuntimeDecisionPanelVisibility(
-      buildParams({
-        runtimeSession: runtime.runtimeSession,
-        sessionFlowStage: 'awaiting_proposal_decision',
-        showProposalPanel: false,
-      })
-    );
-
-    assert.equal(visibility.source, 'runtime_confirmed');
-    assert.equal(visibility.showProposalPanel, false);
-  });
-
-  it('maps extension decision panel under runtime_confirmed', () => {
+  it('maps extension decision panel from runtime', () => {
     const runtime = createMinimalRuntimeSuccess({
       runtimeSession: {
         ...createMinimalRuntimeSuccess().runtimeSession,
@@ -164,15 +66,11 @@ describe('resolveRuntimeDecisionPanelVisibility', () => {
       },
     });
 
-    const visibility = resolveRuntimeDecisionPanelVisibility(
-      buildParams({
-        runtimeSession: runtime.runtimeSession,
-        sessionFlowStage: 'awaiting_extension_decision',
-        showDecisionPanel: true,
-      })
-    );
+    const visibility = resolveRuntimeDecisionPanelVisibility({
+      runtimeSession: runtime.runtimeSession,
+    });
 
-    assert.equal(visibility.source, 'runtime_confirmed');
+    assert.equal(visibility.source, 'runtime_available');
     assert.equal(visibility.showExtensionDecisionPanel, true);
     assert.equal(visibility.showMainDecisionPanel, false);
   });

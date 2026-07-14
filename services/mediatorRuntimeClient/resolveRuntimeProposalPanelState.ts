@@ -7,7 +7,7 @@ export interface RuntimeProposalPanelState {
   userDecided: boolean;
   hostVote: RuntimeProposalVote;
   partnerVote: RuntimeProposalVote;
-  source: 'runtime' | 'legacy';
+  source: 'runtime_available';
 }
 
 function voteIsDecided(vote: RuntimeProposalVote): boolean {
@@ -40,10 +40,7 @@ export function resolveRuntimeProposalUserDecided(
   return voteIsDecided(vote);
 }
 
-/**
- * Resolves proposal panel gating from runtimeSession when available.
- * Returns null when runtime contract is absent — caller uses legacy message state.
- */
+/** Resolves proposal panel gating from runtimeSession. Returns null when unavailable. */
 export function resolveRuntimeProposalPanelState(
   runtimeSession: RuntimeSession | null | undefined,
   isCurrentUserHost: boolean
@@ -59,6 +56,6 @@ export function resolveRuntimeProposalPanelState(
     userDecided: resolveRuntimeProposalUserDecided(runtimeSession, isCurrentUserHost),
     hostVote: proposal.votes.host,
     partnerVote: proposal.votes.partner,
-    source: 'runtime',
+    source: 'runtime_available',
   };
 }

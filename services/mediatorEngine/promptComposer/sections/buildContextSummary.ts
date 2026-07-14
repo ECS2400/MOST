@@ -1,4 +1,5 @@
 import type { SafePromptContext } from '@/services/mediatorEngine/promptComposer/lib/safePromptInput';
+import { resolveParticipantDisplayNames } from '@/services/mediatorEngine/participants/resolveParticipantDisplayName';
 import { voiceLabelForStrategy } from '@/services/mediatorEngine/promptComposer/config/runtimeVoiceLabels';
 
 /** Builds a short context summary without full state JSON. */
@@ -29,10 +30,15 @@ export function buildContextSummary(ctx: SafePromptContext): string {
   const intakeSummary = ctx.mediationState.conflict?.conflictSummary?.trim();
   const pre = ctx.mediationState.conflict?.preAnalysisContext;
   if (intakeSummary || pre) {
+    const names = resolveParticipantDisplayNames(
+      ctx.mediationState.participants?.host?.profile?.displayName,
+      ctx.mediationState.participants?.partner?.profile?.displayName,
+      ctx.language
+    );
     const intakeParts: string[] = [];
     if (intakeSummary) intakeParts.push(`Shared conflict summary: ${intakeSummary}`);
-    if (pre?.hostPerspective) intakeParts.push(`Host perspective: ${pre.hostPerspective}`);
-    if (pre?.partnerPerspective) intakeParts.push(`Partner perspective: ${pre.partnerPerspective}`);
+    if (pre?.hostPerspective) intakeParts.push(`${names.hostName} perspective: ${pre.hostPerspective}`);
+    if (pre?.partnerPerspective) intakeParts.push(`${names.partnerName} perspective: ${pre.partnerPerspective}`);
     if (pre?.keyTrigger) intakeParts.push(`Key trigger: ${pre.keyTrigger}`);
     const emotions = [...(pre?.hostEmotions ?? []), ...(pre?.partnerEmotions ?? [])];
     if (emotions.length > 0) intakeParts.push(`Emotions: ${emotions.join(', ')}`);

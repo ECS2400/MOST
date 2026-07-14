@@ -68,8 +68,8 @@ describe('composePrompt — L1 prompt assembly', () => {
   it('userPrompt zawiera transcriptWindow', () => {
     const result = composePrompt(createRichPipelineInput());
 
-    assert.match(result.userPrompt, /Host:/);
-    assert.match(result.userPrompt, /Partner:/);
+    assert.match(result.userPrompt, /You:/);
+    assert.match(result.userPrompt, /the other person:/);
     assert.match(result.userPrompt, /Dialogue/);
   });
 

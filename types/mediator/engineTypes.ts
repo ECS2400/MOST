@@ -83,7 +83,8 @@ export type ConversationMode =
   | 'DE_ESCALATING'
   | 'REDIRECTING'
   | 'BREAKTHROUGH'
-  | 'SAFETY';
+  | 'SAFETY'
+  | 'REPAIR_VOICE';
 
 /** Therapeutic tempo of the session — slow / normal / fast. */
 export type ConversationPace = 'slow' | 'normal' | 'fast';
@@ -91,6 +92,7 @@ export type ConversationPace = 'slow' | 'normal' | 'fast';
 /** Dynamic event types ranked by Priority Engine. */
 export type PrioritySignalType =
   | 'safety'
+  | 'repair_voice'
   | 'escalation'
   | 'recovery'
   | 'blame_loop'

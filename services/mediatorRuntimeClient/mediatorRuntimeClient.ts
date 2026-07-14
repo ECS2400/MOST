@@ -1,4 +1,4 @@
-import type { LiveMediatorResponse } from '@/services/liveMediation';
+import type { LiveMediatorResponse } from '@/services/liveMediation.types';
 import type { MediatorRuntimeClientInput } from '@/services/mediatorRuntimeClient/buildMediatorRuntimeRequest';
 import { buildMediatorRuntimeRequest } from '@/services/mediatorRuntimeClient/buildMediatorRuntimeRequest';
 import { MEDIATOR_RUNTIME_DEFAULT_TIMEOUT_MS } from '@/services/mediatorRuntimeClient/mediatorRuntimeConfig';
@@ -13,6 +13,11 @@ import {
   parseMediatorRuntimeResponse,
   type MediatorRuntimeParsedSuccess,
 } from '@/services/mediatorRuntimeClient/parseMediatorRuntimeResponse';
+import {
+  logRuntimeException,
+  logRuntimeRequestStartFromInput,
+  logRuntimeResponse,
+} from '@/services/mediatorRuntimeClient/runtimeCallTraceDevLog';
 
 export interface MediatorRuntimeClientOptions {
   timeoutMs?: number;
@@ -54,6 +59,7 @@ async function fetchMediatorRuntimeRaw(
 
   try {
     const headers = await resolveHeaders(options.headers);
+    const traceId = logRuntimeRequestStartFromInput(input, endpoint, headers);
     const response = await fetchImpl(endpoint, {
       method: 'POST',
       headers: {
@@ -70,6 +76,13 @@ async function fetchMediatorRuntimeRaw(
       try {
         body = JSON.parse(text) as unknown;
       } catch {
+        logRuntimeResponse({
+          mediationId: input.mediationId,
+          traceId,
+          status: response.status,
+          headerKeys: [...response.headers.keys()],
+          body: text.slice(0, 500),
+        });
         if (!response.ok) {
           throw createHttpMediatorRuntimeError(response.status);
         }
@@ -79,6 +92,14 @@ async function fetchMediatorRuntimeRaw(
         });
       }
     }
+
+    logRuntimeResponse({
+      mediationId: input.mediationId,
+      traceId,
+      status: response.status,
+      headerKeys: [...response.headers.keys()],
+      body,
+    });
 
     if (!response.ok) {
       if (isRecord(body) && body.ok === false) {
@@ -90,6 +111,10 @@ async function fetchMediatorRuntimeRaw(
 
     return { status: response.status, body };
   } catch (error) {
+    logRuntimeException({
+      mediationId: input.mediationId,
+      error,
+    });
     throw wrapFetchFailure(error);
   } finally {
     clearTimeout(timeoutId);
@@ -101,8 +126,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Calls mediator-runtime Edge Function and returns legacy LiveMediatorResponse.
- * Parallel path — not wired into liveMediation.ts yet.
+ * Calls mediator-runtime Edge Function and returns parsed runtime success payload.
  */
 export async function callMediatorRuntime(
   input: MediatorRuntimeClientInput,
@@ -121,17 +145,7 @@ export async function callMediatorRuntime(
   return parsed.value;
 }
 
-/** Convenience wrapper returning only LiveMediatorResponse for legacy consumers. */
-export async function callMediatorRuntimeForLiveFlow(
-  input: MediatorRuntimeClientInput,
-  options: MediatorRuntimeClientOptions = {}
-): Promise<LiveMediatorResponse> {
-  const result = await callMediatorRuntime(input, options);
-  return result.response;
-}
-
 export type {
   MediatorRuntimeClientInput,
   MediatorRuntimeParsedSuccess,
-  MediatorRuntimeClientOptions,
 };

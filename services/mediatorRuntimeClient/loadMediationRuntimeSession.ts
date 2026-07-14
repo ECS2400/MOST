@@ -2,6 +2,7 @@ import { prepareSupabaseRequest, supabase } from '@/services/supabase';
 import {
   parseLoadedMediationRuntimeRow,
   type LoadedMediationRuntimeState,
+  type LoadedMediationRuntimeStateWithDiagnostics,
 } from '@/services/mediatorRuntimeClient/mediationRuntimeSessionPersistence';
 import {
   buildRuntimeSessionLoadDiagnostics,
@@ -40,7 +41,7 @@ export async function loadMediationRuntimeState(
 export async function loadMediationRuntimeSessionWithDiagnostics(
   mediationId: string,
   options: LoadMediationRuntimeSessionOptions = {}
-): Promise<LoadedMediationRuntimeState & { diagnostics: RuntimeSessionLoadDiagnostics }> {
+): Promise<LoadedMediationRuntimeStateWithDiagnostics> {
   const role = options.role ?? 'unknown';
   const emptyDiagnostics = buildRuntimeSessionLoadDiagnostics({
     role,
@@ -60,6 +61,7 @@ export async function loadMediationRuntimeSessionWithDiagnostics(
       sessionMemory: null,
       runtimeSession: null,
       diagnostics: emptyDiagnostics,
+      devDiagnostics: null,
     };
   }
 
@@ -78,6 +80,8 @@ export async function loadMediationRuntimeSessionWithDiagnostics(
       rowFound: Boolean(data),
       rawRuntimeSession: data?.mediator_runtime_session ?? null,
       rawRuntimeMetadata: data?.mediator_runtime_metadata ?? null,
+      rawMediationState: data?.mediation_state ?? null,
+      rawSessionMemory: data?.session_memory ?? null,
       supabaseErrorCode: error?.code ?? null,
       supabaseErrorMessage: error?.message ?? null,
     });

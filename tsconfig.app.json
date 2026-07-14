@@ -1,0 +1,35 @@
+/**
+ * Expo / React Native app (screens, components, hooks, shared services).
+ * Excludes mediator engine sources and Supabase Edge Functions.
+ */
+{
+  "extends": ["expo/tsconfig.base", "./tsconfig.base.json"],
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "hooks/**/*.ts",
+    "hooks/**/*.tsx",
+    "constants/**/*.ts",
+    "utils/**/*.ts",
+    "types/**/*.ts",
+    "legacyMigration/**/*.ts",
+    "services/**/*.ts",
+    "services/**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "supabase/**",
+    "scripts/**",
+    "tests/**",
+    "services/mediatorEngine/**",
+    "**/__tests__/**",
+    "**/*_test.ts"
+  ]
+}

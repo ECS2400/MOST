@@ -5,6 +5,7 @@ import { collectEscalationSignal } from '@/services/mediatorEngine/priority/sign
 import { collectExhaustionSignal } from '@/services/mediatorEngine/priority/signals/collectExhaustionSignal';
 import { collectReadinessSignal } from '@/services/mediatorEngine/priority/signals/collectReadinessSignal';
 import { collectRecoverySignal } from '@/services/mediatorEngine/priority/signals/collectRecoverySignal';
+import { collectRepairVoiceSignal } from '@/services/mediatorEngine/priority/signals/collectRepairVoiceSignal';
 import { collectSafetySignal } from '@/services/mediatorEngine/priority/signals/collectSafetySignal';
 import type {
   PrioritySignalCollector,
@@ -15,6 +16,7 @@ import type {
 /** Registry of all L1 priority signal collectors — append-only extensibility. */
 export const PRIORITY_SIGNAL_COLLECTORS: readonly PrioritySignalCollector[] = [
   collectSafetySignal,
+  collectRepairVoiceSignal,
   collectEscalationSignal,
   collectRecoverySignal,
   collectBlameLoopSignal,

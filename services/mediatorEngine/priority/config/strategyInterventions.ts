@@ -88,6 +88,13 @@ export const EXHAUSTION_INTERVENTIONS: readonly InterventionType[] = [
   'invite_reflection',
 ];
 
+export const REPAIR_VOICE_INTERVENTIONS: readonly InterventionType[] = [
+  'recover_acknowledge',
+  'reflect',
+  'reframe',
+  'validate',
+];
+
 /** Primary recommended intervention for a therapeutic strategy fallback. */
 export function primaryInterventionForStrategy(strategy: TherapeuticStrategy): InterventionType {
   return PRIORITY_STRATEGY_INTERVENTIONS[strategy][0] ?? 'reflect';

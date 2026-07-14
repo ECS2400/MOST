@@ -1,17 +1,8 @@
 export interface OpeningBootstrapMessage {
-  id: string;
   sender_id: string;
   message_type: string;
   content: string;
-  metadata?: {
-    summaryKind?: string;
-    questionId?: string;
-    openingSummaryDone?: boolean;
-  };
-}
-
-export interface OpeningBootstrapConversationState {
-  openingSummaryDone?: boolean;
+  metadata?: Record<string, unknown> | null;
 }
 
 export function extractOpeningQuestionBare(content: string): string {
@@ -52,14 +43,10 @@ export function hasMediatorOpeningDelivered(messages: OpeningBootstrapMessage[])
   );
 }
 
-export function shouldSkipOpeningBootstrap(
-  messages: OpeningBootstrapMessage[],
-  conversationState?: OpeningBootstrapConversationState | null
-): boolean {
+export function shouldSkipOpeningBootstrap(messages: OpeningBootstrapMessage[]): boolean {
   return (
     hasOpeningSummaryMessage(messages) ||
     hasOpeningFactsQuestion(messages) ||
-    hasMediatorOpeningDelivered(messages) ||
-    Boolean(conversationState?.openingSummaryDone)
+    hasMediatorOpeningDelivered(messages)
   );
 }

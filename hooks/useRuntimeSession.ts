@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadMediationRuntimeSessionWithDiagnostics } from '@/services/mediatorRuntimeClient/loadMediationRuntimeSession';
 import { hasRuntimeSession } from '@/services/mediatorRuntimeClient/hasRuntimeSession';
-import { logRuntimeRecoveryDev } from '@/services/mediatorRuntimeClient/runtimeRecoveryDevLog';
+import { logRuntimeRecoveryBlocked, logRuntimeRecoveryDev } from '@/services/mediatorRuntimeClient/runtimeRecoveryDevLog';
 import { shouldCommitRuntimeSessionRefresh } from '@/services/mediatorRuntimeClient/runtimeSessionRefreshGuard';
 import type {
   RuntimeSessionLoadDiagnostics,
@@ -22,6 +22,7 @@ export interface UseRuntimeSessionResult {
   hasRuntimeSession: () => boolean;
   mediationId: string | undefined;
   recoveryClickCount: number;
+  bumpRecoveryClickCount: () => void;
 }
 
 export interface UseRuntimeSessionOptions {
@@ -67,7 +68,9 @@ export function useRuntimeSession(
   );
   const [runtimeSessionLoadSettled, setRuntimeSessionLoadSettled] = useState(false);
   const [recoveryClickCount, setRecoveryClickCount] = useState(0);
+  const runtimeSessionRef = useRef<RuntimeSession | null>(null);
   const mediationIdRef = useRef<string | undefined>(mediationId);
+  const roleRef = useRef<RuntimeSessionParticipantRole>(role);
   const refreshRequestIdRef = useRef(0);
   const recoveryClickCountRef = useRef(0);
   const mountedRef = useRef(false);
@@ -75,6 +78,7 @@ export function useRuntimeSession(
   mediationIdRef.current = mediationId;
   runtimeSessionRef.current = runtimeSession;
   userIdRef.current = userId;
+  roleRef.current = role;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -97,7 +101,18 @@ export function useRuntimeSession(
 
   const refreshRuntimeSession = useCallback(async (): Promise<RuntimeSession | null> => {
     const activeMediationId = mediationIdRef.current;
+    const activeRole = roleRef.current;
     if (!activeMediationId) {
+      logRuntimeRecoveryBlocked({
+        reason: 'mediation_id_missing',
+        runtimeParticipantRole: activeRole,
+        isCurrentUserHost: activeRole === 'host',
+        mediationId: null,
+        loadSettled: false,
+        runtimeUnavailable: false,
+        attempted: false,
+        inFlight: false,
+      });
       if (!mountedRef.current) return null;
       setRuntimeSession(null);
       runtimeSessionRef.current = null;
@@ -108,7 +123,7 @@ export function useRuntimeSession(
 
     try {
       const loaded = await loadMediationRuntimeSessionWithDiagnostics(activeMediationId, {
-        role,
+        role: activeRole,
         logDiagnostics: true,
       });
 
@@ -124,7 +139,7 @@ export function useRuntimeSession(
         mediationId: activeMediationId,
         requestId,
         userId: userIdRef.current,
-        role,
+        role: activeRole,
         rowFound: loaded.diagnostics.rowFound,
         supabaseErrorCode: loaded.diagnostics.supabaseErrorCode,
         supabaseErrorMessage: loaded.diagnostics.supabaseErrorMessage,
@@ -139,6 +154,16 @@ export function useRuntimeSession(
       });
 
       if (!commitAllowed) {
+        logRuntimeRecoveryBlocked({
+          reason: 'stale_request_guard',
+          runtimeParticipantRole: activeRole,
+          isCurrentUserHost: activeRole === 'host',
+          mediationId: activeMediationId,
+          loadSettled: true,
+          runtimeUnavailable: !hasRuntimeSession(loaded.runtimeSession),
+          attempted: false,
+          inFlight: false,
+        });
         return runtimeSessionRef.current;
       }
 
@@ -148,14 +173,14 @@ export function useRuntimeSession(
       setLoadDiagnostics(loaded.diagnostics ?? null);
       setRuntimeSessionLoadSettled(true);
       if (loaded.runtimeSession) {
-        logRuntimeSessionLoaded(activeMediationId, role, loaded.runtimeSession);
+        logRuntimeSessionLoaded(activeMediationId, activeRole, loaded.runtimeSession);
       }
       return loaded.runtimeSession;
     } catch {
       setRuntimeSessionLoadSettled(true);
       return runtimeSessionRef.current;
     }
-  }, [role]);
+  }, []);
 
   const bumpRecoveryClickCount = useCallback(() => {
     recoveryClickCountRef.current += 1;
@@ -176,8 +201,6 @@ export function useRuntimeSession(
     devDiagnostics,
     loadDiagnostics,
     runtimeSessionLoadSettled,
-    recoveryClickCount,
-    bumpRecoveryClickCount,
     recoveryClickCount,
     bumpRecoveryClickCount,
     refreshRuntimeSession,

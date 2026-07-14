@@ -9,7 +9,7 @@ import type { ConfidenceValue } from './confidence';
 import type { ConversationMode } from './dynamics';
 import type { InterventionType, PrioritySignalType } from './engineTypes';
 import type { MediationState } from './mediationState';
-import type { ReflectionOutput } from './reflection';
+import type { ReflectionOutput, TranscriptMessage } from './reflection';
 import type { SafetyOutput } from './safety';
 import type { StrategyEngineOutput } from './strategyEngineIo';
 
@@ -35,6 +35,10 @@ export interface PriorityInput {
   safety: SafetyOutput | null;
   strategy: StrategyEngineOutput;
   turnNumber: TurnNumber;
+  /** Recent transcript messages for in-turn signal detection — not persisted. */
+  transcriptDelta?: TranscriptMessage[];
+  /** Full transcript window when available — not persisted. */
+  transcriptWindow?: TranscriptMessage[];
 }
 
 /**

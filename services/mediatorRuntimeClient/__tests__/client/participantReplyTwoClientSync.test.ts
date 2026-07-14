@@ -27,48 +27,27 @@ const QUESTION_TURN = 2;
 function questionMessage(): ParticipantReplyMessage {
   return {
     id: 'q-1',
-    mediation_id: MEDIATION_ID,
     sender_id: 'ai',
-    sender_name: 'Mediator',
-    content: 'What happened?',
     message_type: 'question',
-    is_private: false,
-    recipient_id: null,
-    phase: QUESTION_TURN,
-    metadata: { questionId: 'q-meta-1' },
-    created_at: '2026-07-13T10:00:00.000Z',
+    metadata: { replyToQuestionId: 'q-meta-1' },
   };
 }
 
 function hostReply(): ParticipantReplyMessage {
   return {
     id: 'host-reply-1',
-    mediation_id: MEDIATION_ID,
     sender_id: HOST_ID,
-    sender_name: 'Host',
-    content: 'Host answer',
     message_type: 'message',
-    is_private: false,
-    recipient_id: null,
-    phase: QUESTION_TURN,
     metadata: {},
-    created_at: '2026-07-13T10:01:00.000Z',
   };
 }
 
 function partnerReply(): ParticipantReplyMessage {
   return {
     id: 'partner-reply-1',
-    mediation_id: MEDIATION_ID,
     sender_id: PARTNER_ID,
-    sender_name: 'Partner',
-    content: 'Partner answer',
     message_type: 'message',
-    is_private: false,
-    recipient_id: null,
-    phase: QUESTION_TURN,
     metadata: {},
-    created_at: '2026-07-13T10:02:00.000Z',
   };
 }
 

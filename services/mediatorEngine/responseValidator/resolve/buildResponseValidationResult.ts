@@ -46,6 +46,8 @@ export function buildResponseValidationResult(
           failedRuleIds,
           blockingReasons,
           currentGoal: ctx.currentGoal,
+          ruleResults,
+          draftValidationReasons: ctx.draftReply.validation?.reasons,
         })
       : null;
 

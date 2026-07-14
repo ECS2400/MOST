@@ -13,6 +13,12 @@ export interface LoadedMediationRuntimeState {
   runtimeSession: RuntimeSession | null;
 }
 
+export interface LoadedMediationRuntimeStateWithDiagnostics
+  extends LoadedMediationRuntimeState {
+  diagnostics: import('@/services/mediatorRuntimeClient/runtimeSessionLoadDiagnostics').RuntimeSessionLoadDiagnostics;
+  devDiagnostics: import('@/services/mediatorEngine/edge/types').MediatorRuntimeEdgeDevDiagnostics | null;
+}
+
 function parseStoredJsonObject<T extends object>(value: unknown): T | null {
   if (!isRecord(value)) {
     return null;

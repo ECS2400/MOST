@@ -52,6 +52,10 @@ export interface OrchestrateTurnRequest {
   language?: MediatorLang;
   /** Client-originated flow events (transport only until UI-B.3d.2+). */
   clientEvents?: RuntimeClientEvent[];
+  /** Optional full transcript window for prompt composition — not persisted. */
+  transcriptWindow?: TranscriptMessage[];
+  /** Optional participant display names from live client — not persisted. */
+  participantNames?: { hostName?: string; partnerName?: string };
 }
 
 /**

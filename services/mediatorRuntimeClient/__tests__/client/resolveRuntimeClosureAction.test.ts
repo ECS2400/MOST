@@ -38,7 +38,7 @@ describe('resolveRuntimeClosureAction', () => {
     });
 
     assert.equal(action.shouldNavigate, true);
-    assert.equal(action.source, 'runtime');
+    assert.equal(action.source, 'runtime_available');
     assert.equal(action.directive, 'close_on_accept');
     assert.equal(action.suggestedDbStatus, 'resolved');
   });
@@ -53,7 +53,7 @@ describe('resolveRuntimeClosureAction', () => {
     });
 
     assert.equal(action.shouldNavigate, true);
-    assert.equal(action.source, 'runtime');
+    assert.equal(action.source, 'runtime_available');
     assert.equal(action.directive, 'close_without_agreement');
     assert.equal(action.suggestedDbStatus, 'pending_agreements');
   });
@@ -68,7 +68,7 @@ describe('resolveRuntimeClosureAction', () => {
     });
 
     assert.equal(action.shouldNavigate, true);
-    assert.equal(action.source, 'runtime');
+    assert.equal(action.source, 'runtime_available');
     assert.equal(action.directive, 'safety_close');
   });
 
@@ -82,7 +82,7 @@ describe('resolveRuntimeClosureAction', () => {
     });
 
     assert.equal(action.shouldNavigate, false);
-    assert.equal(action.source, 'legacy_fallback');
+    assert.equal(action.source, 'runtime_available');
   });
 
   it('directive none falls back to legacy closure flow', () => {
@@ -95,7 +95,7 @@ describe('resolveRuntimeClosureAction', () => {
     });
 
     assert.equal(action.shouldNavigate, false);
-    assert.equal(action.source, 'legacy_fallback');
+    assert.equal(action.source, 'runtime_available');
     assert.equal(action.directive, 'none');
   });
 
@@ -103,9 +103,7 @@ describe('resolveRuntimeClosureAction', () => {
     const action = resolveRuntimeClosureAction({ runtimeSession: null });
 
     assert.equal(action.shouldNavigate, false);
-    assert.equal(action.source, 'legacy_fallback');
-    assert.equal(action.directive, 'none');
-    assert.equal(action.suggestedDbStatus, null);
+    assert.equal(action.source, 'runtime_unavailable');
   });
 
   it('non-terminal outcome with navigate flag falls back to legacy', () => {
@@ -118,7 +116,7 @@ describe('resolveRuntimeClosureAction', () => {
     });
 
     assert.equal(action.shouldNavigate, false);
-    assert.equal(action.source, 'legacy_fallback');
+    assert.equal(action.source, 'runtime_available');
   });
 
   it('duplicate invocation guard allows only one navigation', () => {

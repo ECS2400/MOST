@@ -5,8 +5,8 @@
  */
 
 import { hasRuntimeSession } from '@/services/mediatorRuntimeClient/hasRuntimeSession';
-import type { LiveLegacyDecisionPanelState } from '@/services/mediatorRuntimeClient/resolveLegacyLiveDecisionPanel';
-import type { LiveDecisionPanelKind } from '@/services/mediatorRuntimeClient/resolveLegacyLiveDecisionPanel';
+import type { LiveLegacyDecisionPanelState } from '@/tests/runtimeComparison/resolveLegacyLiveDecisionPanel';
+import type { LiveDecisionPanelKind } from '@/tests/runtimeComparison/resolveLegacyLiveDecisionPanel';
 import type { RuntimeSession } from '@/types/mediator/runtimeSession';
 
 export type DecisionPanelMismatchReason =

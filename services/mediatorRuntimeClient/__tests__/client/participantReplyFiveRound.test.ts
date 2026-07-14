@@ -21,6 +21,7 @@ import {
 import { resetParticipantRepliesForQuestion } from '@/services/mediatorEngine/clientEvents/participantReplyFlowControl';
 import { createDefaultRuntimeFlowControl } from '@/services/mediatorEngine/clientEvents/applyRuntimeClientEvents';
 import type { LoadedMediationRuntimeState } from '@/services/mediatorRuntimeClient/mediationRuntimeSessionPersistence';
+import { createRuntimeSessionFixture } from '@/services/mediatorRuntimeClient/__tests__/client/runtimeSessionFixtures';
 import type { MediatorRuntimeEdgeSuccess } from '@/services/mediatorEngine/edge/types';
 import type { ParticipantReplyMessage } from '@/services/mediatorRuntimeClient/deriveParticipantReplyStateFromMessages';
 
@@ -72,17 +73,11 @@ function aiDelivered(round: number): ParticipantReplyMessage & { content: string
 }
 
 function staleRuntimeSession(turnOrdinal: number) {
-  return {
-    decision: {
-      nextBeat: 'await_user_action' as const,
-      mayAutoAdvance: false,
-      blockedReason: 'awaiting_both_replies',
-      triggerHint: null,
-    },
+  return createRuntimeSessionFixture({
     session: {
-      stage: 'intake' as const,
-      outcome: 'ongoing' as const,
-      currentGoal: 'EMOTION_NAMING' as const,
+      stage: 'intake',
+      outcome: 'ongoing',
+      currentGoal: 'EMOTION_NAMING',
       activeStrategy: null,
       turnOrdinal,
       isExtensionActive: false,
@@ -93,33 +88,17 @@ function staleRuntimeSession(turnOrdinal: number) {
       },
     },
     progress: {
-      percent: 10,
-      currentGoalIndex: 0,
-      totalGoals: 10,
-      questionsAsked: turnOrdinal,
-      questionsTarget: 8,
       completionEstimate: 10,
+      milestone: null,
+      goalProgress: {
+        completedGoals: [],
+        currentGoal: 'EMOTION_NAMING',
+        currentGoalCompletion: 10,
+        estimatedRemainingGoals: 8,
+      },
+      labelKey: 'runtime.stage.intake',
     },
-    presentation: {
-      deliverables: [],
-      decisionPanel: null,
-      inputState: 'awaiting_both_answers' as const,
-      waitingDisplay: 'waiting_both' as const,
-    },
-    proposal: { phase: 'none' as const, presentedAt: null, acceptedBy: [], rejectedBy: [] },
-    closure: { directive: 'none' as const, suggestedDbStatus: 'live' as const },
-    pending: {
-      awaiting: 'both_replies' as const,
-      awaitingFrom: ['host', 'partner'] as const,
-      satisfiedBy: ['host_message', 'partner_message'] as const,
-    },
-    diagnostics: {
-      explainabilityId: null,
-      safetyLevel: 'L0' as const,
-      fallbackUsed: false,
-      validationWarnings: [],
-    },
-  };
+  });
 }
 
 function buildLoadedState(
@@ -134,6 +113,7 @@ function buildLoadedState(
     transcriptDelta: [],
     language: 'pl',
     engineVersion: 'v2.3',
+    mediationState: null,
   });
   mediationState.currentGoal = 'EMOTION_NAMING';
 

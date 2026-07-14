@@ -64,42 +64,38 @@ describe('resolveRuntimeGenerationFlow', () => {
   it('runtime deliver_question → generate_question', () => {
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession: runtimeWithBeat('deliver_question'),
-      legacyMode: null,
     });
 
     assert.equal(resolution.mode, 'generate_question');
-    assert.equal(resolution.source, 'runtime');
+    assert.equal(resolution.source, 'runtime_available');
   });
 
   it('runtime deliver_final_summary → final_summary', () => {
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession: runtimeWithBeat('deliver_final_summary'),
-      legacyMode: 'generate_question',
     });
 
     assert.equal(resolution.mode, 'final_summary');
-    assert.equal(resolution.source, 'runtime');
+    assert.equal(resolution.source, 'runtime_available');
   });
 
   it('runtime present_proposal → proposed_solution', () => {
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession: runtimeWithBeat('present_proposal'),
-      legacyMode: 'generate_question',
     });
 
     assert.equal(resolution.mode, 'proposed_solution');
-    assert.equal(resolution.source, 'runtime');
+    assert.equal(resolution.source, 'runtime_available');
   });
 
   it('runtime offer_extension → extension_offer (not extension_question)', () => {
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession: runtimeWithBeat('offer_extension', { mayAutoAdvance: false }),
-      legacyMode: 'generate_question',
     });
 
     assert.equal(resolution.mode, 'extension_offer');
     assert.notEqual(resolution.mode, 'extension_question');
-    assert.equal(resolution.source, 'runtime');
+    assert.equal(resolution.source, 'runtime_available');
   });
 
   it('runtime deliver_extension_questions → extension_question', () => {
@@ -108,52 +104,47 @@ describe('resolveRuntimeGenerationFlow', () => {
         mayAutoAdvance: true,
         pending: { awaiting: 'nothing' },
       }),
-      legacyMode: 'generate_question',
     });
 
     assert.equal(resolution.mode, 'extension_question');
-    assert.equal(resolution.source, 'runtime');
+    assert.equal(resolution.source, 'runtime_available');
   });
 
   it('runtime deliver_closure → closure (not final_summary)', () => {
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession: runtimeWithBeat('deliver_closure', { mayAutoAdvance: false }),
-      legacyMode: 'final_summary',
     });
 
     assert.equal(resolution.mode, 'closure');
     assert.notEqual(resolution.mode, 'final_summary');
-    assert.equal(resolution.source, 'runtime');
+    assert.equal(resolution.source, 'runtime_available');
   });
 
   it('runtime safety_intervention → safety_intervention', () => {
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession: runtimeWithBeat('safety_intervention', { mayAutoAdvance: false }),
-      legacyMode: 'generate_question',
     });
 
     assert.equal(resolution.mode, 'safety_intervention');
-    assert.equal(resolution.source, 'runtime');
+    assert.equal(resolution.source, 'runtime_available');
   });
 
   it('runtime await_user_action → null', () => {
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession: runtimeWithBeat('await_user_action', { mayAutoAdvance: false }),
-      legacyMode: 'generate_question',
     });
 
     assert.equal(resolution.mode, null);
-    assert.equal(resolution.source, 'runtime');
+    assert.equal(resolution.source, 'runtime_available');
   });
 
   it('runtime deliver_answer_ack → null for auto-advance', () => {
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession: runtimeWithBeat('deliver_answer_ack', { mayAutoAdvance: false }),
-      legacyMode: 'answer_ack',
     });
 
     assert.equal(resolution.mode, null);
-    assert.equal(resolution.source, 'runtime');
+    assert.equal(resolution.source, 'runtime_available');
   });
 
   it('blocks question generation when pending awaits both replies', () => {
@@ -161,11 +152,10 @@ describe('resolveRuntimeGenerationFlow', () => {
       runtimeSession: runtimeWithBeat('deliver_question', {
         pending: { awaiting: 'both_replies' },
       }),
-      legacyMode: 'generate_question',
     });
 
     assert.equal(resolution.mode, null);
-    assert.equal(resolution.source, 'runtime');
+    assert.equal(resolution.source, 'runtime_available');
   });
 
   it('blocks question generation when pending awaits decision', () => {
@@ -173,17 +163,15 @@ describe('resolveRuntimeGenerationFlow', () => {
       runtimeSession: runtimeWithBeat('deliver_question', {
         pending: { awaiting: 'continue_decision' },
       }),
-      legacyMode: 'generate_question',
     });
 
     assert.equal(resolution.mode, null);
-    assert.equal(resolution.source, 'runtime');
+    assert.equal(resolution.source, 'runtime_available');
   });
 
   it('returns null mode when runtime is unavailable (production default)', () => {
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession: null,
-      legacyMode: 'mid_summary',
     });
 
     assert.equal(resolution.mode, null);
@@ -191,23 +179,20 @@ describe('resolveRuntimeGenerationFlow', () => {
     assert.equal(resolution.reason, 'runtime_unavailable');
   });
 
-  it('falls back when runtime failed only with allowLegacyFallback', () => {
+  it('returns unavailable when runtime failed', () => {
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession: runtimeWithBeat('deliver_question'),
-      legacyMode: 'generate_question',
       runtimeFailed: true,
-      allowLegacyFallback: true,
     });
 
-    assert.equal(resolution.mode, 'generate_question');
-    assert.equal(resolution.source, 'legacy_fallback');
+    assert.equal(resolution.mode, null);
+    assert.equal(resolution.source, 'runtime_unavailable');
     assert.equal(resolution.reason, 'runtime_failed');
   });
 
   it('returns unavailable on invalid runtime state flag (production default)', () => {
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession: runtimeWithBeat('deliver_question'),
-      legacyMode: 'generate_question',
       invalidRuntimeState: true,
     });
 
@@ -219,48 +204,12 @@ describe('resolveRuntimeGenerationFlow', () => {
   it('does not duplicate generate turn when runtime blocks auto-advance', () => {
     const blocked = resolveRuntimeGenerationFlow({
       runtimeSession: runtimeWithBeat('await_user_action', { mayAutoAdvance: false }),
-      legacyMode: 'generate_question',
     });
     const allowed = resolveRuntimeGenerationFlow({
       runtimeSession: runtimeWithBeat('deliver_question'),
-      legacyMode: 'generate_question',
     });
 
     assert.equal(blocked.mode, null);
     assert.equal(allowed.mode, 'generate_question');
-  });
-
-  it('does not call lazy legacy getter when runtime is available', () => {
-    let called = false;
-    const runtimeSession = runtimeWithBeat('deliver_question');
-
-    const resolution = resolveRuntimeGenerationFlow({
-      runtimeSession,
-      getLegacyMode: () => {
-        called = true;
-        return 'generate_question';
-      },
-    });
-
-    assert.equal(called, false);
-    assert.equal(resolution.source, 'runtime');
-    assert.equal(resolution.mode, 'generate_question');
-  });
-
-  it('calls lazy legacy getter when runtime is unavailable and legacy allowed', () => {
-    let called = false;
-
-    const resolution = resolveRuntimeGenerationFlow({
-      runtimeSession: null,
-      allowLegacyFallback: true,
-      getLegacyMode: () => {
-        called = true;
-        return 'mid_summary';
-      },
-    });
-
-    assert.equal(called, true);
-    assert.equal(resolution.mode, 'mid_summary');
-    assert.equal(resolution.source, 'legacy_fallback');
   });
 });

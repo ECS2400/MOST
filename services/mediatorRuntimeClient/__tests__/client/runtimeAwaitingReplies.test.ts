@@ -4,64 +4,11 @@ import { buildParticipantReplyClientEvents } from '@/services/mediatorRuntimeCli
 import { buildLiveRuntimeTurnInput } from '@/services/mediatorRuntimeClient/liveMediationBridge';
 import { resolveRuntimeGenerationFlow } from '@/services/mediatorRuntimeClient/resolveRuntimeGenerationFlow';
 import { shouldBlockRuntimeMediatorGeneration } from '@/services/mediatorRuntimeClient/shouldBlockRuntimeMediatorGeneration';
+import { createRuntimeSessionFixture } from '@/services/mediatorRuntimeClient/__tests__/client/runtimeSessionFixtures';
 import type { RuntimeSession } from '@/types/mediator/runtimeSession';
 
 function runtimeAwaitingBothReplies(): RuntimeSession {
-  return {
-    decision: {
-      nextBeat: 'await_user_action',
-      mayAutoAdvance: false,
-      blockedReason: 'awaiting_both_replies',
-      triggerHint: null,
-    },
-    session: {
-      stage: 'intake',
-      outcome: 'ongoing',
-      currentGoal: 'SAFE_OPENING',
-      activeStrategy: null,
-      turnOrdinal: 2,
-      isExtensionActive: false,
-      participantPresence: {
-        hostActive: true,
-        partnerActive: true,
-        partnerRequired: true,
-      },
-    },
-    progress: {
-      percent: 10,
-      currentGoalIndex: 0,
-      totalGoals: 10,
-      questionsAsked: 1,
-      questionsTarget: 8,
-    },
-    presentation: {
-      deliverables: [],
-      decisionPanel: null,
-      inputState: 'awaiting_both_answers',
-      waitingDisplay: 'waiting_both',
-    },
-    proposal: {
-      phase: 'none',
-      presentedAt: null,
-      acceptedBy: [],
-      rejectedBy: [],
-    },
-    closure: {
-      directive: 'none',
-      suggestedDbStatus: 'live',
-    },
-    pending: {
-      awaiting: 'both_replies',
-      awaitingFrom: ['host', 'partner'],
-      satisfiedBy: ['host_message', 'partner_message'],
-    },
-    diagnostics: {
-      explainabilityId: null,
-      safetyLevel: 'L0',
-      fallbackUsed: false,
-      validationWarnings: [],
-    },
-  };
+  return createRuntimeSessionFixture();
 }
 
 describe('shouldBlockRuntimeMediatorGeneration', () => {
@@ -91,7 +38,6 @@ describe('shouldBlockRuntimeMediatorGeneration', () => {
         runtimeSession,
         mode: 'opening_summary',
         force: true,
-        allowOpeningBootstrap: true,
       }),
       true
     );
@@ -107,7 +53,6 @@ describe('shouldBlockRuntimeMediatorGeneration', () => {
         runtimeSession: deliverOpening,
         mode: 'opening_summary',
         force: true,
-        allowOpeningBootstrap: true,
       }),
       false
     );
@@ -134,11 +79,10 @@ describe('resolveRuntimeGenerationFlow — awaiting replies', () => {
 
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession,
-      legacyMode: 'generate_question',
     });
 
     assert.equal(resolution.mode, null);
-    assert.equal(resolution.source, 'runtime');
+    assert.equal(resolution.source, 'runtime_available');
   });
 
   it('allows generate_question when both replies satisfied and pending is nothing', () => {
@@ -151,11 +95,10 @@ describe('resolveRuntimeGenerationFlow — awaiting replies', () => {
 
     const resolution = resolveRuntimeGenerationFlow({
       runtimeSession,
-      legacyMode: 'generate_question',
     });
 
     assert.equal(resolution.mode, 'generate_question');
-    assert.equal(resolution.source, 'runtime');
+    assert.equal(resolution.source, 'runtime_available');
   });
 });
 

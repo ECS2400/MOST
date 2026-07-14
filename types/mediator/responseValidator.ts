@@ -20,6 +20,20 @@ export interface ResponseValidationRuleResult {
   severity: 'block' | 'warn';
   reason: string;
   metadata?: Record<string, string | number | boolean>;
+  /** Populated by repeated_intervention for precise retry guidance. */
+  repetitionMatchDetail?: RepetitionMatchRetryDetail;
+}
+
+/** Serializable repetition match passed into retry instruction builder. */
+export interface RepetitionMatchRetryDetail {
+  priorIndex: number;
+  priorText: string;
+  matchedPhrase: string | null;
+  matchTypes: string[];
+  tokenOverlap: number;
+  phraseHitCount: number;
+  questionOverlap: number | null;
+  matchedReasons: string[];
 }
 
 /** Full post-LLM validation result. */
@@ -57,4 +71,8 @@ export interface ResponseValidationContext {
   maxAttempts: number;
   /** Therapeutic goal from prompt metadata — used for stage-specific validation. */
   currentGoal?: string;
+  /** Recent mediator messages for cross-turn repetition detection. */
+  recentMediatorMessages?: string[];
+  /** Optional transcript ids aligned with recentMediatorMessages for diagnostics. */
+  recentMediatorMessageRefs?: Array<{ id: string; content: string }>;
 }

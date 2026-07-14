@@ -97,5 +97,11 @@ export interface GenerateMediatorReplyOutput {
   draftReply: DraftMediatorReply;
   providerResponse?: LlmProviderResponse;
   fallbackUsed: boolean;
+  /** True when an invalid provider draft was replaced by deterministic fallback text. */
+  fallbackSubstituted?: boolean;
+  /** Provider text before sanitization or fallback substitution. */
+  originalProviderText?: string | null;
+  /** L1 validateDraftReply reasons for the effective draft text. */
+  draftValidationReasons?: string[];
   generatedAt: string;
 }

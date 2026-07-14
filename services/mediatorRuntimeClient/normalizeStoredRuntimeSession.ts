@@ -104,5 +104,5 @@ export function normalizeStoredRuntimeSession(value: unknown): RuntimeSession | 
     return null;
   }
 
-  return normalized as RuntimeSession;
+  return normalized as unknown as RuntimeSession;
 }

@@ -1,7 +1,8 @@
-import type { MediatorRuntimeEdgeSuccess } from '@/services/mediatorEngine/edge/types';
 import { createEmptySessionMemory } from '@/services/mediatorEngine/_internal/skeletonDefaults';
 import { createBaselineMediationState } from '@/services/mediatorEngine/__tests__/decision/fixtures';
+import { createEmptyIntervention } from '@/services/mediatorEngine/_internal/skeletonDefaults';
 import { composeRuntimeSession } from '@/services/mediatorEngine/runtimeSession';
+import type { MediatorRuntimeEdgeSuccess } from '@/services/mediatorEngine/edge/types';
 
 export function createMinimalRuntimeSuccess(
   overrides: Partial<MediatorRuntimeEdgeSuccess> = {}
@@ -26,33 +27,10 @@ export function createMinimalRuntimeSuccess(
   const sessionMemory = createEmptySessionMemory();
 
   const intervention = {
-    id: 'int-1',
-    type: 'open_deepen' as const,
-    target: 'both' as const,
-    visibility: 'public' as const,
+    ...createEmptyIntervention(3),
     content: {
       primaryMessage: 'What would help you feel heard in this moment?',
     },
-    goal: 'EMOTION_NAMING' as const,
-    intent: 'help_name_emotion' as const,
-    strategy: 'validate_emotions' as const,
-    rationale: 'test',
-    expectedEffect: {
-      id: 'eff-1',
-      description: 'test',
-      observableSignals: [],
-      targetParticipant: 'both' as const,
-      verificationMethod: 'next_message' as const,
-      successCriteria: {
-        type: 'check_confirmed' as const,
-        threshold: 1,
-        confidenceRequired: 50,
-      },
-      timeHorizon: 1,
-    },
-    libraryPatternId: null,
-    signature: 'sig-1',
-    generatedAt: '2026-07-06T00:00:00.000Z',
   };
 
   const runtimeMetadata = {

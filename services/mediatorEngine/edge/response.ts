@@ -106,7 +106,7 @@ export function isMediatorRuntimeResponseSafe(payload: MediatorRuntimeEdgeSucces
   ] as const;
 
   for (const key of forbiddenTopLevel) {
-    if (key in (payload as Record<string, unknown>)) {
+    if (key in (payload as unknown as Record<string, unknown>)) {
       return false;
     }
   }

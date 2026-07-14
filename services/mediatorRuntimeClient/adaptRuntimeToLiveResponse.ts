@@ -1,5 +1,5 @@
 import type { InterventionType } from '@/types/mediator';
-import type { LiveMediatorResponse } from '@/services/liveMediation';
+import type { LiveMediatorResponse } from '@/services/liveMediation.types';
 import type { MediatorRuntimeEdgeSuccess } from '@/services/mediatorEngine/edge/types';
 import type { QuestionTarget } from '@/services/mediatorRuntimeClient/types';
 

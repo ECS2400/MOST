@@ -73,6 +73,7 @@ export async function createMediationRecord(
     .from('mediations')
     .insert({
       user_id: input.userId,
+      partner_id: null,
       couple_id: input.coupleId ?? null,
       what_happened: input.whatHappened.trim() || null,
       what_angered: input.whatAngered.trim() || null,

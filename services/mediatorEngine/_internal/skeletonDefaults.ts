@@ -135,6 +135,8 @@ export function createEmptyMediationState(request: OrchestrateTurnRequest): Medi
         partnerEmotions: [],
         partnerNeeds: [],
         keyTrigger: null,
+        hostPerspective: null,
+        partnerPerspective: null,
       },
     },
     dynamics: {

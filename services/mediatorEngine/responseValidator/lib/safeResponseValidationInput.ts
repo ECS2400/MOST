@@ -132,6 +132,27 @@ export function safeResponseValidationInput(input: unknown): ResponseValidationC
       ? promptComposerOutput.promptMetadata.goal
       : undefined;
 
+  const recentMediatorMessages = Array.isArray(
+    promptComposerOutput.promptMetadata?.recentMediatorMessages
+  )
+    ? promptComposerOutput.promptMetadata.recentMediatorMessages.filter(
+        (entry): entry is string => typeof entry === 'string' && entry.trim().length > 0
+      )
+    : undefined;
+
+  const recentMediatorMessageRefs = Array.isArray(
+    promptComposerOutput.promptMetadata?.recentMediatorMessageRefs
+  )
+    ? promptComposerOutput.promptMetadata.recentMediatorMessageRefs.filter(
+        (entry): entry is { id: string; content: string } =>
+          !!entry &&
+          typeof entry === 'object' &&
+          typeof entry.id === 'string' &&
+          typeof entry.content === 'string' &&
+          entry.content.trim().length > 0
+      )
+    : undefined;
+
   return {
     text: typeof draftReply.text === 'string' ? draftReply.text : '',
     draftReply,
@@ -141,6 +162,8 @@ export function safeResponseValidationInput(input: unknown): ResponseValidationC
     attemptNumber,
     maxAttempts,
     currentGoal,
+    recentMediatorMessages,
+    recentMediatorMessageRefs,
     promptComposerOutput,
   };
 }

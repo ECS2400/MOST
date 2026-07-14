@@ -1,5 +1,9 @@
 import { supabase } from '@/services/supabase';
 import { buildCombinedDescription } from '@/services/mediationCreate';
+import {
+  PartnerMediationLinkError,
+  resolveMediationPartnerLinkUpdate,
+} from '@/services/mediationPartnerValidation';
 
 export type PartnerMediationInvite = {
   id: string;
@@ -12,12 +16,35 @@ export type PartnerMediationInvite = {
   hasPartnerAnalysis: boolean;
 };
 
+export { PartnerMediationLinkError } from '@/services/mediationPartnerValidation';
+
 export async function linkPartnerToMediation(
   mediationId: string,
   hostUserId: string,
   partnerId: string,
   coupleId?: string | null
 ): Promise<void> {
+  const { data: existing, error: readError } = await supabase
+    .from('mediations')
+    .select('user_id, partner_id')
+    .eq('id', mediationId)
+    .maybeSingle();
+
+  if (readError || !existing) {
+    throw new Error(readError?.message || 'Nie udało się powiązać partnera z mediacją.');
+  }
+
+  const action = resolveMediationPartnerLinkUpdate({
+    hostUserId,
+    partnerId,
+    existingHostUserId: existing.user_id ?? null,
+    existingPartnerId: existing.partner_id ?? null,
+  });
+
+  if (action === 'noop') {
+    return;
+  }
+
   const { error } = await supabase
     .from('mediations')
     .update({
@@ -26,7 +53,8 @@ export async function linkPartnerToMediation(
       updated_at: new Date().toISOString(),
     })
     .eq('id', mediationId)
-    .eq('user_id', hostUserId);
+    .eq('user_id', hostUserId)
+    .is('partner_id', null);
 
   if (error) {
     throw new Error(error.message || 'Nie udało się powiązać partnera z mediacją.');

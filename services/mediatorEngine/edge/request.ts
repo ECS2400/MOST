@@ -151,6 +151,20 @@ export function parseMediatorRuntimeRequest(body: unknown): ParseMediatorRuntime
     language: normalizeLanguage(raw.language),
     engineVersion: 'v2.3',
     clientEvents,
+    transcriptWindow: normalizeTranscriptDelta(raw.transcriptWindow),
+    participantNames:
+      raw.participantNames && typeof raw.participantNames === 'object'
+        ? {
+            hostName:
+              typeof (raw.participantNames as { hostName?: unknown }).hostName === 'string'
+                ? (raw.participantNames as { hostName: string }).hostName
+                : undefined,
+            partnerName:
+              typeof (raw.participantNames as { partnerName?: unknown }).partnerName === 'string'
+                ? (raw.participantNames as { partnerName: string }).partnerName
+                : undefined,
+          }
+        : undefined,
   };
 
   return { ok: true, value: request };
@@ -170,6 +184,8 @@ export function toOrchestrateTurnRequest(
     engineVersion: 'v2.3',
     language: request.language,
     clientEvents: request.clientEvents,
+    transcriptWindow: request.transcriptWindow,
+    participantNames: request.participantNames,
   };
 }
 

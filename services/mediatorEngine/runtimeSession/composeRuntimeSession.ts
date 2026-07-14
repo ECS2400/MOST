@@ -24,6 +24,8 @@ import type {
   RuntimeMediationDbStatus,
   RuntimePendingUserAction,
   RuntimeProposalPhase,
+  RuntimeProposalVote,
+  RuntimeProposalVotes,
   RuntimeQuestionTarget,
   RuntimeSession,
   RuntimeSessionOutcome,
@@ -337,17 +339,19 @@ function composeProposal(
           sharedRule: agreements.sharedRule,
         };
 
-  const votes =
+  const votes: RuntimeProposalVotes =
     flowControl != null
       ? {
-          host:
+          host: (
             flowControl.proposalVotes.host === 'pending'
               ? null
-              : flowControl.proposalVotes.host,
-          partner:
+              : flowControl.proposalVotes.host
+          ) as RuntimeProposalVote,
+          partner: (
             flowControl.proposalVotes.partner === 'pending'
               ? null
-              : flowControl.proposalVotes.partner,
+              : flowControl.proposalVotes.partner
+          ) as RuntimeProposalVote,
         }
       : {
           host: agreements.acceptedByBoth ? 'accepted' : null,

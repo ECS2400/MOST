@@ -10,14 +10,12 @@ import {
 describe('resolveRuntimeSessionProgressDisplay', () => {
   it('uses completionEstimate when runtimeSession is present', () => {
     const runtime = createMinimalRuntimeSuccess();
-    const legacy = 42;
-    const resolved = resolveLiveProgressPercent(runtime.runtimeSession, legacy);
+    const resolved = resolveLiveProgressPercent(runtime.runtimeSession);
     assert.equal(resolved, runtime.runtimeSession.progress.completionEstimate);
-    assert.notEqual(resolved, legacy);
   });
 
-  it('falls back to legacy progress when runtimeSession is null', () => {
-    assert.equal(resolveLiveProgressPercent(null, 55), 55);
+  it('returns zero when runtime is unavailable', () => {
+    assert.equal(resolveLiveProgressPercent(null, true), 0);
   });
 
   it('resolves runtime stage label from labelKey', () => {
@@ -29,17 +27,17 @@ describe('resolveRuntimeSessionProgressDisplay', () => {
 
   it('builds header label with percent and stage when runtimeSession exists', () => {
     const runtime = createMinimalRuntimeSuccess();
-    const header = resolveLivePhaseHeaderLabel(
-      runtime.runtimeSession,
-      'Question 3 of 15 · Legacy',
-      'en'
-    );
+    const header = resolveLivePhaseHeaderLabel(runtime.runtimeSession, 'en');
     assert.match(header, /%/);
-    assert.doesNotMatch(header, /Question 3 of 15/);
   });
 
-  it('keeps legacy header label when runtimeSession is null', () => {
-    const legacy = 'Question 3 of 15 · Legacy';
-    assert.equal(resolveLivePhaseHeaderLabel(null, legacy, 'en'), legacy);
+  it('returns recovery label when runtime is unavailable', () => {
+    assert.equal(
+      resolveLivePhaseHeaderLabel(null, 'en', {
+        runtimeUnavailable: true,
+        recoveryLabel: 'Runtime unavailable',
+      }),
+      'Runtime unavailable'
+    );
   });
 });

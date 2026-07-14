@@ -22,6 +22,8 @@ export interface TranscriptMessage {
   content: string;
   turnNumber: TurnNumber;
   createdAt: IsoTimestamp;
+  /** Live/engine message kind — drives repetition comparison eligibility. */
+  messageType?: string;
 }
 
 /** Input to Reflection Engine for a single turn. */

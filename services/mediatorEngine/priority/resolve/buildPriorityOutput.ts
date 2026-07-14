@@ -13,6 +13,7 @@ import {
   ESCALATION_FORBIDDEN,
   ESCALATION_INTERVENTIONS,
   EXHAUSTION_INTERVENTIONS,
+  REPAIR_VOICE_INTERVENTIONS,
   SAFETY_INTERVENTIONS,
 } from '@/services/mediatorEngine/priority/config/strategyInterventions';
 import type { PrioritySignalDraft } from '@/services/mediatorEngine/priority/signals/types';
@@ -46,6 +47,8 @@ function conversationModeForSignal(type: PrioritySignal['type']): ConversationMo
   switch (type) {
     case 'safety':
       return 'SAFETY';
+    case 'repair_voice':
+      return 'REPAIR_VOICE';
     case 'escalation':
       return 'DE_ESCALATING';
     case 'blame_loop':
@@ -64,6 +67,7 @@ function blocksGoalTransition(
   if (input.safety?.blockGoalTransitions) return true;
   switch (top.type) {
     case 'safety':
+    case 'repair_voice':
     case 'escalation':
     case 'recovery':
     case 'blame_loop':
@@ -102,6 +106,8 @@ function resolveAllowedInterventions(
     }
     case 'recovery':
       return [...new Set(['recover_acknowledge', 'reflect', 'validate', 'reframe', ...strategyAllowed])];
+    case 'repair_voice':
+      return [...new Set([...REPAIR_VOICE_INTERVENTIONS, ...strategyAllowed])];
     case 'blame_loop':
       return [...new Set([...BLAME_LOOP_INTERVENTIONS, ...strategyAllowed])];
     case 'breakthrough':

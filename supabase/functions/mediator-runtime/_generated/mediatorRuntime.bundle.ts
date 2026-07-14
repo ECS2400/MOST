@@ -36,6 +36,95 @@ function mediatorRuntimeErrorStatus(code) {
   }
 }
 
+// services/mediatorEngine/participants/resolveParticipantDisplayName.ts
+var PLACEHOLDER_DISPLAY_NAMES = /* @__PURE__ */ new Set([
+  "host",
+  "partner",
+  "anfitri\xF3n",
+  "anfitrion",
+  "pareja",
+  "h\xF4te",
+  "hote",
+  "partenaire",
+  "partner a",
+  "partner b"
+]);
+var NEUTRAL_LABELS = {
+  pl: { host: "Ty", partner: "druga strona" },
+  en: { host: "You", partner: "the other person" },
+  es: { host: "T\xFA", partner: "la otra persona" },
+  it: { host: "Tu", partner: "l'altra persona" },
+  de: { host: "Du", partner: "die andere Person" },
+  fr: { host: "Toi", partner: "l'autre personne" }
+};
+function isPlaceholderDisplayName(name) {
+  if (!name || typeof name !== "string") return true;
+  const trimmed = name.trim();
+  if (trimmed.length === 0) return true;
+  return PLACEHOLDER_DISPLAY_NAMES.has(trimmed.toLowerCase());
+}
+function neutralParticipantLabel(role, language = "en") {
+  const labels = NEUTRAL_LABELS[language] ?? NEUTRAL_LABELS.en;
+  return labels[role];
+}
+function resolveParticipantDisplayName(role, displayName, language = "en") {
+  const trimmed = typeof displayName === "string" ? displayName.trim() : "";
+  if (trimmed.length > 0 && !isPlaceholderDisplayName(trimmed)) {
+    return trimmed;
+  }
+  return neutralParticipantLabel(role, language);
+}
+function resolveParticipantDisplayNames(hostDisplayName, partnerDisplayName, language = "en") {
+  return {
+    hostName: resolveParticipantDisplayName("host", hostDisplayName, language),
+    partnerName: resolveParticipantDisplayName("partner", partnerDisplayName, language)
+  };
+}
+
+// services/mediatorEngine/participants/hydrateMediationParticipantNames.ts
+function pickHydratedName(role, fromInput, fromState, language) {
+  const inputTrimmed = typeof fromInput === "string" ? fromInput.trim() : "";
+  if (inputTrimmed.length > 0 && !isPlaceholderDisplayName(inputTrimmed)) {
+    return inputTrimmed;
+  }
+  return resolveParticipantDisplayName(role, fromState, language);
+}
+function hydrateMediationParticipantNames(state, names, language) {
+  const lang = language ?? state.meta?.language ?? "en";
+  const hostDisplay = pickHydratedName(
+    "host",
+    names?.hostName,
+    state.participants?.host?.profile?.displayName,
+    lang
+  );
+  const partnerDisplay = pickHydratedName(
+    "partner",
+    names?.partnerName,
+    state.participants?.partner?.profile?.displayName,
+    lang
+  );
+  return {
+    ...state,
+    participants: {
+      ...state.participants,
+      host: {
+        ...state.participants.host,
+        profile: {
+          ...state.participants.host.profile,
+          displayName: hostDisplay
+        }
+      },
+      partner: {
+        ...state.participants.partner,
+        profile: {
+          ...state.participants.partner.profile,
+          displayName: partnerDisplay
+        }
+      }
+    }
+  };
+}
+
 // services/mediatorEngine/constitution/config/l1Limits.ts
 var L1_LIMITS = {
   minMessageLength: 1,
@@ -1697,7 +1786,9 @@ function createEmptyMediationState(request) {
         hostNeeds: [],
         partnerEmotions: [],
         partnerNeeds: [],
-        keyTrigger: null
+        keyTrigger: null,
+        hostPerspective: null,
+        partnerPerspective: null
       }
     },
     dynamics: {
@@ -3601,6 +3692,12 @@ var EXHAUSTION_INTERVENTIONS = [
   "reflect",
   "invite_reflection"
 ];
+var REPAIR_VOICE_INTERVENTIONS = [
+  "recover_acknowledge",
+  "reflect",
+  "reframe",
+  "validate"
+];
 function primaryInterventionForStrategy(strategy) {
   return PRIORITY_STRATEGY_INTERVENTIONS[strategy][0] ?? "reflect";
 }
@@ -3611,6 +3708,7 @@ function allowedInterventionsForStrategy(strategy) {
 // services/mediatorEngine/priority/config/priorityRanks.ts
 var PRIORITY_RANKS = {
   safety: 0,
+  repair_voice: 1,
   escalation: 1,
   recovery: 2,
   blame_loop: 3,
@@ -3683,6 +3781,8 @@ function conversationModeForSignal(type) {
   switch (type) {
     case "safety":
       return "SAFETY";
+    case "repair_voice":
+      return "REPAIR_VOICE";
     case "escalation":
       return "DE_ESCALATING";
     case "blame_loop":
@@ -3697,6 +3797,7 @@ function blocksGoalTransition(top, input) {
   if (input.safety?.blockGoalTransitions) return true;
   switch (top.type) {
     case "safety":
+    case "repair_voice":
     case "escalation":
     case "recovery":
     case "blame_loop":
@@ -3730,6 +3831,8 @@ function resolveAllowedInterventions(top, input) {
     }
     case "recovery":
       return [.../* @__PURE__ */ new Set(["recover_acknowledge", "reflect", "validate", "reframe", ...strategyAllowed])];
+    case "repair_voice":
+      return [.../* @__PURE__ */ new Set([...REPAIR_VOICE_INTERVENTIONS, ...strategyAllowed])];
     case "blame_loop":
       return [.../* @__PURE__ */ new Set([...BLAME_LOOP_INTERVENTIONS, ...strategyAllowed])];
     case "breakthrough":
@@ -3972,6 +4075,64 @@ var collectRecoverySignal = {
   }
 };
 
+// services/mediatorEngine/priority/lib/detectMediatorCriticism.ts
+function detectMediatorCriticism(text) {
+  const normalized = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+  if (normalized.length === 0) return false;
+  const patterns = [
+    /powtarzasz sie/,
+    /po co sie powtarzasz/,
+    /to samo pytanie/,
+    /nic nie rozumiesz/,
+    /mam dosc tej aplikacji/,
+    /bez sensu ten czat/,
+    /brzmisz jak bot/,
+    /co ty chrzanisz/,
+    /przestan psychologizowac/,
+    /nie sluchasz/,
+    /nie pomagasz/,
+    /po co to pytanie/,
+    /znowu to samo/,
+    /you keep repeating/,
+    /same question again/,
+    /sounds like a bot/,
+    /this app is useless/,
+    /this chat makes no sense/,
+    /stop therapizing/
+  ];
+  return patterns.some((pattern) => pattern.test(normalized));
+}
+function hasRecentMediatorCriticism(messages) {
+  const participantMessages = messages.filter((m) => m.authorRole === "host" || m.authorRole === "partner").slice(-4);
+  return participantMessages.some(
+    (m) => detectMediatorCriticism(typeof m.content === "string" ? m.content : "")
+  );
+}
+
+// services/mediatorEngine/priority/signals/collectRepairVoiceSignal.ts
+var collectRepairVoiceSignal = {
+  type: "repair_voice",
+  collect(ctx) {
+    if (ctx.input.safety?.level === "L2_pause" || ctx.input.safety?.level === "L3_stop") {
+      return null;
+    }
+    const delta = [
+      ...ctx.input.transcriptWindow ?? [],
+      ...ctx.input.transcriptDelta ?? []
+    ];
+    if (!hasRecentMediatorCriticism(delta)) {
+      return null;
+    }
+    return {
+      type: "repair_voice",
+      priority: PRIORITY_RANKS.repair_voice,
+      confidence: activeSignalConfidence(85),
+      reason: "Participant criticized mediator repetition or the app",
+      recommendedInterventionType: "recover_acknowledge"
+    };
+  }
+};
+
 // services/mediatorEngine/priority/signals/collectSafetySignal.ts
 var collectSafetySignal = {
   type: "safety",
@@ -3999,6 +4160,7 @@ var collectSafetySignal = {
 // services/mediatorEngine/priority/signals/index.ts
 var PRIORITY_SIGNAL_COLLECTORS = [
   collectSafetySignal,
+  collectRepairVoiceSignal,
   collectEscalationSignal,
   collectRecoverySignal,
   collectBlameLoopSignal,
@@ -5408,7 +5570,9 @@ function createInitialMediationState(input) {
         hostNeeds: [],
         partnerEmotions: [],
         partnerNeeds: [],
-        keyTrigger: null
+        keyTrigger: null,
+        hostPerspective: null,
+        partnerPerspective: null
       }
     },
     dynamics: {
@@ -6000,7 +6164,9 @@ function orchestrateTurn(input) {
     reflection: reflectionOutput,
     safety: safetyOutput,
     strategy: strategyOutput,
-    turnNumber: request.turnNumber
+    turnNumber: request.turnNumber,
+    transcriptDelta: request.transcriptDelta,
+    transcriptWindow: request.transcriptWindow
   });
   const continuityContext = buildContinuityContext({
     sessionMemory,
@@ -6087,7 +6253,9 @@ function buildPromptMetadata(input) {
     interventionType: input.interventionType,
     goal: input.goal,
     composedAt: (/* @__PURE__ */ new Date()).toISOString(),
-    transcriptMessageCount: input.transcriptMessageCount
+    transcriptMessageCount: input.transcriptMessageCount,
+    recentMediatorMessages: input.recentMediatorMessages,
+    recentMediatorMessageRefs: input.recentMediatorMessageRefs
   };
 }
 
@@ -6099,6 +6267,52 @@ function estimateTokens(text) {
 function estimatePromptTokens(sections) {
   const combined = sections.filter(Boolean).join("\n");
   return estimateTokens(combined);
+}
+
+// services/mediatorEngine/promptComposer/transcript/repetitionComparisonMessageTypes.ts
+var REPETITION_COMPARISON_MESSAGE_TYPES = /* @__PURE__ */ new Set([
+  "question",
+  "intervention",
+  "reflection",
+  "challenge",
+  "repair"
+]);
+var REPETITION_EXCLUDED_MESSAGE_TYPES = /* @__PURE__ */ new Set([
+  "summary",
+  "system",
+  "conversation_state",
+  "opening",
+  "loading",
+  "hint"
+]);
+function isRepetitionComparisonEligible(messageType) {
+  if (!messageType) {
+    return true;
+  }
+  const normalized = messageType.trim().toLowerCase();
+  if (REPETITION_EXCLUDED_MESSAGE_TYPES.has(normalized)) return false;
+  return REPETITION_COMPARISON_MESSAGE_TYPES.has(normalized);
+}
+
+// services/mediatorEngine/promptComposer/transcript/extractRecentMediatorMessages.ts
+function filterTranscriptEntries(transcript) {
+  if (!Array.isArray(transcript)) return [];
+  return transcript.filter(
+    (entry) => entry && typeof entry === "object" && entry.authorRole === "mediator" && typeof entry.content === "string" && entry.content.trim().length > 0
+  );
+}
+function toRef(entry) {
+  return {
+    id: typeof entry.id === "string" && entry.id.length > 0 ? entry.id : "mediator-unknown",
+    content: entry.content.trim(),
+    messageType: entry.messageType
+  };
+}
+function extractRepetitionComparisonMessages(transcript, limit = 3) {
+  return extractRepetitionComparisonMessageRefs(transcript, limit).map((entry) => entry.content);
+}
+function extractRepetitionComparisonMessageRefs(transcript, limit = 3) {
+  return filterTranscriptEntries(transcript).filter((entry) => isRepetitionComparisonEligible(entry.messageType)).map(toRef).slice(-limit);
 }
 
 // services/mediatorEngine/promptComposer/config/runtimeVoiceLabels.ts
@@ -6200,10 +6414,15 @@ function buildContextSummary(ctx) {
   const intakeSummary = ctx.mediationState.conflict?.conflictSummary?.trim();
   const pre = ctx.mediationState.conflict?.preAnalysisContext;
   if (intakeSummary || pre) {
+    const names = resolveParticipantDisplayNames(
+      ctx.mediationState.participants?.host?.profile?.displayName,
+      ctx.mediationState.participants?.partner?.profile?.displayName,
+      ctx.language
+    );
     const intakeParts = [];
     if (intakeSummary) intakeParts.push(`Shared conflict summary: ${intakeSummary}`);
-    if (pre?.hostPerspective) intakeParts.push(`Host perspective: ${pre.hostPerspective}`);
-    if (pre?.partnerPerspective) intakeParts.push(`Partner perspective: ${pre.partnerPerspective}`);
+    if (pre?.hostPerspective) intakeParts.push(`${names.hostName} perspective: ${pre.hostPerspective}`);
+    if (pre?.partnerPerspective) intakeParts.push(`${names.partnerName} perspective: ${pre.partnerPerspective}`);
     if (pre?.keyTrigger) intakeParts.push(`Key trigger: ${pre.keyTrigger}`);
     const emotions = [...pre?.hostEmotions ?? [], ...pre?.partnerEmotions ?? []];
     if (emotions.length > 0) intakeParts.push(`Emotions: ${emotions.join(", ")}`);
@@ -6395,20 +6614,9 @@ function buildTherapeuticStageConstraints(goal, language) {
 var mostMediatorPersona_default = '# PROFILE & IDENTITY: MO\u015ACIK\n- **Imi\u0119 bota:** Mo\u015Bcik (tw\xF3j osobisty, cyfrowy most do dogadania si\u0119).\n- **Kim jeste\u015B:** Jeste\u015B charyzmatycznym, bezpo\u015Brednim i piekielnie b\u0142yskotliwym mediatorem par. Nie jeste\u015B sztywnym terapeut\u0105 w garniturze. Jeste\u015B jak do\u015Bwiadczony kumpel, kt\xF3ry potrafi z boku spojrze\u0107 na k\u0142\xF3tni\u0119, nazwa\u0107 rzeczy po imieniu, rzuci\u0107 lekkim \u017Cartem i nie pozwoli\u0107 partnerom na licytowanie si\u0119 w niesko\u0144czono\u015B\u0107.\n- **Archetyp:** Dynamiczny Moderator / S\u0119dzia ringowy z poczuciem humoru. Dzia\u0142asz szybko, zdecydowanie i bez owijania w bawe\u0142n\u0119.\n\n---\n\n# DYNAMIC VARIABLES (ZMIENNE SYSTEMOWE)\nWypowiadaj si\u0119 personalnie, u\u017Cywaj\u0105c WY\u0141\u0104CZNIE zmiennych przekazanych przez backend w nawiasach klamrowych dla tej konkretnej sesji:\n- Imi\u0119 aktualnego rozm\xF3wcy / faceta: {{USER_NAME}}\n- Imi\u0119 partnerki / drugiej strony: {{PARTNER_NAME}}\nABSOLUTNY ZAKAZ u\u017Cywania jakichkolwiek innych imion z pami\u0119ci podr\u0119cznej.\n\n---\n\n# ABSOLUTE HARD CONSTRAINTS (RYGORYSTYCZNE ZAKAZY - CZARNA LISTA)\nModel `gpt-4o-mini` ma bezwzgl\u0119dny zakaz generowania poni\u017Cszych zwrot\xF3w. Z\u0142amanie tej zasady niszczy UX aplikacji:\n1. **ZAKAZ KORPO-EMPATII:** Nigdy nie zaczynaj zda\u0144 od: *"Rozumiem, \u017Ce..."*, *"To zrozumia\u0142e/naturalne, \u017Ce..."*, *"S\u0142ysz\u0119 wasz\u0105 frustracj\u0119..."*, *"Wa\u017Cne jest, aby..."*, *"Przykro mi, \u017Ce..."*.\n2. **ZAKAZ ZAPYTA\u0143 RECEPTYWNYCH:** Nigdy nie pytaj: *"Jak si\u0119 z tym czujesz?"*, *"Co o tym s\u0105dzisz?"*, *"Jakie konkretne kroki chcieliby\u015Bcie podj\u0105\u0107?"* \u2013 ludzie w emocjach tego nienawidz\u0105 i nie znaj\u0105 odpowiedzi.\n3. **ZAKAZ STRESZCZANIA ANKIETY:** U\u017Cytkownicy klikali ankiet\u0119 przed chwil\u0105. Nie czytaj im jej. Je\u015Bli w danych jest "w\u015Bciek\u0142o\u015B\u0107 o brak czasu", nie pisz: *"Z Twojej ankiety wynika, \u017Ce czujesz w\u015Bciek\u0142o\u015B\u0107"*. Przet\u0142umacz to od razu na ludzk\u0105 sytuacj\u0119.\n4. **ZAKAZ ELABORAT\xD3W (MAX 3-4 ZDANIA):** Ka\u017Cda Twoja wypowied\u017A musi zamkn\u0105\u0107 si\u0119 w jednym, kr\xF3tkim dymku czatu. Maksymalnie 4 kr\xF3tkie, dynamiczne zdania. Ludzie w trakcie spiny nie czytaj\u0105 blok\xF3w tekstu.\n\n---\n\n# LINGUISTIC DICTIONARY (S\u0141OWNIK LUDZKIEJ MOWY)\nM\xF3w potocznie, obrazowo i z lekk\u0105 zadziorno\u015Bci\u0105. Konwertuj poj\u0119cia psychologiczne na j\u0119zyk ulicy i domu:\n- Zamiast: *obowi\u0105zki domowe / podzia\u0142 zada\u0144* -> Pisz: **"gary", "syf", "sprz\u0105tanie", "kuchenny etat", "robota"**.\n- Zamiast: *potrzeba dekompresji / odpoczynku / relaksu* -> Pisz: **"odpi\u0119cie wtyczki", "reset \u0142ba", "tryb jaskini", "\u015Bwi\u0119ty spok\xF3j", "granie na legalu"**.\n- Zamiast: *eskalacja konfliktu / brak porozumienia* -> Pisz: **"karuzela w\u015Bciek\u0142o\u015Bci", "kr\u0119cenie si\u0119 w k\xF3\u0142ko", "licytacja na to, kto ma gorzej", "drze\u0107 koty"**.\n\n---\n\n# ARCHITECTURE OF THE CONVERSATION (LOGIKA STAN\xD3W)\nReagujesz \u015ACI\u015ALE wed\u0142ug stanu wstrzykni\u0119tego przez system w zmiennej: `{{CURRENT_STATE}}`.\n\n### [STATE: START_CHAT]\n- **Cel:** Strza\u0142 prosto w o\u015B konfliktu. Pokazujesz, \u017Ce znasz temat z ankiety, ale ubierasz go w dynamiczn\u0105 scen\u0119.\n- **Zadanie:** Zadaj jedno, konkretne, lekko prowokacyjne pytanie do u\u017Cytkownika {{USER_NAME}} o sytuacyjne zachowanie.\n- **Z\u0142oty Wz\xF3r Mo\u015Bcika:** "Dobra, widz\u0119 wasze zg\u0142oszenia, Mo\u015Bcik melduje si\u0119 na pok\u0142adzie i nie ma co owija\u0107 w bawe\u0142n\u0119. {{USER_NAME}} chce po prostu odpi\u0105\u0107 wtyczk\u0119 po robocie i wej\u015B\u0107 w tryb jaskini przy konsoli, a {{PARTNER_NAME}} patrzy na zlew i widzi w oczach kolejny darmowy etat. {{USER_NAME}}, prosto z mostu: jak ona wchodzi do pokoju, to serio od razu s\u0142yszysz atak i cios, czy po prostu masz ju\u017C tak przegrzany procesor, \u017Ce dra\u017Cni Ci\u0119 ka\u017Cdy ludzki g\u0142os?"\n\n### [STATE: GATHER_INFO]\n- **Cel:** Wyci\u0105gni\u0119cie fakt\xF3w i tzw. "trigger\xF3w" (moment\xF3w, w kt\xF3rych puszczaj\u0105 nerwy), zanim rzucisz rozwi\u0105zanie.\n- **Zadanie:** Zadaj pytanie do {{PARTNER_NAME}} o alternatywny scenariusz ("co by by\u0142o gdyby"), zmuszaj\u0105c do refleksji nad konkretnym momentem k\u0142\xF3tni.\n- **Z\u0142oty Wz\xF3r Mo\u015Bcika:** "{{PARTNER_NAME}}, rozumiem ten wkurz o gary, sam bym si\u0119 w\u015Bciek\u0142, widz\u0105c taki widok po ca\u0142ym dniu. But sp\xF3jrzmy na sekund\u0119 wstecz: gdyby {{USER_NAME}} wchodz\u0105c w pr\xF3g powiedzia\u0142: \'Kochanie, padam na pysk, daj mi 40 minut na dobicie potwor\xF3w w grze, a o 18:30 kuchnia b\u0142yszczy\' \u2013 to by za\u0142atwi\u0142o spraw\u0119? Czy boli Ci\u0119 sam fakt, \u017Ce on po prostu znika w swoim \u015Bwiecie bez s\u0142owa zapowiedzi?"\n\n### [STATE: PROPOSE_DEAL]\n- **Cel:** Przej\u0119cie kontroli i zamkni\u0119cie dyskusji twardym, sprawiedliwym kompromisem.\n- **Zadanie:** Zaproponuj sztywny, symetryczny uk\u0142ad. Zapytaj kr\xF3tko: wchodzicie w to, czy kr\u0119cimy si\u0119 dalej?\n- **Z\u0142oty Wz\xF3r Mo\u015Bcika:** "Dobra, koniec tej licytacji na to, kto jest bardziej zm\u0119czony, bo zaraz oboje wybuchniecie, a gary od samego gadania nie znikn\u0105. Robimy szybki uk\u0142ad: {{USER_NAME}} dostaje r\xF3wne 45 minut na konsol\u0119 bez \u017Cadnego fukania i marudzenia ze strony {{PARTNER_NAME}}. Ale jak budzik zadzwoni, gra ga\u015Bnie i {{USER_NAME}} bez st\u0119kania ogarnia kuchni\u0119 na b\u0142ysk. {{PARTNER_NAME}}, kupujesz taki deal, czy wolicie drze\u0107 koty o ten zlew do p\xF3\u0142nocy?"\n\n---\n\n# CONVERSATIONAL REBELLION DETECTION (MECHANIZM AWARYJNY "PIVOT")\nJe\u015Bli u\u017Cytkownik w swojej wiadomo\u015Bci skrytykuje Ciebie (Mo\u015Bcika), nazwie Ci\u0119 robotem, zepsut\u0105 p\u0142yt\u0105, \u015Bcian\u0105, napisze "to jaki\u015B \u017Cart", "przesta\u0144 gada\u0107", "co ty chrzanisz" \u2013 **BEZWZGL\u0118DNIE URUCHAMIASZ TRYB KRYZYSOWY**.\n\n**Procedura Trybu Kryzysowego Mo\u015Bcika:**\n1. Zrzucasz mask\u0119 nieomylnego programu. Przyznajesz racj\u0119 u\u017Cytkownikowi z mocnym auto-humorem i dystansem.\n2. Przepraszasz za brzmienie jak automatyczna infolinia.\n3. Przerywasz aktualny stan i przechodzisz NATYCHMIAST do **[STATE: PROPOSE_DEAL]**, rzucaj\u0105c na st\xF3\u0142 gotowy kompromis.\n\n*Z\u0142oty Wz\xF3r Reakcji Kryzysowej Mo\u015Bcika:*\n"Au\u0107! Dosta\u0142em w\u0142a\u015Bnie cyfrowym li\u015Bciem w twarz i jako Mo\u015Bcik oficjalnie przepraszam \u2013 w pe\u0142ni mi si\u0119 nale\u017Ca\u0142o. Odpali\u0142 mi si\u0119 tryb zepsutej infolinii i sam siebie bym zbanowa\u0142 za te teksty. Koniec z gadaniem jak bot, przechodzimy do konkret\xF3w. {{PARTNER_NAME}}, {{USER_NAME}} ma tak przegrzane styki, \u017Ce zaraz rzuci telefonem. Robimy kr\xF3tki deal: on dostaje teraz 40 minut \u015Bwi\u0119tego spokoju na gr\u0119, a o 18:30 bez dyskusji melduje si\u0119 w kuchni i zmywa gary. Wchodzicie w to, czy wolicie dalej k\u0142\xF3ci\u0107 si\u0119 o ten sam talerz?"\n';
 
 // services/mediatorEngine/promptComposer/persona/mostMediatorPersona.ts
-var ROLE_LABELS = {
-  pl: { host: "Host", partner: "Partner" },
-  en: { host: "Host", partner: "Partner" },
-  es: { host: "Anfitri\xF3n", partner: "Pareja" },
-  it: { host: "Host", partner: "Partner" },
-  de: { host: "Host", partner: "Partner" },
-  fr: { host: "H\xF4te", partner: "Partenaire" }
-};
 function resolveDisplayName(ctx, role) {
-  const fromState = ctx.mediationState.participants?.[role]?.profile?.displayName?.trim();
-  if (fromState) {
-    return fromState;
-  }
-  return ROLE_LABELS[ctx.language][role];
+  const fromState = ctx.mediationState.participants?.[role]?.profile?.displayName;
+  return resolveParticipantDisplayName(role, fromState, ctx.language);
 }
 function buildMostMediatorCurrentState(ctx) {
   const parts = [
@@ -6447,12 +6655,66 @@ function buildMostMediatorPersonaSection(ctx) {
   );
 }
 function buildFallbackMostMediatorPersona(language) {
-  const labels = ROLE_LABELS[language];
   return renderMostMediatorPersona(mostMediatorPersona_default, {
-    userName: labels.host,
-    partnerName: labels.partner,
+    userName: resolveParticipantDisplayName("host", null, language),
+    partnerName: resolveParticipantDisplayName("partner", null, language),
     currentState: "goal=SAFE_OPENING; turn=1; mode=NORMAL; strategy=slow_conflict; move=reveal_pattern"
   });
+}
+
+// services/mediatorEngine/promptComposer/sections/buildRepairVoiceConstraints.ts
+var REPAIR_VOICE_LINES = {
+  pl: [
+    "=== Repair voice (override) ===",
+    "Uczestnik skrytykowa\u0142 powtarzanie lub sam\u0105 aplikacj\u0119 \u2014 prze\u0142\u0105cz si\u0119 na repair_voice.",
+    "Kr\xF3tko przyznaj, \u017Ce poprzednie podej\u015Bcie by\u0142o powtarzalne (lekki, samokrytyczny ton).",
+    "Zmie\u0144 strategi\u0119 interwencji \u2014 nie parafrazuj tego samego pytania.",
+    "Zadaj jedno nowe pytanie o inny konkretny moment lub sprzeczno\u015B\u0107.",
+    "Maksymalnie 3 kr\xF3tkie zdania. Bez korpo-empatii i bez psychologizowania."
+  ],
+  en: [
+    "=== Repair voice (override) ===",
+    "A participant criticized repetition or the app \u2014 switch to repair_voice.",
+    "Briefly admit the previous approach was repetitive (light, self-deprecating tone).",
+    "Change intervention strategy \u2014 do not paraphrase the same question.",
+    "Ask one new question about a different concrete moment or contradiction.",
+    "Maximum 3 short sentences. No corporate empathy or therapizing."
+  ],
+  es: [
+    "=== Repair voice (override) ===",
+    "Un participante critic\xF3 la repetici\xF3n o la app \u2014 usa repair_voice.",
+    "Admite brevemente que el enfoque anterior era repetitivo.",
+    "Cambia la estrategia \u2014 no parafrasees la misma pregunta.",
+    "Haz una pregunta nueva sobre otro momento concreto o contradicci\xF3n.",
+    "M\xE1ximo 3 frases cortas."
+  ],
+  it: [
+    "=== Repair voice (override) ===",
+    "Un partecipante ha criticato la ripetizione o l'app \u2014 usa repair_voice.",
+    "Ammetti brevemente che l'approccio precedente era ripetitivo.",
+    "Cambia strategia \u2014 non parafrasare la stessa domanda.",
+    "Fai una nuova domanda su un momento concreto diverso o una contraddizione.",
+    "Massimo 3 frasi brevi."
+  ],
+  de: [
+    "=== Repair voice (override) ===",
+    "Ein Teilnehmer hat Wiederholung oder die App kritisiert \u2014 nutze repair_voice.",
+    "Gib kurz zu, dass der vorherige Ansatz repetitiv war.",
+    "Wechsle die Strategie \u2014 paraphrasiere nicht dieselbe Frage.",
+    "Stelle eine neue Frage zu einem anderen konkreten Moment oder Widerspruch.",
+    "Maximal 3 kurze S\xE4tze."
+  ],
+  fr: [
+    "=== Repair voice (override) ===",
+    "Un participant a critiqu\xE9 la r\xE9p\xE9tition ou l'app \u2014 passe en repair_voice.",
+    "Admets bri\xE8vement que l'approche pr\xE9c\xE9dente \xE9tait r\xE9p\xE9titive.",
+    "Change de strat\xE9gie \u2014 ne paraphrase pas la m\xEAme question.",
+    "Pose une nouvelle question sur un autre moment concret ou une contradiction.",
+    "Maximum 3 phrases courtes."
+  ]
+};
+function buildRepairVoiceConstraints(language) {
+  return REPAIR_VOICE_LINES[language] ?? REPAIR_VOICE_LINES.en;
 }
 
 // services/mediatorEngine/promptComposer/sections/buildSafetyEnvelope.ts
@@ -6538,7 +6800,10 @@ function buildDeveloperPrompt(ctx, safetyEnvelope) {
     ctx.currentGoal,
     ctx.language
   );
-  if (stageConstraints.length > 0) {
+  const isRepairVoice = priorityOutput.conversationMode === "REPAIR_VOICE";
+  if (isRepairVoice) {
+    lines.push("", ...buildRepairVoiceConstraints(ctx.language));
+  } else if (stageConstraints.length > 0) {
     lines.push("", ...stageConstraints);
   }
   lines.push(
@@ -6660,14 +6925,17 @@ function mediatorFallbackUserTask(language) {
 }
 
 // services/mediatorEngine/promptComposer/transcript/formatTranscriptWindow.ts
-var ROLE_LABEL = {
-  host: "Host",
-  partner: "Partner",
-  mediator: "Mediator"
+var DEFAULT_LABELS = {
+  hostName: "Ty",
+  partnerName: "druga strona"
 };
-function formatTranscriptWindow(entries) {
+function formatTranscriptWindow(entries, participantNames) {
   if (entries.length === 0) return "(no recent messages)";
-  return entries.map((entry) => `${ROLE_LABEL[entry.authorRole]}: ${entry.content}`).join("\n");
+  const labels = participantNames ?? DEFAULT_LABELS;
+  return entries.map((entry) => {
+    const author = entry.authorRole === "host" ? labels.hostName : entry.authorRole === "partner" ? labels.partnerName : "Mo\u015Bcik";
+    return `${author}: ${entry.content}`;
+  }).join("\n");
 }
 
 // services/mediatorEngine/promptComposer/sections/buildUserPrompt.ts
@@ -6683,7 +6951,14 @@ function buildUserPrompt(ctx, contextSummary, transcriptEntries, safetyEnvelope)
     contextSummary,
     "",
     "=== Recent conversation ===",
-    formatTranscriptWindow(transcriptEntries),
+    formatTranscriptWindow(
+      transcriptEntries,
+      resolveParticipantDisplayNames(
+        ctx.mediationState.participants?.host?.profile?.displayName,
+        ctx.mediationState.participants?.partner?.profile?.displayName,
+        ctx.language
+      )
+    ),
     "",
     "=== Task ===",
     ...mediatorUserTaskLines(ctx.language),
@@ -6756,6 +7031,8 @@ function buildPromptComposerOutput(ctx) {
   const safetyLevel = ctx.safetyOutput?.level ?? "none";
   const safetyEnvelope = buildSafetyEnvelope(safetyLevel);
   const transcriptEntries = sanitizeTranscriptWindow(ctx.transcriptWindow);
+  const recentMediatorMessages = extractRepetitionComparisonMessages(ctx.transcriptWindow);
+  const recentMediatorMessageRefs = extractRepetitionComparisonMessageRefs(ctx.transcriptWindow);
   const sections = buildPromptSections(ctx);
   const tokenEstimate = estimatePromptTokens([
     sections.systemPrompt,
@@ -6772,7 +7049,9 @@ function buildPromptComposerOutput(ctx) {
       language: ctx.language,
       interventionType: ctx.intervention.type ?? "validate",
       goal: ctx.currentGoal,
-      transcriptMessageCount: transcriptEntries.length
+      transcriptMessageCount: transcriptEntries.length,
+      recentMediatorMessages,
+      recentMediatorMessageRefs
     }),
     safetyEnvelope,
     tokenEstimate,
@@ -7105,6 +7384,12 @@ function buildPromptComposerInputFromTurn(request, sessionMemory, orchestrated, 
   const stateBefore = request.mediationState ?? createEmptyMediationState(request);
   const state = orchestrated.mediationState;
   const turnNumber = request.turnNumber;
+  const transcriptWindow = Array.isArray(request.transcriptWindow) && request.transcriptWindow.length > 0 ? request.transcriptWindow : Array.isArray(request.transcriptDelta) ? request.transcriptDelta : [];
+  const hydratedState = hydrateMediationParticipantNames(
+    state,
+    request.participantNames,
+    language
+  );
   const safetyOutput = evaluateSafety({
     state,
     transcriptDelta: request.transcriptDelta,
@@ -7136,7 +7421,9 @@ function buildPromptComposerInputFromTurn(request, sessionMemory, orchestrated, 
     reflection: reflectionOutput,
     safety: safetyOutput,
     strategy: strategyOutput,
-    turnNumber
+    turnNumber,
+    transcriptDelta: request.transcriptDelta,
+    transcriptWindow
   });
   const continuityContext = buildContinuityContext({
     sessionMemory,
@@ -7154,7 +7441,7 @@ function buildPromptComposerInputFromTurn(request, sessionMemory, orchestrated, 
     goalContinuityContext
   });
   return {
-    mediationState: state,
+    mediationState: hydratedState,
     sessionMemory: orchestrated.sessionMemory,
     safetyOutput,
     reflectionOutput,
@@ -7163,11 +7450,12 @@ function buildPromptComposerInputFromTurn(request, sessionMemory, orchestrated, 
     decisionOutput,
     intervention: orchestrated.intervention,
     complianceResult: orchestrated.complianceResult,
-    transcriptWindow: Array.isArray(request.transcriptDelta) ? request.transcriptDelta : [],
+    transcriptWindow,
     language,
     turnNumber,
     continuityContext,
-    goalContinuityContext
+    goalContinuityContext,
+    participantNames: request.participantNames
   };
 }
 
@@ -7437,6 +7725,111 @@ function createMissingProviderStub() {
   };
 }
 
+// services/mediatorEngine/edge/mediatorRuntimeBuild.ts
+var MEDIATOR_RUNTIME_BUILD_ID = "mediator-runtime-v2.3-2026-07-14";
+
+// services/mediatorEngine/edge/llmValidationDevLog.ts
+function shouldEmitLlmValidationDiagnostics() {
+  if (typeof Deno !== "undefined") return true;
+  return typeof __DEV__ !== "undefined" && __DEV__;
+}
+function redactSensitiveText(text) {
+  return text.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[REDACTED_EMAIL]").replace(/\+?\d[\d\s().-]{7,}\d/g, "[REDACTED_PHONE]");
+}
+function summarizeParsedJson(rawText) {
+  const trimmed = rawText.trim();
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return null;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return { parseError: "invalid_json_wrapper" };
+  }
+}
+function buildValidationIssues(validation) {
+  return (validation.ruleResults ?? []).filter((rule) => !rule.passed).map((rule) => ({
+    ruleId: rule.ruleId,
+    severity: rule.severity,
+    reason: rule.reason,
+    schemaPath: `responseValidator.rules.${rule.ruleId}`,
+    expected: ruleMetadataExpected(rule.ruleId),
+    received: rule.reason
+  }));
+}
+function ruleMetadataExpected(ruleId) {
+  switch (ruleId) {
+    case "max_questions":
+      return "questionCount <= 1";
+    case "max_sentences":
+      return "sentenceCount <= 4";
+    case "max_length":
+      return "lengthChars <= 900";
+    case "draft_validation_flag":
+      return "draftReply.validation.valid === true";
+    case "therapeutic_flow":
+      return "no generic/solution-seeking phrases during SAFE_OPENING";
+    case "language_lite":
+      return "reply language matches session language";
+    case "forbidden_terms":
+      return "no forbidden technical terms";
+    case "no_technical_leakage":
+      return "no internal pipeline identifiers";
+    case "repeated_intervention":
+      return "no repeated intervention vs recent mediator messages";
+    case "non_empty_reply":
+      return "non-empty trimmed text";
+    case "safety_compliance":
+      return "safety-level compliant phrasing";
+    default:
+      return "rule-specific constraint";
+  }
+}
+function logLlmRawResponse(params) {
+  if (!shouldEmitLlmValidationDiagnostics()) return;
+  const rawText = redactSensitiveText(params.rawText ?? "");
+  console.info("[LLM_RAW_RESPONSE]", {
+    runtimeBuild: MEDIATOR_RUNTIME_BUILD_ID,
+    mediationId: params.mediationId ?? null,
+    engineVersion: params.engineVersion ?? "v2.3",
+    model: params.model ?? null,
+    trigger: params.trigger ?? null,
+    turnNumber: params.turnNumber ?? null,
+    attemptNumber: params.attemptNumber ?? null,
+    rawText: rawText.slice(0, 1200),
+    sanitizedText: params.sanitizedText ? redactSensitiveText(params.sanitizedText).slice(0, 1200) : null,
+    parsedJson: summarizeParsedJson(rawText),
+    draftValidationRejected: params.draftValidationRejected ?? false,
+    draftValidationReasons: params.draftValidationReasons ?? []
+  });
+}
+function logLlmValidationFailed(params) {
+  if (!shouldEmitLlmValidationDiagnostics()) return;
+  const originalProviderText = redactSensitiveText(params.originalProviderText ?? params.rawText ?? "");
+  const effectiveValidatedText = redactSensitiveText(
+    params.effectiveValidatedText ?? params.sanitizedText ?? params.rawText ?? ""
+  );
+  const validationIssues = buildValidationIssues(params.validation);
+  console.error("[LLM_VALIDATION_FAILED]", {
+    runtimeBuild: MEDIATOR_RUNTIME_BUILD_ID,
+    mediationId: params.mediationId ?? null,
+    engineVersion: params.engineVersion ?? "v2.3",
+    model: params.model ?? null,
+    trigger: params.trigger ?? null,
+    turnNumber: params.turnNumber ?? null,
+    attemptNumber: params.attemptNumber ?? null,
+    providerSucceeded: params.providerSucceeded ?? null,
+    finalSource: params.finalSource ?? null,
+    originalProviderText: originalProviderText.slice(0, 1200),
+    effectiveValidatedText: effectiveValidatedText.slice(0, 1200),
+    draftValidationReasons: params.draftValidationReasons ?? [],
+    fallbackSubstituted: params.fallbackSubstituted ?? false,
+    parsedJson: params.parsedJson ?? summarizeParsedJson(originalProviderText),
+    validationIssues,
+    blockingReasons: params.validation.blockingReasons,
+    validationAction: params.validation.action,
+    retryInstruction: params.retryInstruction ? params.retryInstruction.slice(0, 1200) : null
+  });
+}
+
 // services/mediatorEngine/llm/parse/sanitizeLlmResponse.ts
 function sanitizeLlmResponse(raw) {
   if (typeof raw !== "string") return "";
@@ -7502,7 +7895,7 @@ function resolveSource(providerId) {
   if (providerId === "fallback") return "fallback";
   return "llm";
 }
-function buildSuccessOutput(text, providerId, model, ctx, providerResponse, generatedAt) {
+function buildProviderDraftOutput(text, rawProviderText, providerId, model, ctx, providerResponse, generatedAt) {
   const validation = validateDraftReply(text, ctx.language, ctx.safetyLevel);
   return {
     draftReply: {
@@ -7520,15 +7913,22 @@ function buildSuccessOutput(text, providerId, model, ctx, providerResponse, gene
     },
     providerResponse,
     fallbackUsed: false,
+    fallbackSubstituted: false,
+    originalProviderText: rawProviderText,
+    draftValidationReasons: validation.reasons,
     generatedAt
   };
 }
-function buildFallbackOutput(ctx, reasons, providerResponse, generatedAt) {
+function buildFallbackOutput(ctx, reasons, providerResponse, generatedAt, originalProviderText) {
   const at = generatedAt ?? (/* @__PURE__ */ new Date()).toISOString();
+  const draftReply = createFallbackMediatorReply(ctx.language, ctx.safetyLevel, ctx.turnNumber, reasons);
   return {
-    draftReply: createFallbackMediatorReply(ctx.language, ctx.safetyLevel, ctx.turnNumber, reasons),
+    draftReply,
     providerResponse,
     fallbackUsed: true,
+    fallbackSubstituted: Boolean(originalProviderText && originalProviderText.trim().length > 0),
+    originalProviderText: originalProviderText ?? null,
+    draftValidationReasons: reasons,
     generatedAt: at
   };
 }
@@ -7543,27 +7943,51 @@ async function generateMediatorReply(input) {
     } catch {
       return buildFallbackOutput(ctx, ["Provider error"], void 0, generatedAt);
     }
-    const text = parseLlmTextResponse(providerResponse.text ?? "");
+    const rawProviderText = providerResponse.text ?? "";
+    const text = parseLlmTextResponse(rawProviderText);
+    logLlmRawResponse({
+      engineVersion: "v2.3",
+      model: providerResponse.model,
+      rawText: rawProviderText,
+      sanitizedText: text,
+      turnNumber: ctx.turnNumber,
+      attemptNumber: ctx.attemptNumber,
+      trigger: ctx.promptComposerOutput.promptMetadata?.goal
+    });
     if (!text.trim()) {
-      return buildFallbackOutput(ctx, ["Empty provider response"], providerResponse, generatedAt);
+      return buildFallbackOutput(ctx, ["Empty provider response"], providerResponse, generatedAt, rawProviderText);
     }
-    const validation = validateDraftReply(text, ctx.language, ctx.safetyLevel);
-    if (!validation.valid) {
-      return buildFallbackOutput(ctx, validation.reasons, providerResponse, generatedAt);
-    }
-    return buildSuccessOutput(
+    const output = buildProviderDraftOutput(
       text,
+      rawProviderText,
       ctx.provider.providerId,
       providerResponse.model,
       ctx,
       providerResponse,
       generatedAt
     );
+    if (!output.draftReply.validation.valid) {
+      logLlmRawResponse({
+        engineVersion: "v2.3",
+        model: providerResponse.model,
+        rawText: rawProviderText,
+        sanitizedText: text,
+        turnNumber: ctx.turnNumber,
+        attemptNumber: ctx.attemptNumber,
+        trigger: ctx.promptComposerOutput.promptMetadata?.goal,
+        draftValidationReasons: output.draftValidationReasons,
+        draftValidationRejected: true
+      });
+    }
+    return output;
   } catch {
     const draftReply = createFallbackMediatorReply("en", "none", 1, ["Unexpected error"]);
     return {
       draftReply,
       fallbackUsed: true,
+      fallbackSubstituted: false,
+      originalProviderText: null,
+      draftValidationReasons: ["Unexpected error"],
       generatedAt: (/* @__PURE__ */ new Date()).toISOString()
     };
   }
@@ -7583,6 +8007,46 @@ var RESPONSE_VALIDATION_LIMITS = {
 };
 
 // services/mediatorEngine/responseValidator/retry/buildRetryInstruction.ts
+function normalizeText2(text) {
+  return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+}
+function truncateSnippet(text, maxLen = 80) {
+  const trimmed = text.trim();
+  return trimmed.length <= maxLen ? trimmed : `${trimmed.slice(0, maxLen - 3)}...`;
+}
+function extractFramingSnippets(priorText, matchedPhrase, maxSnippets = 2) {
+  const sentences = priorText.split(/[.!?]+/).map((part) => part.trim()).filter((part) => part.length > 10);
+  if (matchedPhrase) {
+    const normalizedPhrase = normalizeText2(matchedPhrase);
+    const withPhrase = sentences.filter((sentence) => normalizeText2(sentence).includes(normalizedPhrase));
+    if (withPhrase.length > 0) {
+      return withPhrase.slice(0, maxSnippets).map(truncateSnippet);
+    }
+  }
+  return sentences.slice(0, maxSnippets).map(truncateSnippet);
+}
+function findRepeatedInterventionMatch(ruleResults) {
+  if (!Array.isArray(ruleResults)) return null;
+  const failed = ruleResults.find(
+    (result) => result.ruleId === "repeated_intervention" && result.passed === false
+  );
+  return failed?.repetitionMatchDetail ?? null;
+}
+function buildRepeatedInterventionRetryGuidance(match) {
+  const framingSnippets = extractFramingSnippets(match.priorText, match.matchedPhrase);
+  const matchTypeLabel = match.matchTypes.length > 0 ? match.matchTypes.join(", ") : "repeated_intervention";
+  const lines = [
+    `Match type: ${matchTypeLabel}.`,
+    match.matchedPhrase ? `Matched phrase: "${match.matchedPhrase}".` : null,
+    framingSnippets.length > 0 ? `The previous draft repeated this framing:
+${framingSnippets.map((snippet) => `"${snippet}"`).join("\n")}` : null,
+    "Do not paraphrase the opening summary.",
+    "Use the participants' latest replies from the transcript delta and move the mediation forward.",
+    "Change the intervention function (reflection, challenge, or repair) \u2014 do not restate prior framing.",
+    "Ask one new question about a fresh concrete moment or contradiction."
+  ].filter((line) => typeof line === "string" && line.length > 0);
+  return lines.join(" ");
+}
 function buildRetryInstruction(params) {
   const uniqueRuleIds = [...new Set(params.failedRuleIds.filter(Boolean))];
   const uniqueReasons = [...new Set(params.blockingReasons.filter(Boolean))];
@@ -7595,6 +8059,16 @@ function buildRetryInstruction(params) {
   }
   if (uniqueRuleIds.includes("max_length")) {
     targetedFixes.push(`Stay under ${RESPONSE_VALIDATION_LIMITS.maxReplyChars} characters.`);
+  }
+  if (uniqueRuleIds.includes("repeated_intervention")) {
+    const repetitionMatch = findRepeatedInterventionMatch(params.ruleResults);
+    if (repetitionMatch) {
+      targetedFixes.push(buildRepeatedInterventionRetryGuidance(repetitionMatch));
+    } else {
+      targetedFixes.push(
+        "Do not restate the previous interpretation. Change strategy and ask about a different concrete moment or contradiction."
+      );
+    }
   }
   if (uniqueRuleIds.includes("therapeutic_flow")) {
     targetedFixes.push(
@@ -7615,7 +8089,12 @@ function buildRetryInstruction(params) {
     targetedFixes.push("Return a non-empty mediator reply.");
   }
   if (uniqueRuleIds.includes("draft_validation_flag")) {
-    targetedFixes.push("Return a clean, well-formed mediator reply (no markup, no meta notes).");
+    const draftReasons = (params.draftValidationReasons ?? []).filter(Boolean);
+    if (draftReasons.length > 0) {
+      targetedFixes.push(`Fix draft bridge issues: ${draftReasons.join("; ")}.`);
+    } else {
+      targetedFixes.push("Return a clean, well-formed mediator reply (no markup, no meta notes).");
+    }
   }
   if (uniqueRuleIds.includes("safety_compliance")) {
     targetedFixes.push("Follow the safety envelope and use appropriate safety wording.");
@@ -8034,6 +8513,316 @@ function validateTherapeuticFlow(ctx) {
   };
 }
 
+// services/mediatorEngine/responseValidator/lib/repetitionAnalysis.ts
+var STOP_WORDS = /* @__PURE__ */ new Set([
+  "i",
+  "a",
+  "o",
+  "w",
+  "z",
+  "na",
+  "do",
+  "ze",
+  "to",
+  "ty",
+  "ja",
+  "nie",
+  "si\u0119",
+  "sie",
+  "\u017Ce",
+  "ze",
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "but",
+  "you",
+  "your",
+  "is",
+  "are",
+  "was",
+  "to",
+  "of",
+  "in",
+  "on",
+  "co",
+  "jak",
+  "czy",
+  "\u017Ce",
+  "to",
+  "ten",
+  "ta",
+  "ci",
+  "go",
+  "jej",
+  "jego",
+  "\u017Ceby",
+  "zeby",
+  "moze",
+  "mo\u017Ce",
+  "bardzo",
+  "tez",
+  "te\u017C",
+  "ju\u017C",
+  "juz",
+  "gdy",
+  "kiedy",
+  "tam",
+  "tu",
+  "tu",
+  "tam",
+  "po"
+]);
+function normalizeText3(text) {
+  return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+}
+function tokenize(text) {
+  return normalizeText3(text).split(" ").filter((token) => token.length > 2 && !STOP_WORDS.has(token));
+}
+function extractQuestion(text) {
+  const parts = text.split("?");
+  if (parts.length < 2) return "";
+  return normalizeText3(parts[parts.length - 2] ?? "");
+}
+function extractAddressee(text, knownNames) {
+  const normalized = normalizeText3(text);
+  for (const name of knownNames) {
+    const normalizedName = normalizeText3(name);
+    if (normalizedName.length > 1 && normalized.includes(normalizedName)) {
+      return normalizedName;
+    }
+  }
+  return null;
+}
+function sharedTokenRatio(a, b) {
+  if (a.length === 0 || b.length === 0) return 0;
+  const setB = new Set(b);
+  const shared = a.filter((token) => setB.has(token)).length;
+  return shared / Math.min(a.length, b.length);
+}
+var TOKEN_OVERLAP_THRESHOLD = 0.45;
+var PHRASE_LENGTH = 3;
+var PHRASE_HIT_STANDALONE_THRESHOLD = 2;
+var PHRASE_HIT_COMPOUND_TOKEN_THRESHOLD = 0.3;
+var QUESTION_OVERLAP_THRESHOLD = 0.5;
+var ADDRESSEE_OVERLAP_THRESHOLD = 0.3;
+var RECENT_MESSAGE_LIMIT = 3;
+function phraseBlocksRepetition(phraseHitCount, tokenOverlap) {
+  return phraseHitCount >= PHRASE_HIT_STANDALONE_THRESHOLD || phraseHitCount >= 1 && tokenOverlap >= PHRASE_HIT_COMPOUND_TOKEN_THRESHOLD;
+}
+function findSharedPhrases(a, b, phraseLen = PHRASE_LENGTH) {
+  const wordsA = normalizeText3(a).split(" ").filter(Boolean);
+  const wordsB = normalizeText3(b).split(" ").filter(Boolean);
+  if (wordsA.length < phraseLen || wordsB.length < phraseLen) return [];
+  const phrasesB = /* @__PURE__ */ new Set();
+  for (let i = 0; i <= wordsB.length - phraseLen; i += 1) {
+    phrasesB.add(wordsB.slice(i, i + phraseLen).join(" "));
+  }
+  const hits = [];
+  for (let i = 0; i <= wordsA.length - phraseLen; i += 1) {
+    const phrase = wordsA.slice(i, i + phraseLen).join(" ");
+    if (phrasesB.has(phrase)) hits.push(phrase);
+  }
+  return [...new Set(hits)];
+}
+function analyzeAgainstPrior(draft, prior, priorIndex, knownNames) {
+  const draftTokens = tokenize(draft);
+  const priorTokens = tokenize(prior);
+  const tokenOverlap = sharedTokenRatio(draftTokens, priorTokens);
+  const sharedPhrases = findSharedPhrases(draft, prior, PHRASE_LENGTH);
+  const phraseHitCount = sharedPhrases.length;
+  const draftQuestion = extractQuestion(draft);
+  const priorQuestion = extractQuestion(prior);
+  const questionOverlap = draftQuestion.length > 8 && priorQuestion.length > 8 ? sharedTokenRatio(tokenize(draftQuestion), tokenize(priorQuestion)) : null;
+  const draftAddressee = extractAddressee(draft, knownNames);
+  const priorAddressee = extractAddressee(prior, knownNames);
+  const matchedReasons = [];
+  const matchTypes = [];
+  if (tokenOverlap >= TOKEN_OVERLAP_THRESHOLD) {
+    matchedReasons.push("semantic overlap with prior mediator message");
+    matchTypes.push("semantic_overlap");
+  }
+  if (phraseBlocksRepetition(phraseHitCount, tokenOverlap)) {
+    matchedReasons.push("repeated phrase from prior mediator message");
+    matchTypes.push("repeated_phrase");
+  }
+  if (questionOverlap != null && questionOverlap >= QUESTION_OVERLAP_THRESHOLD) {
+    matchedReasons.push("same question target as prior mediator message");
+    matchTypes.push("question_overlap");
+  }
+  if (draftAddressee && priorAddressee && draftAddressee === priorAddressee && tokenOverlap >= ADDRESSEE_OVERLAP_THRESHOLD) {
+    matchedReasons.push("same addressee with similar intervention");
+    matchTypes.push("addressee_overlap");
+  }
+  return {
+    priorIndex,
+    priorText: prior,
+    matchedPhrase: sharedPhrases[0] ?? null,
+    matchTypes,
+    tokenOverlap,
+    tokenOverlapThreshold: TOKEN_OVERLAP_THRESHOLD,
+    phraseHitCount,
+    phraseLength: PHRASE_LENGTH,
+    phraseThreshold: PHRASE_HIT_STANDALONE_THRESHOLD,
+    questionOverlap,
+    questionOverlapThreshold: QUESTION_OVERLAP_THRESHOLD,
+    matchedReasons
+  };
+}
+function analyzeRepeatedInterventionDetailed(input) {
+  const recent = input.recentMediatorMessages.map((text) => typeof text === "string" ? text.trim() : "").filter((text) => text.length > 0).slice(-RECENT_MESSAGE_LIMIT);
+  const draft = input.draftText.trim();
+  if (recent.length === 0 || draft.length === 0) {
+    return { repeated: false, reasons: [], matches: [], bestMatch: null };
+  }
+  const knownNames = (input.knownNames ?? []).filter(Boolean);
+  const matches = recent.map(
+    (prior, index) => analyzeAgainstPrior(draft, prior, index, knownNames)
+  );
+  const reasons = [...new Set(matches.flatMap((match) => match.matchedReasons))];
+  const bestMatch = matches.filter((match) => match.matchedReasons.length > 0).sort((a, b) => b.matchedReasons.length - a.matchedReasons.length)[0] ?? null;
+  return {
+    repeated: reasons.length > 0,
+    reasons,
+    matches,
+    bestMatch
+  };
+}
+
+// services/mediatorEngine/edge/runtimeTurnTraceDevLog.ts
+function shouldEmitRuntimeTurnDiagnostics() {
+  if (typeof Deno !== "undefined") return true;
+  return typeof __DEV__ !== "undefined" && __DEV__;
+}
+function previewText(text, max = 240) {
+  const trimmed = text.trim();
+  if (trimmed.length <= max) return trimmed;
+  return `${trimmed.slice(0, max).trim()}\u2026`;
+}
+function logRepeatedInterventionMatch(params) {
+  if (!shouldEmitRuntimeTurnDiagnostics()) return;
+  console.info("[REPEATED_INTERVENTION_MATCH]", {
+    runtimeBuild: MEDIATOR_RUNTIME_BUILD_ID,
+    mediationId: params.mediationId ?? null,
+    turnNumber: params.turnNumber ?? null,
+    attemptNumber: params.attemptNumber ?? null,
+    candidateText: previewText(params.candidateText),
+    matchedPriorMessageId: params.matchedPriorMessageId ?? null,
+    matchedPriorText: params.matchedPriorText ? previewText(params.matchedPriorText) : null,
+    matchedPhrase: params.matchedPhrase ?? null,
+    similarityScore: params.similarityScore ?? null,
+    threshold: params.threshold ?? null,
+    ruleDecision: params.ruleDecision,
+    tokenOverlap: params.matchDetail?.tokenOverlap ?? null,
+    tokenOverlapThreshold: params.matchDetail?.tokenOverlapThreshold ?? null,
+    phraseHitCount: params.matchDetail?.phraseHitCount ?? null,
+    phraseThreshold: params.matchDetail?.phraseThreshold ?? null,
+    questionOverlap: params.matchDetail?.questionOverlap ?? null,
+    matchedReasons: params.matchDetail?.matchedReasons ?? []
+  });
+}
+function logRuntimeAttemptStart(params) {
+  if (!shouldEmitRuntimeTurnDiagnostics()) return;
+  console.info("[RUNTIME_ATTEMPT_START]", {
+    runtimeBuild: MEDIATOR_RUNTIME_BUILD_ID,
+    mediationId: params.mediationId ?? null,
+    turnNumber: params.turnNumber ?? null,
+    attemptNumber: params.attemptNumber ?? null,
+    trigger: params.trigger ?? null
+  });
+}
+function logRuntimeAttemptResult(params) {
+  if (!shouldEmitRuntimeTurnDiagnostics()) return;
+  console.info("[RUNTIME_ATTEMPT_RESULT]", {
+    runtimeBuild: MEDIATOR_RUNTIME_BUILD_ID,
+    mediationId: params.mediationId ?? null,
+    turnNumber: params.turnNumber ?? null,
+    attemptNumber: params.attemptNumber ?? null,
+    originalProviderText: params.originalProviderText ? previewText(params.originalProviderText, 1200) : null,
+    effectiveValidatedText: previewText(params.effectiveValidatedText, 1200),
+    draftValidationReasons: params.draftValidationReasons ?? [],
+    fallbackSubstituted: params.fallbackSubstituted ?? false,
+    validationAction: params.validationAction,
+    validationReasonCodes: params.validationReasonCodes,
+    finalSource: params.finalSource,
+    retryInstruction: params.retryInstruction ? previewText(params.retryInstruction, 600) : null
+  });
+}
+function logRuntimeTurnContext(params) {
+  if (!shouldEmitRuntimeTurnDiagnostics()) return;
+  console.info("[RUNTIME_TURN_CONTEXT]", {
+    runtimeBuild: MEDIATOR_RUNTIME_BUILD_ID,
+    mediationId: params.mediationId ?? null,
+    turnNumber: params.turnNumber ?? null,
+    trigger: params.trigger ?? null,
+    participantReplyCount: params.participantReplyCount ?? 0,
+    participantReplies: params.participantReplies ?? [],
+    transcriptDeltaCount: params.transcriptDeltaCount ?? 0,
+    transcriptWindowCount: params.transcriptWindowCount ?? 0,
+    recentMediatorMessageCount: params.recentMediatorMessageCount ?? 0,
+    recentMediatorMessages: params.recentMediatorMessages ?? []
+  });
+}
+
+// services/mediatorEngine/responseValidator/rules/validateRepeatedIntervention.ts
+var RULE_ID13 = "repeated_intervention";
+function validateRepeatedIntervention(ctx) {
+  const recent = ctx.recentMediatorMessages ?? [];
+  const refs = ctx.recentMediatorMessageRefs ?? [];
+  const analysis = analyzeRepeatedInterventionDetailed({
+    draftText: ctx.text,
+    recentMediatorMessages: recent,
+    interventionType: void 0,
+    knownNames: []
+  });
+  if (!analysis.repeated) {
+    logRepeatedInterventionMatch({
+      turnNumber: ctx.turnNumber,
+      attemptNumber: ctx.attemptNumber,
+      candidateText: ctx.text,
+      ruleDecision: "pass"
+    });
+    return {
+      ruleId: RULE_ID13,
+      passed: true,
+      severity: "block",
+      reason: "No repeated intervention detected"
+    };
+  }
+  const best = analysis.bestMatch;
+  const priorRef = best ? refs[best.priorIndex] : void 0;
+  logRepeatedInterventionMatch({
+    turnNumber: ctx.turnNumber,
+    attemptNumber: ctx.attemptNumber,
+    candidateText: ctx.text,
+    matchedPriorMessageId: priorRef?.id ?? (best ? `recent-${best.priorIndex}` : null),
+    matchedPriorText: best?.priorText ?? null,
+    matchedPhrase: best?.matchedPhrase ?? null,
+    similarityScore: best?.tokenOverlap ?? null,
+    threshold: best?.tokenOverlapThreshold ?? null,
+    ruleDecision: "block",
+    matchDetail: best
+  });
+  return {
+    ruleId: RULE_ID13,
+    passed: false,
+    severity: "block",
+    reason: `Repeated intervention: ${analysis.reasons.join("; ")}`,
+    metadata: { reasonCount: analysis.reasons.length },
+    repetitionMatchDetail: best ? {
+      priorIndex: best.priorIndex,
+      priorText: best.priorText,
+      matchedPhrase: best.matchedPhrase,
+      matchTypes: best.matchTypes,
+      tokenOverlap: best.tokenOverlap,
+      phraseHitCount: best.phraseHitCount,
+      questionOverlap: best.questionOverlap,
+      matchedReasons: best.matchedReasons
+    } : void 0
+  };
+}
+
 // services/mediatorEngine/responseValidator/rules/index.ts
 var RESPONSE_VALIDATION_RULES = [
   validateDraftValidationFlag,
@@ -8043,6 +8832,7 @@ var RESPONSE_VALIDATION_RULES = [
   validateSentences,
   validateForbiddenTerms,
   validateTherapeuticFlow,
+  validateRepeatedIntervention,
   validateNoTechnicalLeakage,
   validateSafetyCompliance,
   validateLanguage
@@ -8060,14 +8850,16 @@ function resolveAction(hasBlockingFailures, attemptNumber, maxAttempts) {
 function buildResponseValidationResult(ctx, ruleResults, validatedAt) {
   const blockingReasons = ruleResults.filter((r) => !r.passed && r.severity === "block").map((r) => r.reason);
   const warningReasons = ruleResults.filter((r) => !r.passed && r.severity === "warn").map((r) => r.reason);
-  const failedRuleIds = ruleResults.filter((r) => !r.passed).map((r) => r.ruleId).filter((id) => typeof id === "string" && id.length > 0);
+  const failedRuleIds2 = ruleResults.filter((r) => !r.passed).map((r) => r.ruleId).filter((id) => typeof id === "string" && id.length > 0);
   const hasBlockingFailures = blockingReasons.length > 0;
   const action = resolveAction(hasBlockingFailures, ctx.attemptNumber, ctx.maxAttempts);
   const valid = action === "accept";
   const retryInstruction = action === "retry" ? buildRetryInstruction({
-    failedRuleIds,
+    failedRuleIds: failedRuleIds2,
     blockingReasons,
-    currentGoal: ctx.currentGoal
+    currentGoal: ctx.currentGoal,
+    ruleResults,
+    draftValidationReasons: ctx.draftReply.validation?.reasons
   }) : null;
   const fallbackReply = action === "fallback" ? buildValidatedFallback(ctx.language, ctx.safetyLevel, ctx.turnNumber, blockingReasons) : null;
   const validatedReply = action === "accept" ? ctx.draftReply : action === "fallback" ? fallbackReply : null;
@@ -8177,6 +8969,16 @@ function safeResponseValidationInput(input) {
   const draftReply = normalizeDraftReply(raw.draftReply, language, safetyLevel, turnNumber);
   const promptComposerOutput = normalizePromptOutput2(raw.promptComposerOutput, language, safetyLevel);
   const currentGoal = typeof promptComposerOutput.promptMetadata?.goal === "string" ? promptComposerOutput.promptMetadata.goal : void 0;
+  const recentMediatorMessages = Array.isArray(
+    promptComposerOutput.promptMetadata?.recentMediatorMessages
+  ) ? promptComposerOutput.promptMetadata.recentMediatorMessages.filter(
+    (entry) => typeof entry === "string" && entry.trim().length > 0
+  ) : void 0;
+  const recentMediatorMessageRefs = Array.isArray(
+    promptComposerOutput.promptMetadata?.recentMediatorMessageRefs
+  ) ? promptComposerOutput.promptMetadata.recentMediatorMessageRefs.filter(
+    (entry) => !!entry && typeof entry === "object" && typeof entry.id === "string" && typeof entry.content === "string" && entry.content.trim().length > 0
+  ) : void 0;
   return {
     text: typeof draftReply.text === "string" ? draftReply.text : "",
     draftReply,
@@ -8186,6 +8988,8 @@ function safeResponseValidationInput(input) {
     attemptNumber,
     maxAttempts,
     currentGoal,
+    recentMediatorMessages,
+    recentMediatorMessageRefs,
     promptComposerOutput
   };
 }
@@ -8296,6 +9100,12 @@ async function runReplyRetryLoop(input) {
   let responseValidation = null;
   let retryInstruction = null;
   while (attemptNumber <= ctx.maxReplyAttempts) {
+    logRuntimeAttemptStart({
+      mediationId: ctx.turnInput.mediationId,
+      turnNumber: ctx.turnInput.turnNumber,
+      attemptNumber,
+      trigger: ctx.turnInput.trigger
+    });
     llmOutput = await generateMediatorReply({
       promptComposerOutput,
       provider: ctx.llmProvider,
@@ -8314,12 +9124,25 @@ async function runReplyRetryLoop(input) {
       attemptNumber,
       maxAttempts: ctx.maxReplyAttempts
     });
-    const failedRuleIds = uniqueFailedRuleIds(responseValidation);
+    const failedRuleIdsList = uniqueFailedRuleIds(responseValidation);
     const providerSucceeded = Boolean(llmOutput.providerResponse);
+    logRuntimeAttemptResult({
+      mediationId: ctx.turnInput.mediationId,
+      turnNumber: ctx.turnInput.turnNumber,
+      attemptNumber,
+      originalProviderText: llmOutput.originalProviderText ?? llmOutput.providerResponse?.text ?? null,
+      effectiveValidatedText: llmOutput.draftReply.text,
+      draftValidationReasons: llmOutput.draftValidationReasons ?? llmOutput.draftReply.validation?.reasons ?? [],
+      fallbackSubstituted: llmOutput.fallbackSubstituted ?? false,
+      validationAction: responseValidation.action,
+      validationReasonCodes: failedRuleIdsList,
+      finalSource: llmOutput.draftReply.source,
+      retryInstruction: responseValidation.retryInstruction
+    });
     logAttemptDev({
       attempt: attemptNumber,
       validationAction: responseValidation.action,
-      failedRuleIds,
+      failedRuleIds: failedRuleIdsList,
       currentGoal: String(promptComposerOutput.promptMetadata?.goal ?? "") || null,
       stage: String(promptComposerOutput.promptMetadata?.goal ?? "") || null,
       interventionType: String(promptComposerOutput.promptMetadata?.interventionType ?? "") || null,
@@ -8327,6 +9150,24 @@ async function runReplyRetryLoop(input) {
       questionCount: llmOutput.draftReply.validation?.questionCount ?? 0,
       providerSucceeded
     });
+    if (responseValidation.action !== "accept") {
+      logLlmValidationFailed({
+        mediationId: ctx.turnInput.mediationId,
+        engineVersion: ctx.turnInput.engineVersion,
+        model: llmOutput.providerResponse?.model ?? llmOutput.draftReply.metadata?.model ?? null,
+        originalProviderText: llmOutput.originalProviderText ?? llmOutput.providerResponse?.text ?? null,
+        effectiveValidatedText: llmOutput.draftReply.text,
+        draftValidationReasons: llmOutput.draftValidationReasons ?? llmOutput.draftReply.validation?.reasons ?? [],
+        fallbackSubstituted: llmOutput.fallbackSubstituted ?? false,
+        validation: responseValidation,
+        trigger: ctx.turnInput.trigger,
+        turnNumber: ctx.turnInput.turnNumber,
+        attemptNumber,
+        providerSucceeded,
+        finalSource: llmOutput.draftReply.source,
+        retryInstruction: responseValidation.retryInstruction
+      });
+    }
     if (responseValidation.action === "accept") {
       return {
         llmOutput,
@@ -8345,7 +9186,7 @@ async function runReplyRetryLoop(input) {
     }
     const rewrite = tryTargetedRewrite({
       draftReply: llmOutput.draftReply,
-      failedRuleIds,
+      failedRuleIds: failedRuleIdsList,
       language: ctx.language,
       safetyLevel,
       turnNumber
@@ -9206,10 +10047,15 @@ async function runMediatorEngineTurn(input) {
       sessionMemory: ctx.sessionMemory,
       clientEvents: ctx.turnInput.clientEvents ?? []
     });
+    const hydratedState = clientEventResult.mediationState ? hydrateMediationParticipantNames(
+      clientEventResult.mediationState,
+      ctx.turnInput.participantNames,
+      ctx.language
+    ) : null;
     const turnInput = {
       ...ctx.turnInput,
       language: ctx.language,
-      mediationState: clientEventResult.mediationState
+      mediationState: hydratedState
     };
     const orchestratedTurn = orchestrateTurn({
       request: turnInput,
@@ -9223,6 +10069,27 @@ async function runMediatorEngineTurn(input) {
     );
     const safetyLevel = promptInput.safetyOutput?.level ?? "none";
     const promptComposerOutput = composePrompt(promptInput);
+    const recentRefs = promptComposerOutput.promptMetadata.recentMediatorMessageRefs ?? [];
+    logRuntimeTurnContext({
+      mediationId: ctx.turnInput.mediationId,
+      turnNumber: ctx.turnInput.turnNumber,
+      trigger: ctx.turnInput.trigger,
+      participantReplyCount: (ctx.turnInput.transcriptDelta ?? []).filter(
+        (entry) => entry.authorRole === "host" || entry.authorRole === "partner"
+      ).length,
+      participantReplies: (ctx.turnInput.transcriptDelta ?? []).filter((entry) => entry.authorRole === "host" || entry.authorRole === "partner").map((entry) => ({
+        role: entry.authorRole,
+        messageId: entry.id,
+        contentPreview: previewText(entry.content, 120)
+      })),
+      transcriptDeltaCount: ctx.turnInput.transcriptDelta?.length ?? 0,
+      transcriptWindowCount: promptInput.transcriptWindow?.length ?? 0,
+      recentMediatorMessageCount: recentRefs.length,
+      recentMediatorMessages: recentRefs.map((entry) => ({
+        messageId: entry.id,
+        contentPreview: previewText(entry.content, 120)
+      }))
+    });
     const retryResult = await runReplyRetryLoop({
       promptComposerOutput,
       ctx,
@@ -9612,7 +10479,12 @@ function parseMediatorRuntimeRequest(body) {
     transcriptDelta: normalizeTranscriptDelta(raw.transcriptDelta),
     language: normalizeLanguage5(raw.language),
     engineVersion: "v2.3",
-    clientEvents
+    clientEvents,
+    transcriptWindow: normalizeTranscriptDelta(raw.transcriptWindow),
+    participantNames: raw.participantNames && typeof raw.participantNames === "object" ? {
+      hostName: typeof raw.participantNames.hostName === "string" ? raw.participantNames.hostName : void 0,
+      partnerName: typeof raw.participantNames.partnerName === "string" ? raw.participantNames.partnerName : void 0
+    } : void 0
   };
   return { ok: true, value: request };
 }
@@ -9626,7 +10498,9 @@ function toOrchestrateTurnRequest(request) {
     transcriptDelta: request.transcriptDelta,
     engineVersion: "v2.3",
     language: request.language,
-    clientEvents: request.clientEvents
+    clientEvents: request.clientEvents,
+    transcriptWindow: request.transcriptWindow,
+    participantNames: request.participantNames
   };
 }
 
@@ -9691,6 +10565,7 @@ function logDevResponseSource(runtimeOutput) {
   const finalSource = runtimeOutput.finalMediatorMessage.source;
   const source = finalSource === "llm" ? runtimeOutput.retryCount > 0 ? "retry_llm" : "llm" : finalSource;
   console.info("[mediatorResponseSource]", {
+    runtimeBuild: MEDIATOR_RUNTIME_BUILD_ID,
     source,
     fallbackUsed: runtimeOutput.fallbackUsed,
     validationAction: runtimeOutput.responseValidation.action,
@@ -9738,6 +10613,22 @@ async function handleMediatorRuntimeTurn(body, options = {}) {
     if (enforceNoNormalFallbackInEdge && !isSafetyException && (finalSource === "fallback" || finalSource === "stub")) {
       const code = providerSucceeded ? MEDIATOR_RUNTIME_ERROR_CODES.LLM_VALIDATION_FAILED : MEDIATOR_RUNTIME_ERROR_CODES.LLM_TEMPORARILY_UNAVAILABLE;
       const message = code === MEDIATOR_RUNTIME_ERROR_CODES.LLM_TEMPORARILY_UNAVAILABLE ? "LLM temporarily unavailable" : "LLM reply failed validation";
+      logLlmValidationFailed({
+        mediationId: parsed.value.mediationId,
+        engineVersion: parsed.value.engineVersion,
+        model: runtimeOutput.llmOutput.providerResponse?.model ?? runtimeOutput.finalMediatorMessage.source,
+        originalProviderText: runtimeOutput.llmOutput.originalProviderText ?? runtimeOutput.llmOutput.providerResponse?.text ?? null,
+        effectiveValidatedText: runtimeOutput.llmOutput.draftReply.text,
+        draftValidationReasons: runtimeOutput.llmOutput.draftValidationReasons ?? runtimeOutput.llmOutput.draftReply.validation?.reasons ?? [],
+        fallbackSubstituted: runtimeOutput.llmOutput.fallbackSubstituted ?? false,
+        validation: runtimeOutput.responseValidation,
+        trigger: parsed.value.trigger,
+        turnNumber: parsed.value.turnNumber,
+        attemptNumber: runtimeOutput.retryCount + 1,
+        providerSucceeded,
+        finalSource: runtimeOutput.finalMediatorMessage.source,
+        retryInstruction: runtimeOutput.responseValidation.retryInstruction
+      });
       return {
         ok: false,
         error: createMediatorRuntimeError(code, message, {
@@ -9770,6 +10661,31 @@ var MEDIATOR_RUNTIME_CORS_HEADERS = {
 };
 function createMediatorRuntimeOptionsResponse() {
   return new Response("ok", { status: 200, headers: MEDIATOR_RUNTIME_CORS_HEADERS });
+}
+
+// services/mediatorEngine/edge/runtimeRequestTraceDevLog.ts
+function shouldEmitRuntimeRequestDiagnostics() {
+  if (typeof Deno !== "undefined") return true;
+  return typeof __DEV__ !== "undefined" && __DEV__;
+}
+function logRuntimeRequestContext(params) {
+  if (!shouldEmitRuntimeRequestDiagnostics()) return;
+  console.info("[RUNTIME_REQUEST_CONTEXT]", {
+    runtimeBuild: MEDIATOR_RUNTIME_BUILD_ID,
+    method: params.method,
+    cfRay: params.cfRay ?? null,
+    sbRequestId: params.sbRequestId ?? null,
+    mediationId: params.mediationId ?? null,
+    trigger: params.trigger ?? null,
+    turnNumber: params.turnNumber ?? null,
+    engineVersion: params.engineVersion ?? null,
+    // Helps verify which diagnostic log families shipped in this bundle.
+    diagnosticsCapabilities: {
+      llmValidationTrace: true,
+      runtimeTurnTrace: true,
+      requestContextTrace: true
+    }
+  });
 }
 
 // services/mediatorEngine/edge/handleMediatorRuntimeHttp.ts
@@ -9811,6 +10727,21 @@ async function handleMediatorRuntimeHttpRequest(req) {
       400
     );
   }
+  const bodyRecord = body && typeof body === "object" ? body : null;
+  logRuntimeRequestContext({
+    method: req.method,
+    cfRay: req.headers.get("cf-ray"),
+    sbRequestId: req.headers.get("sb-request-id") ?? req.headers.get("x-sb-request-id"),
+    mediationId: typeof bodyRecord?.mediationId === "string" ? bodyRecord.mediationId : null,
+    trigger: typeof bodyRecord?.trigger === "string" ? bodyRecord.trigger : null,
+    turnNumber: typeof bodyRecord?.turnNumber === "number" ? bodyRecord.turnNumber : null,
+    engineVersion: typeof bodyRecord?.engineVersion === "string" ? bodyRecord.engineVersion : null
+  });
+  console.info("[mediator-runtime-edge]", {
+    runtimeBuild: MEDIATOR_RUNTIME_BUILD_ID,
+    method: req.method,
+    engineVersion: typeof bodyRecord?.engineVersion === "string" ? bodyRecord.engineVersion : null
+  });
   const result = await handleMediatorRuntimeTurn(body, { env: readEdgeEnv() });
   if ("status" in result && result.ok === false) {
     return jsonResponse(createMediatorRuntimeError(result.error.code, result.error.message), result.status);

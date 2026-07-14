@@ -1,7 +1,21 @@
 import type { RuntimeSession } from '@/types/mediator/runtimeSession';
 
-export function runtimeAwaitingBothRepliesFixture(): RuntimeSession {
-  return {
+export interface RuntimeSessionFixtureOverrides {
+  decision?: Partial<RuntimeSession['decision']>;
+  session?: Partial<RuntimeSession['session']>;
+  progress?: Partial<RuntimeSession['progress']>;
+  presentation?: Partial<RuntimeSession['presentation']>;
+  proposal?: Partial<RuntimeSession['proposal']>;
+  closure?: Partial<RuntimeSession['closure']>;
+  pending?: Partial<RuntimeSession['pending']>;
+  diagnostics?: Partial<RuntimeSession['diagnostics']>;
+}
+
+/** Canonical RuntimeSession fixture aligned with types/mediator/runtimeSession.ts. */
+export function createRuntimeSessionFixture(
+  overrides: RuntimeSessionFixtureOverrides = {}
+): RuntimeSession {
+  const base: RuntimeSession = {
     decision: {
       nextBeat: 'await_user_action',
       mayAutoAdvance: false,
@@ -22,28 +36,34 @@ export function runtimeAwaitingBothRepliesFixture(): RuntimeSession {
       },
     },
     progress: {
-      percent: 10,
-      currentGoalIndex: 0,
-      totalGoals: 10,
-      questionsAsked: 1,
-      questionsTarget: 8,
       completionEstimate: 10,
+      milestone: null,
+      goalProgress: {
+        completedGoals: [],
+        currentGoal: 'SAFE_OPENING',
+        currentGoalCompletion: 10,
+        estimatedRemainingGoals: 8,
+      },
+      labelKey: 'runtime.stage.intake',
     },
     presentation: {
       deliverables: [],
-      decisionPanel: null,
-      inputState: 'awaiting_both_answers',
-      waitingDisplay: 'waiting_both',
+      primaryDeliverable: 'public_message',
+      hideInput: false,
+      showDecisionPanel: null,
+      hostOnlyGeneration: true,
     },
     proposal: {
       phase: 'none',
-      presentedAt: null,
-      acceptedBy: [],
-      rejectedBy: [],
+      content: null,
+      votes: { host: null, partner: null },
+      requiresBothAcceptance: true,
     },
     closure: {
       directive: 'none',
       suggestedDbStatus: 'live',
+      closureMessage: null,
+      navigateToClosure: false,
     },
     pending: {
       awaiting: 'both_replies',
@@ -52,9 +72,31 @@ export function runtimeAwaitingBothRepliesFixture(): RuntimeSession {
     },
     diagnostics: {
       explainabilityId: null,
-      safetyLevel: 'L0',
+      safetyLevel: 'none',
       fallbackUsed: false,
       validationWarnings: [],
     },
   };
+
+  return {
+    decision: { ...base.decision, ...overrides.decision },
+    session: { ...base.session, ...overrides.session },
+    progress: {
+      ...base.progress,
+      ...overrides.progress,
+      goalProgress: {
+        ...base.progress.goalProgress,
+        ...overrides.progress?.goalProgress,
+      },
+    },
+    presentation: { ...base.presentation, ...overrides.presentation },
+    proposal: { ...base.proposal, ...overrides.proposal },
+    closure: { ...base.closure, ...overrides.closure },
+    pending: { ...base.pending, ...overrides.pending },
+    diagnostics: { ...base.diagnostics, ...overrides.diagnostics },
+  };
+}
+
+export function runtimeAwaitingBothRepliesFixture(): RuntimeSession {
+  return createRuntimeSessionFixture();
 }

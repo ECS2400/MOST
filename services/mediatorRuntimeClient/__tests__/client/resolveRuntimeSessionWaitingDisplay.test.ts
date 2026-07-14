@@ -16,23 +16,16 @@ describe('resolveRuntimeSessionWaitingDisplay', () => {
 
   it('uses runtime label for answer waiting when session exists', () => {
     const runtime = createMinimalRuntimeSuccess();
-    const display = resolveLiveWaitingAnswerDisplay(
-      runtime.runtimeSession,
-      'Legacy waiting text',
-      'en',
-      true
-    );
-    assert.equal(display.source, 'runtime');
+    const display = resolveLiveWaitingAnswerDisplay(runtime.runtimeSession, 'en', true);
+    assert.equal(display.source, 'runtime_available');
     assert.equal(display.kind, 'waiting_both');
     assert.match(display.label, /both/i);
-    assert.doesNotMatch(display.label, /Legacy waiting/);
   });
 
-  it('falls back to legacy answer hint when runtimeSession is null', () => {
-    const legacy = 'Waiting for partner to answer';
-    const display = resolveLiveWaitingAnswerDisplay(null, legacy, 'en', true);
-    assert.equal(display.source, 'legacy');
-    assert.equal(display.label, legacy);
+  it('returns empty label when runtime is unavailable', () => {
+    const display = resolveLiveWaitingAnswerDisplay(null, 'en', true, true);
+    assert.equal(display.source, 'runtime_unavailable');
+    assert.equal(display.label, '');
   });
 
   it('maps host_reply to waiting_host and adjusts label for host user', () => {
@@ -46,21 +39,11 @@ describe('resolveRuntimeSessionWaitingDisplay', () => {
         },
       },
     });
-    const hostDisplay = resolveLiveWaitingAnswerDisplay(
-      runtime.runtimeSession,
-      'Legacy',
-      'en',
-      true
-    );
+    const hostDisplay = resolveLiveWaitingAnswerDisplay(runtime.runtimeSession, 'en', true);
     assert.equal(hostDisplay.kind, 'waiting_host');
     assert.match(hostDisplay.label, /your turn/i);
 
-    const partnerDisplay = resolveLiveWaitingAnswerDisplay(
-      runtime.runtimeSession,
-      'Legacy',
-      'en',
-      false
-    );
+    const partnerDisplay = resolveLiveWaitingAnswerDisplay(runtime.runtimeSession, 'en', false);
     assert.match(partnerDisplay.label, /host/i);
   });
 
@@ -75,13 +58,8 @@ describe('resolveRuntimeSessionWaitingDisplay', () => {
         },
       },
     });
-    const display = resolveLiveProposalWaitingDisplay(
-      runtime.runtimeSession,
-      'Legacy proposal hint',
-      'en',
-      true
-    );
-    assert.equal(display.source, 'runtime');
+    const display = resolveLiveProposalWaitingDisplay(runtime.runtimeSession, 'en', true);
+    assert.equal(display.source, 'runtime_available');
     assert.equal(display.kind, 'waiting_proposal_decision');
     assert.match(display.label, /proposal/i);
   });
@@ -97,12 +75,8 @@ describe('resolveRuntimeSessionWaitingDisplay', () => {
         },
       },
     });
-    const display = resolveLiveContinueWaitingDisplay(
-      runtime.runtimeSession,
-      'Legacy continue hint',
-      'en'
-    );
-    assert.equal(display.source, 'runtime');
+    const display = resolveLiveContinueWaitingDisplay(runtime.runtimeSession, 'en');
+    assert.equal(display.source, 'runtime_available');
     assert.equal(display.kind, 'waiting_continue_decision');
     assert.match(display.label, /continue/i);
   });

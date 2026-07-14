@@ -9,6 +9,8 @@ import {
   MEDIATOR_RUNTIME_CORS_HEADERS,
   createMediatorRuntimeOptionsResponse,
 } from '@/services/mediatorEngine/edge/cors';
+import { MEDIATOR_RUNTIME_BUILD_ID } from '@/services/mediatorEngine/edge/mediatorRuntimeBuild';
+import { logRuntimeRequestContext } from '@/services/mediatorEngine/edge/runtimeRequestTraceDevLog';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -53,6 +55,27 @@ export async function handleMediatorRuntimeHttpRequest(req: Request): Promise<Re
       400
     );
   }
+
+  const bodyRecord =
+    body && typeof body === 'object' ? (body as Record<string, unknown>) : null;
+
+  logRuntimeRequestContext({
+    method: req.method,
+    cfRay: req.headers.get('cf-ray'),
+    sbRequestId: req.headers.get('sb-request-id') ?? req.headers.get('x-sb-request-id'),
+    mediationId: typeof bodyRecord?.mediationId === 'string' ? bodyRecord.mediationId : null,
+    trigger: typeof bodyRecord?.trigger === 'string' ? bodyRecord.trigger : null,
+    turnNumber: typeof bodyRecord?.turnNumber === 'number' ? bodyRecord.turnNumber : null,
+    engineVersion:
+      typeof bodyRecord?.engineVersion === 'string' ? bodyRecord.engineVersion : null,
+  });
+
+  console.info('[mediator-runtime-edge]', {
+    runtimeBuild: MEDIATOR_RUNTIME_BUILD_ID,
+    method: req.method,
+    engineVersion:
+      typeof bodyRecord?.engineVersion === 'string' ? bodyRecord.engineVersion : null,
+  });
 
   const result = await handleMediatorRuntimeTurn(body, { env: readEdgeEnv() });
 

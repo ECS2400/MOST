@@ -7,31 +7,32 @@ import type {
   LiveQuestionPhase,
   LiveSessionFlow,
   LiveSessionStage,
-} from '@/services/liveMediation';
+} from '@/services/liveMediation.types';
 import type { RuntimeSession } from '@/types/mediator/runtimeSession';
 
-import { RUNTIME_UNAVAILABLE_SESSION_FLOW } from '@/services/mediatorRuntimeClient/runtimeUnavailableRecoveryFlow';
 
 const LIVE_QUESTIONS_TARGET = 15;
+
+const RUNTIME_UNAVAILABLE_SESSION_FLOW: LiveSessionFlow = {
+  stage: 'questions',
+  questionNumber: 0,
+  maxQuestions: 0,
+  questionPhase: 'opening',
+  extensionActive: false,
+};
 const LIVE_EXTENSION_QUESTIONS = 5;
 
 export interface ResolveRuntimeSessionFlowParams {
   runtimeSession: RuntimeSession | null | undefined;
-  /** Precomputed legacy flow — prefer {@link getLegacySessionFlow} for lazy fallback. */
-  legacySessionFlow?: LiveSessionFlow;
-  /** Invoked only when legacy fallback is required. */
-  getLegacySessionFlow?: () => LiveSessionFlow;
   runtimeFailed?: boolean;
   invalidRuntimeState?: boolean;
-  /** Test/migration diagnostics only — production live mediation must keep false. */
-  allowLegacyFallback?: boolean;
   /** Question count for runtime-only mapping (e.g. from computeLiveTurnState). */
   questionNumberHint?: number;
 }
 
 export interface RuntimeSessionFlowResolution {
   flow: LiveSessionFlow;
-  source: 'runtime' | 'legacy_fallback' | 'runtime_unavailable';
+  source: 'runtime_available' | 'runtime_unavailable';
   reason: RuntimeActionExecutionReason;
 }
 
@@ -49,8 +50,7 @@ function deriveExtensionActive(runtimeSession: RuntimeSession): boolean {
 
 function mapRuntimeQuestionPhase(
   runtimeSession: RuntimeSession,
-  extensionActive: boolean,
-  legacyQuestionPhase?: LiveQuestionPhase
+  extensionActive: boolean
 ): LiveQuestionPhase {
   if (extensionActive) {
     return 'extension';
@@ -80,9 +80,6 @@ function mapRuntimeQuestionPhase(
     session.currentGoal === 'EMOTION_NAMING' ||
     session.currentGoal === 'PERSPECTIVE_SHARING'
   ) {
-    if (legacyQuestionPhase) {
-      return legacyQuestionPhase === 'deepening' ? 'deepening' : 'opening';
-    }
     if (
       session.currentGoal === 'PERSPECTIVE_SHARING' ||
       session.stage === 'story_collection'
@@ -90,10 +87,6 @@ function mapRuntimeQuestionPhase(
       return 'deepening';
     }
     return 'opening';
-  }
-
-  if (legacyQuestionPhase) {
-    return legacyQuestionPhase === 'opening' ? 'deepening' : legacyQuestionPhase;
   }
 
   return 'deepening';
@@ -159,37 +152,21 @@ function mapRuntimeStage(runtimeSession: RuntimeSession): LiveSessionStage {
   return 'questions';
 }
 
-function resolveLegacySessionFlow(params: ResolveRuntimeSessionFlowParams): LiveSessionFlow {
-  if (params.legacySessionFlow) {
-    return params.legacySessionFlow;
-  }
-  if (params.getLegacySessionFlow) {
-    return params.getLegacySessionFlow();
-  }
-  throw new Error('resolveRuntimeSessionFlow: legacy session flow required for fallback');
-}
-
 function mapRuntimeSessionToLiveSessionFlow(
   runtimeSession: RuntimeSession,
   options: {
     questionNumberHint?: number;
-    legacy?: LiveSessionFlow;
   } = {}
 ): LiveSessionFlow {
   const extensionActive = deriveExtensionActive(runtimeSession);
   const stage = mapRuntimeStage(runtimeSession);
-  const questionPhase = mapRuntimeQuestionPhase(
-    runtimeSession,
-    extensionActive,
-    options.legacy?.questionPhase
-  );
+  const questionPhase = mapRuntimeQuestionPhase(runtimeSession, extensionActive);
 
   const maxQuestions = extensionActive
     ? LIVE_QUESTIONS_TARGET + LIVE_EXTENSION_QUESTIONS
-    : options.legacy?.maxQuestions ?? LIVE_QUESTIONS_TARGET;
+    : LIVE_QUESTIONS_TARGET;
 
-  const questionNumber =
-    options.questionNumberHint ?? options.legacy?.questionNumber ?? 0;
+  const questionNumber = options.questionNumberHint ?? 0;
 
   return {
     stage,
@@ -200,9 +177,7 @@ function mapRuntimeSessionToLiveSessionFlow(
   };
 }
 
-/**
- * Resolves live session flow from runtimeSession with legacy computeLiveSessionFlow fallback.
- */
+/** Resolves live session flow from runtimeSession only. */
 export function resolveRuntimeSessionFlow(
   params: ResolveRuntimeSessionFlowParams
 ): RuntimeSessionFlowResolution {
@@ -210,16 +185,7 @@ export function resolveRuntimeSessionFlow(
     runtimeSession: params.runtimeSession,
     runtimeFailed: params.runtimeFailed,
     invalidRuntimeState: params.invalidRuntimeState,
-    allowLegacyFallback: params.allowLegacyFallback,
   });
-
-  if (execution.useLegacyFallback) {
-    return {
-      flow: resolveLegacySessionFlow(params),
-      source: 'legacy_fallback',
-      reason: execution.reason,
-    };
-  }
 
   if (execution.runtimeUnavailable || !hasRuntimeSession(params.runtimeSession)) {
     return {
@@ -233,7 +199,7 @@ export function resolveRuntimeSessionFlow(
     flow: mapRuntimeSessionToLiveSessionFlow(params.runtimeSession, {
       questionNumberHint: params.questionNumberHint,
     }),
-    source: 'runtime',
+    source: 'runtime_available',
     reason: 'runtime_available',
   };
 }

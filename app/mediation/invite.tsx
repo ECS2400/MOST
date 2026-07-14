@@ -124,7 +124,7 @@ export default function MediationInviteScreen() {
         setActionMsg(lm.invite.codeGeneratedLocal);
       }
 
-      if (isConnected && partner?.id) {
+      if (isConnected && partner?.id && partner.id !== user.id) {
         try {
           await linkPartnerToMediation(mediationId, user.id, partner.id, couple?.id);
         } catch {
@@ -229,7 +229,7 @@ export default function MediationInviteScreen() {
   }
 
   async function handleSendInApp() {
-    if (!isConnected || !partner || !user || !mediationId) {
+    if (!user || !isConnected || !partner || partner.id === user.id || !mediationId) {
       Alert.alert(lm.invite.noConnectionTitle, lm.invite.noConnectionBody, [{ text: 'OK' }]);
       return;
     }

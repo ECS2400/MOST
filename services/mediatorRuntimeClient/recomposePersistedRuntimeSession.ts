@@ -12,7 +12,7 @@ import type { Intervention, MediationState, SessionMemory } from '@/types/mediat
 import type { RuntimeSession } from '@/types/mediator/runtimeSession';
 
 function resolveTurnNumber(state: MediationState, sessionMemory: SessionMemory): number {
-  const fromState = state.meta?.turnNumber;
+  const fromState = state.meta.currentTurnNumber;
   if (typeof fromState === 'number' && fromState > 0) {
     return fromState;
   }

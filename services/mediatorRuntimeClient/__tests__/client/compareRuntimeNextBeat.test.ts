@@ -5,7 +5,7 @@ import {
   compareRuntimeNextBeat,
   mapLegacyGenerateModeToIntent,
   mapRuntimeNextBeatToIntent,
-} from '@/services/mediatorRuntimeClient/compareRuntimeNextBeat';
+} from '@/tests/runtimeComparison/compareRuntimeNextBeat';
 
 describe('mapLegacyGenerateModeToIntent', () => {
   it('maps all MediatorMode values returned by resolveGenerateMode', () => {

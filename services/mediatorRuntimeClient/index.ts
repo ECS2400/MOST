@@ -8,7 +8,6 @@ export type { RuntimeClientEventAction } from '@/services/mediatorRuntimeClient/
 
 export {
   callMediatorRuntime,
-  callMediatorRuntimeForLiveFlow,
 } from '@/services/mediatorRuntimeClient/mediatorRuntimeClient';
 export type {
   MediatorRuntimeClientOptions,
@@ -96,15 +95,14 @@ export {
 export type {
   RuntimeWaitingDisplay,
   RuntimeWaitingDisplayKind,
+  RuntimeWaitingDisplaySource,
 } from '@/services/mediatorRuntimeClient/resolveRuntimeSessionWaitingDisplay';
 
 export {
   canSubmitLiveMessage,
-  computeLegacyInputVisible,
   resolveRuntimeInputState,
 } from '@/services/mediatorRuntimeClient/resolveRuntimeSessionInputState';
 export type {
-  LegacyInputVisibilityInput,
   ResolveRuntimeInputStateParams,
   RuntimeInputState,
   RuntimeInputVisibilityReason,
@@ -127,58 +125,14 @@ export type {
 } from '@/services/mediatorRuntimeClient/resolveRuntimeGenerationFlow';
 
 export {
-  resolveRuntimeGenerationMode,
-  logRuntimeGenerationModeResolution,
-  mapRuntimeBeatToLegacyMode,
-} from '@/services/mediatorRuntimeClient/resolveRuntimeGenerationMode';
-export type {
-  ResolveRuntimeGenerationModeParams,
-  RuntimeGenerationModeReason,
-  RuntimeGenerationModeResolution,
-  RuntimeGenerationModeSource,
-} from '@/services/mediatorRuntimeClient/resolveRuntimeGenerationMode';
-
-export {
-  compareRuntimeNextBeat,
-  logLiveGenerationIntentComparison,
-  mapLegacyGenerateModeToIntent,
-  mapRuntimeNextBeatToIntent,
-} from '@/services/mediatorRuntimeClient/compareRuntimeNextBeat';
-export type {
-  CompareRuntimeNextBeatParams,
-  GenerationIntentMismatchReason,
-  LiveGenerationIntent,
-  LiveGenerationIntentComparison,
-} from '@/services/mediatorRuntimeClient/compareRuntimeNextBeat';
-
-export {
-  compareLiveDecisionPanels,
-  logLiveDecisionPanelComparison,
-  resolveRuntimeLiveDecisionPanelKind,
-} from '@/services/mediatorRuntimeClient/compareLiveDecisionPanels';
-export type {
-  DecisionPanelMismatchReason,
-  LiveDecisionPanelComparison,
-} from '@/services/mediatorRuntimeClient/compareLiveDecisionPanels';
-
-export {
   resolveRuntimeDecisionPanelVisibility,
 } from '@/services/mediatorRuntimeClient/resolveRuntimeDecisionPanelVisibility';
 export type {
   DecisionPanelKind,
-  LegacyDecisionPanelVisibilityInput,
   ResolveRuntimeDecisionPanelVisibilityParams,
+  RuntimeDecisionPanelSource,
   RuntimeDecisionPanelVisibility,
 } from '@/services/mediatorRuntimeClient/resolveRuntimeDecisionPanelVisibility';
-
-export {
-  resolveLegacyLiveDecisionPanelState,
-} from '@/services/mediatorRuntimeClient/resolveLegacyLiveDecisionPanel';
-export type {
-  LiveDecisionPanelKind,
-  LiveLegacyDecisionPanelInput,
-  LiveLegacyDecisionPanelState,
-} from '@/services/mediatorRuntimeClient/resolveLegacyLiveDecisionPanel';
 
 export {
   mapRuntimeClosureNavigationOutcome,
@@ -191,13 +145,13 @@ export type {
   MediationDbStatus,
   ResolveRuntimeClosureActionParams,
   RuntimeClosureAction,
+  RuntimeClosureSource,
 } from '@/services/mediatorRuntimeClient/resolveRuntimeClosureAction';
 
 export {
   canExecuteRuntimeClientAction,
   planLiveRuntimeClientAction,
   resolveRuntimeActionExecution,
-  shouldUseLegacyClosureFallback,
 } from '@/services/mediatorRuntimeClient/resolveRuntimeActionExecution';
 export type {
   LiveRuntimeClientActionKind,
@@ -222,17 +176,6 @@ export type {
   ResolveRuntimeSessionFlowParams,
   RuntimeSessionFlowResolution,
 } from '@/services/mediatorRuntimeClient/resolveRuntimeSessionFlow';
-
-export {
-  buildLegacyGenerateMode,
-  buildLegacySessionFlow,
-  shouldUseLegacyLiveFallback,
-} from '@/services/mediatorRuntimeClient/buildLegacyLiveFallback';
-export type {
-  LegacyGenerateModeContext,
-  LegacyLiveFallbackContext,
-  LegacyLiveFallbackGate,
-} from '@/services/mediatorRuntimeClient/buildLegacyLiveFallback';
 
 export {
   buildBootstrapMediationStateFromContext,
