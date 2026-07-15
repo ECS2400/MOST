@@ -14,6 +14,7 @@ export default function MediationLayout() {
       <Stack.Screen name="invite" />
       <Stack.Screen name="join" />
       <Stack.Screen name="partner-perspective" />
+      <Stack.Screen name="session" />
       <Stack.Screen name="live" />
       <Stack.Screen name="closure" />
       <Stack.Screen name="summary" />

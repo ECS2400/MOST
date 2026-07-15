@@ -219,6 +219,22 @@ export function withAgreementFromFirstDeal(
   return next;
 }
 
+/**
+ * Public END agreement slice from session_payload.agreement.
+ * Returns null when contract invariant fails (missing / bad source / non-string text).
+ * Does not expose acceptance or createdAt.
+ */
+export function readPublicEndAgreement(
+  payload: Record<string, unknown>
+): { source: 'FIRST_DEAL' | 'COMPROMISE'; text: string } | null {
+  const agreement = asRecord(payload.agreement);
+  if (!agreement) return null;
+  const source = agreement.source;
+  if (source !== 'FIRST_DEAL' && source !== 'COMPROMISE') return null;
+  if (typeof agreement.text !== 'string') return null;
+  return { source, text: agreement.text };
+}
+
 export function setConfirmation(
   payload: Record<string, unknown>,
   screen: 'SUMMARY' | 'COMPROMISE' | 'LESSON' | 'DATE',

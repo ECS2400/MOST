@@ -108,7 +108,7 @@ export default function MediationInviteScreen() {
 
         if (data?.status === 'live') {
           router.replace({
-            pathname: '/mediation/live',
+            pathname: '/mediation/session',
             params: { mediationId },
           });
           return;
@@ -179,7 +179,7 @@ export default function MediationInviteScreen() {
           }
           if (isPartnerView && row.status === 'live') {
             router.replace({
-              pathname: '/mediation/live',
+              pathname: '/mediation/session',
               params: { mediationId },
             });
           }
@@ -260,7 +260,7 @@ export default function MediationInviteScreen() {
 
       await startLiveMediation(mediationId, user.id);
       router.replace({
-        pathname: '/mediation/live',
+        pathname: '/mediation/session',
         params: { mediationId },
       });
     } catch (e: unknown) {

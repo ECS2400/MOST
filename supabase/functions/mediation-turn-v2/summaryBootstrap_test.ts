@@ -291,6 +291,158 @@ Deno.test('buildEnvelope SUMMARY has CONTINUE action', () => {
   assertEquals(envelope.actions[0]?.type, 'CONTINUE');
 });
 
+Deno.test('buildEnvelope END with FIRST_DEAL agreement', () => {
+  const envelope = buildEnvelope({
+    session: baseSession({
+      current_screen: 'END',
+      generation_status: 'IDLE',
+      session_payload: {
+        ...baseSession().session_payload,
+        agreement: {
+          source: 'FIRST_DEAL',
+          acceptance: 'ACCEPTED_BY_BOTH',
+          text: 'Spacer co wieczór',
+          createdAt: '2026-07-15T10:00:00.000Z',
+        },
+      },
+    }),
+    talker: 'HOST',
+    correlationId: '00000000-0000-4000-8000-000000000099',
+  });
+  assertEquals(envelope.screen, 'END');
+  assertEquals(
+    (envelope.content.agreement as { source: string; text: string }).source,
+    'FIRST_DEAL'
+  );
+  assertEquals(
+    (envelope.content.agreement as { source: string; text: string }).text,
+    'Spacer co wieczór'
+  );
+  assertEquals(typeof envelope.content.closingMessage, 'string');
+  assertEquals(envelope.actions[0]?.type, 'CLOSE');
+  // Public slice only — no acceptance / createdAt / full payload keys
+  assertEquals(
+    Object.keys(envelope.content.agreement as object).sort().join(','),
+    'source,text'
+  );
+  assertEquals(envelope.content.confirmations, undefined);
+  assertEquals(envelope.content.firstDeal, undefined);
+  assertEquals(envelope.content.easyChoices, undefined);
+});
+
+Deno.test('buildEnvelope END with COMPROMISE agreement', () => {
+  const envelope = buildEnvelope({
+    session: baseSession({
+      current_screen: 'END',
+      progress_total: 7,
+      generation_status: 'IDLE',
+      session_payload: {
+        ...baseSession().session_payload,
+        agreement: {
+          source: 'COMPROMISE',
+          acceptance: 'GENERATED_FINAL',
+          text: 'Podział budżetu 60/40',
+          createdAt: '2026-07-15T11:00:00.000Z',
+        },
+      },
+    }),
+    talker: 'PARTNER',
+    correlationId: '00000000-0000-4000-8000-000000000099',
+  });
+  assertEquals(envelope.screen, 'END');
+  assertEquals(
+    (envelope.content.agreement as { source: string; text: string }).source,
+    'COMPROMISE'
+  );
+  assertEquals(
+    (envelope.content.agreement as { source: string; text: string }).text,
+    'Podział budżetu 60/40'
+  );
+  assertEquals(
+    Object.keys(envelope.content.agreement as object).sort().join(','),
+    'source,text'
+  );
+});
+
+Deno.test('buildEnvelope END without agreement throws UNSUPPORTED_SESSION_STATE', () => {
+  try {
+    buildEnvelope({
+      session: baseSession({
+        current_screen: 'END',
+        generation_status: 'IDLE',
+      }),
+      talker: 'HOST',
+      correlationId: '00000000-0000-4000-8000-000000000099',
+    });
+    throw new Error('Expected AppError');
+  } catch (error) {
+    if (!(error instanceof AppError)) throw error;
+    assertEquals(error.publicCode, 'UNSUPPORTED_SESSION_STATE');
+    assertEquals(error.stage, 'end_agreement_missing');
+  }
+});
+
+Deno.test('buildEnvelope END with invalid agreement source throws', () => {
+  try {
+    buildEnvelope({
+      session: baseSession({
+        current_screen: 'END',
+        generation_status: 'IDLE',
+        session_payload: {
+          ...baseSession().session_payload,
+          agreement: {
+            source: 'LESSON',
+            acceptance: 'ACCEPTED_BY_BOTH',
+            text: 'Nie powinno przejść',
+            createdAt: '2026-07-15T10:00:00.000Z',
+          },
+        },
+      }),
+      talker: 'HOST',
+      correlationId: '00000000-0000-4000-8000-000000000099',
+    });
+    throw new Error('Expected AppError');
+  } catch (error) {
+    if (!(error instanceof AppError)) throw error;
+    assertEquals(error.publicCode, 'UNSUPPORTED_SESSION_STATE');
+  }
+});
+
+Deno.test('buildEnvelope END public content does not leak full payload', () => {
+  const envelope = buildEnvelope({
+    session: baseSession({
+      current_screen: 'END',
+      generation_status: 'IDLE',
+      session_payload: {
+        ...baseSession().session_payload,
+        summary: 'sekretne podsumowanie',
+        firstDeal: { dealText: 'tajne' },
+        compromise: { dealText: 'tajne2', whyItFitsBoth: 'x' },
+        lesson: { observation: 'o', lesson: 'l' },
+        date: { dateIdea: 'd', scenario: ['a'] },
+        agreement: {
+          source: 'FIRST_DEAL',
+          acceptance: 'ACCEPTED_BY_BOTH',
+          text: 'Jawne ustalenie',
+          createdAt: '2026-07-15T10:00:00.000Z',
+        },
+      },
+    }),
+    talker: 'HOST',
+    correlationId: '00000000-0000-4000-8000-000000000099',
+  });
+  const keys = Object.keys(envelope.content).sort();
+  assertEquals(keys.join(','), 'agreement,closingMessage');
+  assertEquals(
+    Object.keys(envelope.content.agreement as object).sort().join(','),
+    'source,text'
+  );
+  assertEquals(
+    (envelope.content.agreement as { text: string }).text,
+    'Jawne ustalenie'
+  );
+});
+
 Deno.test('parseStartGenerationResult CLAIMED / ALREADY_CLAIMED / COMPLETED', () => {
   const sessionRow = {
     session_id: '00000000-0000-4000-8000-000000000001',

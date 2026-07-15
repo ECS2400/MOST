@@ -227,7 +227,7 @@ export function partnerInviteRoute(invite: PartnerMediationInvite): {
         params: { mediationId: invite.id },
       };
     }
-    return { pathname: '/mediation/live', params: { mediationId: invite.id } };
+    return { pathname: '/mediation/session', params: { mediationId: invite.id } };
   }
 
   if (invite.hasPartnerAnalysis) {

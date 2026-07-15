@@ -129,7 +129,7 @@ export function mediationHistoryRoute(
     case 'inviting':
       return { pathname: '/mediation/invite', params: { mediationId } };
     case 'live':
-      return { pathname: '/mediation/live', params: { mediationId } };
+      return { pathname: '/mediation/session', params: { mediationId } };
     case 'resolved':
     case 'pending_agreements':
       return { pathname: '/mediation/summary', params: { mediationId } };

@@ -54,7 +54,7 @@ export default function MediationJoinScreen() {
 
       if (result.status === 'live' && result.partnerJoined) {
         router.replace({
-          pathname: '/mediation/live',
+          pathname: '/mediation/session',
           params: { mediationId: result.mediationId },
         });
         return;

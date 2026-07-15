@@ -1,9 +1,11 @@
+import { AppError } from './errors.ts';
 import {
   getEasyChoiceAnswer,
   getFirstDealVote,
   isConfirmed,
   readCurrentRound,
   readEasyChoicesRounds,
+  readPublicEndAgreement,
   readSummaryText,
 } from './payload.ts';
 import type {
@@ -260,8 +262,17 @@ export function buildEnvelope(input: {
       },
     ];
   } else if (screen === 'END') {
+    const agreement = readPublicEndAgreement(payload);
+    if (!agreement) {
+      throw new AppError(
+        'UNSUPPORTED_SESSION_STATE',
+        422,
+        'end_agreement_missing'
+      );
+    }
     content = {
       closingMessage: 'Dziękujemy — możecie wrócić do aplikacji.',
+      agreement,
     };
     actions = [
       {

@@ -431,7 +431,7 @@ export default function MediationAnalysisScreen() {
 
       if (data?.status === 'live') {
         router.replace({
-          pathname: '/mediation/live',
+          pathname: '/mediation/session',
           params: { mediationId: rowId || mediationId || '' },
         });
         return;
