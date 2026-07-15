@@ -524,14 +524,14 @@ Zasada Runtime V2: **1 ekran generowany = 1 Claude call = 1 generation_kind**.
 | 4 | COMPROMISE | **0 lub 1** | **1** | **0** |
 | 5 | LESSON | **1** | 1 | 1 |
 | 6 | DATE | **1** | 1 | 1 |
-| **Razem** | | **max 6** | 1+1+1+1+1+1 = **6** | 1+1+1+0+1+1 = **5** |
+| **Razem** | | **happy max 6** | 1+1+1+1+1+1 = **6** | 1+1+1+0+1+1 = **5** |
 
 | Reguła | Wartość |
 |--------|---------|
-| Hard maximum | **6** / sesję |
+| Hard maximum | **7** / sesję (6 happy COMPROMISE + 1 techniczny RETRY) |
 | Reclaim po lease expiry | Nowe `CLAIMED` → +1 do budżetu |
 | Retry stylistyczny | **Zabroniony** |
-| RETRY klienta po FAILED | Nowe `CLAIMED` → wlicza się w hard max 6; **nie** tworzy nowego ekranu produktowego |
+| RETRY klienta po FAILED | Nowe `CLAIMED` → wlicza się w hard max 7; **nie** tworzy nowego ekranu produktowego |
 
 ---
 

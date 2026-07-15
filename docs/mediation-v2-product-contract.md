@@ -700,11 +700,11 @@ Błąd sieci / parsera po `CLAIMED` **nie cofa** licznika — call został rozpo
 
 ### Hard maximum
 
-- **6 wywołań** na pełną sesję (ścieżka COMPROMISE).
-- Ścieżka YES+YES zużywa **5**.
+- **7 rozpoczętych wywołań** hard max (ścieżka COMPROMISE = 6 + 1 zapas techniczny RETRY).
+- Ścieżka YES+YES zużywa **5**; z jednym RETRY → max **6**.
 - **Brak retry stylistycznego.**
 - Reclaim po wygaśnięciu lease = nowe `CLAIMED` = kolejne rozpoczęcie Claude (zużywa budżet ponownie).
-- Techniczny RETRY klienta po `FAILED` = nowe `CLAIMED` i wlicza się w hard max 6.
+- Techniczny RETRY klienta po `FAILED` = nowe `CLAIMED` i wlicza się w hard max 7.
 
 Więcej wywołań wymaga uzasadnienia w PR i aktualizacji tej sekcji.
 
@@ -820,7 +820,7 @@ Backend (`mediation-turn-v2` — jedyna Edge Function runtime mediacji) odpowiad
 | Limity | `session_version`, paywall |
 | Idempotencja | `requestId` + `session_version` + deduplikacja commitów |
 | Historia | Exclusion history per couple_id/category/type (max 50/kubełek) |
-| LLM | Wywołanie modelu (max 6/sesję), przekazanie exclusion context |
+| LLM | Wywołanie modelu (max 7/sesję), przekazanie exclusion context |
 | Walidacja | Struktura JSON odpowiedzi LLM (schema, nie styl) |
 | Persystencja | Atomowe RPC, np. `commit_mediation_action` — **nie** legacy `commit_mediation_turn` |
 
@@ -887,7 +887,7 @@ mediation-turn-v2 (Edge Function)
         ↓
   [atomowy commit_mediation_action]  ← bez LLM
         ↓
-  [optional: LLM call poza transakcją + JSON schema validate]  (max 6/session)
+  [optional: LLM call poza transakcją + JSON schema validate]  (max 7/session)
         ↓
   [atomowy commit_mediation_action]  ← zapis treści, agreement, screen
         ↓
@@ -1000,7 +1000,7 @@ Projekt uznajemy za **zakończony**, gdy spełnione są **wszystkie** poniższe:
 | 11 | Repo i produkcja zawierają **ten sam zestaw** Edge Functions |
 | 12 | Testy i typecheck przechodzą |
 | 13 | Cleanup wykonany i zweryfikowany (audit repo vs Supabase) |
-| 14 | Budżet LLM: max 6 wywołań/sesję (YES+YES = 5), 1 ekran = 1 call, bez retry stylistycznego |
+| 14 | Budżet LLM: max 7 wywołań/sesję (YES+YES = 5, COMPROMISE = 6, +1 RETRY), 1 ekran = 1 call |
 
 ---
 

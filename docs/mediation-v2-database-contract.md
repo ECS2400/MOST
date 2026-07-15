@@ -24,7 +24,7 @@ Mutacje **wyłącznie** przez `service_role` RPC (`SECURITY DEFINER`). Uczestnic
 | 2 | **`session_id`** = PK i **`sessionId`** w API (Product Contract §9, API Contract §2) |
 | 3 | **`couple_id` + `conflict_category`** zapisane w wierszu sesji przy utworzeniu (Product Contract §9.1 — **opcja A**) |
 | 4 | **Brak chatu** — zero tabel/wierszy na dowolny tekst użytkownika |
-| 5 | **Max 6 wywołań LLM / sesję** — `session_payload.metadata.llmCallCount` = liczba **rozpoczętych** Claude calls; +1 wyłącznie przy claim outcome `CLAIMED` (w tym reclaim) |
+| 5 | **Max 7 wywołań LLM / sesję** — `session_payload.metadata.llmCallCount` = liczba **rozpoczętych** Claude calls; +1 wyłącznie przy claim/start outcome `CLAIMED` (w tym reclaim); hard max 7 = COMPROMISE 6 + 1 RETRY |
 | 6 | **LLM poza transakcją SQL** — RPC Commit 1 / Commit 2 (Product Contract §5, §7) |
 | 7 | **Idempotencja** — `(session_id, request_id)` w osobnej tabeli |
 | 8 | **`mediations`** (intake) pozostaje tabelą SHARED; legacy JSONB runtime zostanie usunięte po cutover (Architecture Alignment §6) |
@@ -190,7 +190,7 @@ Mapa ekranów wymagających sync obojga uczestników:
 
 | Podpole | Typ | Opis |
 |---------|-----|------|
-| `llmCallCount` | `integer` | Liczba **rozpoczętych** wywołań Claude (max **6**). +1 wyłącznie przy claim `CLAIMED` (w tym reclaim). Nie cofany przy fail sieci/parsera. |
+| `llmCallCount` | `integer` | Liczba **rozpoczętych** wywołań Claude (max **7**). +1 wyłącznie przy claim/start `CLAIMED` (w tym reclaim). Nie cofany przy fail sieci/parsera. |
 | `lastFailedAt` | `string (ISO) \| null` | Timestamp ostatniego `generation_status = FAILED` |
 
 **Nie duplikować w payload:** `lastGenerationKind` — autorytatywne jest `mediation_sessions.last_generation_kind` (kolumna).
@@ -397,7 +397,7 @@ Wszystkie w schemacie `public`. Legacy `mediation_macro_state` (031) **zostanie 
 | `easyChoices.currentRound` | `0`–`5` |
 | `firstDealVotes.*` | `null` lub enum `mediation_vote` |
 | `agreement` | Zgodność `source` + `acceptance` (§4.3) |
-| `metadata.llmCallCount` | `0`–`6` |
+| `metadata.llmCallCount` | `0`–`7` |
 
 ### 10.3 `used_content_logs`
 
@@ -518,7 +518,17 @@ Interfejsy **bez implementacji SQL**. Wszystkie mutujące: **jedna transakcja** 
 | **Input** | `p_session_id`, `p_request_id`, `p_expected_session_version`, `p_talker mediation_talker`, `p_screen mediation_screen`, `p_confirmation_key text` (`SUMMARY`\|`LESSON`\|`COMPROMISE`) |
 | **Output** | Zaktualizowany wiersz + `session_version` |
 | **Transakcja** | Atomowa: idempotencja → lock → potwierdzenie → ewentualne przejście `macro_state` → increment version |
-| **Semantyka** | API `CONTINUE` (Product Contract §10.3) |
+| **Semantyka** | API `CONTINUE` (Product Contract §10.3) — **Case A** (bez generacji) |
+
+### 13.3b `start_mediation_generation` (040)
+
+| Aspekt | Wartość |
+|--------|---------|
+| **Input** | `p_session_id`, `p_request_id`, `p_expected_session_version`, `p_expected_screen`, `p_next_screen`, `p_session_payload`, `p_generation_status` (`GENERATING_*`), `p_generation_kind`, `p_progress_total` |
+| **Output** | `{ outcome, claimToken?, session?, response? }` — `CLAIMED \| ALREADY_CLAIMED \| IN_PROGRESS \| ALREADY_COMPLETED` |
+| **Transakcja** | Atomowa: kickoff (głosy/confirmations/status) + claim + `llmCallCount+1` pod **tym samym** client `requestId` |
+| **Idempotency** | **Nie** zapisuje `mediation_session_idempotency`; final response dopiero w `commit_claimed_mediation_generation` lub fail commit |
+| **Version** | Fresh kickoff: `session_version +1` raz; finalize oczekuje wersji **po** kickoffie |
 
 ### 13.4 `commit_mediation_vote`
 
@@ -545,7 +555,7 @@ Interfejsy **bez implementacji SQL**. Wszystkie mutujące: **jedna transakcja** 
 | **Output** | Wiersz |
 | **Transakcja** | Atomowa per faza |
 | **START** | Ustaw `generation_status` → `GENERATING_*` |
-| **COMPLETE** | Merge patch do `session_payload`, `generation_status = IDLE`, opcjonalnie `macro_state`, INSERT `used_content_logs` + purge 50. **Uwaga Runtime V2:** `llmCallCount` inkrementuje `claim_mediation_generation` przy `CLAIMED`, nie COMPLETE. |
+| COMPLETE | Merge patch do `session_payload`, `generation_status = IDLE`, opcjonalnie `macro_state`, INSERT `used_content_logs` + purge 50. **Uwaga Runtime V2:** `llmCallCount` inkrementuje `claim_mediation_generation` / `start_mediation_generation` przy `CLAIMED`, nie COMPLETE. |
 
 **LLM wykonywany przez Edge między START a COMPLETE** — poza transakcją.
 

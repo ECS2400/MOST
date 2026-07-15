@@ -36,6 +36,8 @@ const RPC_CODE_MAP: Array<{
   { match: 'SESSION_NOT_FOUND', publicCode: 'INTERNAL_ERROR', httpStatus: 500 },
   { match: 'SESSION_VERSION_CONFLICT', publicCode: 'SESSION_VERSION_CONFLICT', httpStatus: 409 },
   { match: 'INVALID_TRANSITION', publicCode: 'INVALID_TRANSITION', httpStatus: 409 },
+  { match: 'DUPLICATE_ACTION', publicCode: 'DUPLICATE_ACTION', httpStatus: 409 },
+  { match: 'REQUEST_ID_ALREADY_USED', publicCode: 'INVALID_TRANSITION', httpStatus: 409 },
   { match: 'INVALID_CONFLICT_CATEGORY', publicCode: 'CONFLICT_CATEGORY_MISSING', httpStatus: 422 },
   { match: 'HOST_PARTNER_MUST_DIFFER', publicCode: 'PARTNER_NOT_READY', httpStatus: 409 },
   { match: 'INVALID_GENERATION_STATUS', publicCode: 'INVALID_TRANSITION', httpStatus: 409 },

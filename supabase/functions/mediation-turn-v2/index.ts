@@ -1,42 +1,41 @@
 /**
- * mediation-turn-v2 — SUMMARY + EASY_CHOICES (one screen = one Claude call).
+ * mediation-turn-v2 — full closed flow SUMMARY → … → END
  *
- * Vertical slice:
- * POST → Auth → mediations → create/load mediation_session
- * → claim → Anthropic (single screen) → finalize → public envelope
+ * Pipelines:
+ * - content: claim → Claude → finalize (bootstrap / LOAD resume)
+ * - user action (Case A): deterministic transition → commit_mediation_action
+ * - generation kickoff (Case B / RETRY): start_mediation_generation (same client requestId)
+ *   → Claude → finalize
  */
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import {
-  buildEasyChoicesResponse,
-  classifyEasyChoicesBootstrap,
-  isPublicEasyChoicesResponse,
-  readEasyChoicesCurrentRound,
-  withEasyChoicesRoundsOnPayload,
-} from './easyChoicesBootstrap.ts';
+  buildEnvelope,
+  isPublicEnvelope,
+  processingEnvelope,
+} from './envelope.ts';
 import { AppError, logStageError, mapRpcErrorMessage } from './errors.ts';
-import { parseBootstrapRequest } from './request.ts';
 import {
-  buildSummaryResponse,
-  classifySummaryBootstrap,
-  isPublicSummaryResponse,
-  readSummaryText,
-  withSummaryOnPayload,
-} from './summaryBootstrap.ts';
+  asSessionRow,
+  runClaimedGeneration,
+  runGenerationPipeline,
+  startMediationGeneration,
+} from './generation.ts';
+import { hasScreenContent } from './payload.ts';
+import { parseTurnRequest } from './request.ts';
 import {
-  generateEasyChoicesRounds,
-  generateSummaryText,
   SUMMARY_MODEL_VERSION,
   SUMMARY_PROMPT_VERSION,
 } from './summaryLlm.ts';
+import { applyUserTransition, retryTransition } from './transitions.ts';
 import type {
-  ClaimOutcome,
-  CommitClaimedResult,
-  EasyChoiceRound,
+  CommitActionResult,
+  GenerationKind,
   MediationRow,
   MediationSessionRow,
-  MediationTurnV2Response,
+  MediationTurnV2Envelope,
   PublicErrorCode,
+  Talker,
 } from './types.ts';
 
 const corsHeaders = {
@@ -44,9 +43,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers':
     'authorization, x-client-info, apikey, content-type',
 };
-
-const SUMMARY_GENERATION_KIND = 'SUMMARY';
-const EASY_CHOICES_GENERATION_KIND = 'EASY_CHOICES';
 
 const MEDIATION_SELECT = [
   'id',
@@ -84,70 +80,8 @@ function errorResponse(
   return jsonResponse({ error: publicCode }, httpStatus);
 }
 
-function asSessionRow(value: unknown): MediationSessionRow | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const row = value as Record<string, unknown>;
-  if (typeof row.session_id !== 'string') return null;
-  if (typeof row.session_version !== 'number') return null;
-  if (typeof row.current_screen !== 'string') return null;
-  if (typeof row.generation_status !== 'string') return null;
-  if (!row.session_payload || typeof row.session_payload !== 'object') {
-    return null;
-  }
-  return {
-    session_id: row.session_id,
-    mediation_id: String(row.mediation_id ?? ''),
-    couple_id: String(row.couple_id ?? ''),
-    host_user_id: String(row.host_user_id ?? ''),
-    partner_user_id:
-      typeof row.partner_user_id === 'string' ? row.partner_user_id : null,
-    conflict_category: String(row.conflict_category ?? ''),
-    session_payload: row.session_payload as Record<string, unknown>,
-    session_version: row.session_version,
-    current_screen: row.current_screen,
-    generation_status: row.generation_status,
-    last_generation_kind:
-      typeof row.last_generation_kind === 'string'
-        ? row.last_generation_kind
-        : null,
-    progress_total:
-      typeof row.progress_total === 'number' ? row.progress_total : 6,
-    prompt_version: String(row.prompt_version ?? ''),
-    model_version: String(row.model_version ?? ''),
-  };
-}
-
 function throwRpc(error: { message?: string } | null, stage: string): never {
   throw mapRpcErrorMessage(error?.message ?? 'UNKNOWN_RPC_ERROR', stage);
-}
-
-function parseClaimOutcome(value: unknown): ClaimOutcome {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new AppError('INTERNAL_ERROR', 500, 'claim_shape');
-  }
-  const row = value as Record<string, unknown>;
-  const outcome = row.outcome;
-
-  if (outcome === 'CLAIMED') {
-    if (typeof row.claimToken !== 'string' || row.claimToken.length === 0) {
-      throw new AppError('INTERNAL_ERROR', 500, 'claim_token_missing');
-    }
-    return { outcome: 'CLAIMED', claimToken: row.claimToken };
-  }
-
-  if (outcome === 'ALREADY_CLAIMED') {
-    return { outcome: 'ALREADY_CLAIMED' };
-  }
-
-  if (outcome === 'IN_PROGRESS') {
-    return { outcome: 'IN_PROGRESS' };
-  }
-
-  if (outcome === 'ALREADY_COMPLETED') {
-    return { outcome: 'ALREADY_COMPLETED', response: row.response };
-  }
-
-  throw new AppError('INTERNAL_ERROR', 500, 'claim_outcome');
 }
 
 async function loadMediation(
@@ -159,13 +93,8 @@ async function loadMediation(
     .select(MEDIATION_SELECT)
     .eq('id', mediationId)
     .maybeSingle();
-
-  if (error) {
-    throw new AppError('INTERNAL_ERROR', 500, 'load_mediation');
-  }
-  if (!data) {
-    throw new AppError('MEDIATION_NOT_FOUND', 404, 'load_mediation');
-  }
+  if (error) throw new AppError('INTERNAL_ERROR', 500, 'load_mediation');
+  if (!data) throw new AppError('MEDIATION_NOT_FOUND', 404, 'load_mediation');
   return data as unknown as MediationRow;
 }
 
@@ -173,6 +102,17 @@ function assertMembership(userId: string, mediation: MediationRow): void {
   if (userId === mediation.user_id) return;
   if (mediation.partner_id && userId === mediation.partner_id) return;
   throw new AppError('FORBIDDEN', 403, 'membership');
+}
+
+function assertSessionMembership(
+  userId: string,
+  session: MediationSessionRow
+): Talker {
+  if (userId === session.host_user_id) return 'HOST';
+  if (session.partner_user_id && userId === session.partner_user_id) {
+    return 'PARTNER';
+  }
+  throw new AppError('FORBIDDEN', 403, 'session_membership');
 }
 
 function requireConflictCategory(mediation: MediationRow): string {
@@ -210,10 +150,7 @@ async function findSessionIdByMediationId(
     .select('session_id')
     .eq('mediation_id', mediationId)
     .maybeSingle();
-
-  if (error) {
-    throw new AppError('INTERNAL_ERROR', 500, 'find_session');
-  }
+  if (error) throw new AppError('INTERNAL_ERROR', 500, 'find_session');
   if (!data || typeof data.session_id !== 'string') return null;
   return data.session_id;
 }
@@ -252,7 +189,6 @@ async function createSession(
     p_prompt_version: SUMMARY_PROMPT_VERSION,
     p_model_version: SUMMARY_MODEL_VERSION,
   });
-
   if (error) throwRpc(error, 'create_mediation_session');
   const row = asSessionRow(data);
   if (!row) {
@@ -261,298 +197,194 @@ async function createSession(
   return row;
 }
 
-async function claimGeneration(
+async function commitAction(
   admin: SupabaseClient,
   input: {
     session: MediationSessionRow;
     requestId: string;
-    generationKind: string;
-    expectedScreen: string;
-  }
-): Promise<ClaimOutcome> {
-  const { data, error } = await admin.rpc('claim_mediation_generation', {
-    p_session_id: input.session.session_id,
-    p_request_id: input.requestId,
-    p_generation_kind: input.generationKind,
-    p_expected_session_version: input.session.session_version,
-    p_expected_screen: input.expectedScreen,
-    p_expected_generation_status: input.session.generation_status,
-  });
-
-  if (error) throwRpc(error, 'claim_mediation_generation');
-  return parseClaimOutcome(data);
-}
-
-async function failGenerationClaim(
-  admin: SupabaseClient,
-  input: {
-    sessionId: string;
-    requestId: string;
-    claimToken: string;
-    generationKind: string;
-  }
-): Promise<void> {
-  const { error } = await admin.rpc('fail_mediation_generation_claim', {
-    p_session_id: input.sessionId,
-    p_request_id: input.requestId,
-    p_claim_token: input.claimToken,
-    p_generation_kind: input.generationKind,
-  });
-
-  if (error) {
-    console.error('[mediation-turn-v2]', {
-      publicCode: 'INTERNAL_ERROR',
-      stage: 'fail_mediation_generation_claim',
-      requestId: input.requestId,
-      rpcMessage: error.message ?? null,
-    });
-  }
-}
-
-async function finalizeClaimedGeneration(
-  admin: SupabaseClient,
-  input: {
-    session: MediationSessionRow;
-    requestId: string;
-    claimToken: string;
-    generationKind: string;
     expectedScreen: string;
     nextScreen: string;
     sessionPayload: Record<string, unknown>;
-    responsePayload: MediationTurnV2Response;
+    generationStatus: string;
+    lastGenerationKind: string;
+    progressTotal: number;
+    responsePayload: MediationTurnV2Envelope;
   }
-): Promise<MediationTurnV2Response> {
-  const { data, error } = await admin.rpc(
-    'commit_claimed_mediation_generation',
-    {
-      p_session_id: input.session.session_id,
-      p_request_id: input.requestId,
-      p_claim_token: input.claimToken,
-      p_generation_kind: input.generationKind,
-      p_expected_session_version: input.session.session_version,
-      p_expected_screen: input.expectedScreen,
-      p_next_screen: input.nextScreen,
-      p_session_payload: input.sessionPayload,
-      p_generation_status: 'IDLE',
-      p_last_generation_kind: input.generationKind,
-      p_progress_total: 6,
-      p_response_payload: input.responsePayload,
-    }
-  );
+): Promise<{ envelope: MediationTurnV2Envelope; session: MediationSessionRow }> {
+  const { data, error } = await admin.rpc('commit_mediation_action', {
+    p_session_id: input.session.session_id,
+    p_request_id: input.requestId,
+    p_expected_session_version: input.session.session_version,
+    p_expected_screen: input.expectedScreen,
+    p_next_screen: input.nextScreen,
+    p_session_payload: input.sessionPayload,
+    p_generation_status: input.generationStatus,
+    p_last_generation_kind: input.lastGenerationKind,
+    p_progress_total: input.progressTotal,
+    p_response_payload: input.responsePayload,
+  });
+  if (error) throwRpc(error, 'commit_mediation_action');
 
-  if (error) throwRpc(error, 'commit_claimed_mediation_generation');
-
-  const result = data as CommitClaimedResult;
+  const result = data as CommitActionResult;
   if (!result || typeof result !== 'object') {
-    throw new AppError('INTERNAL_ERROR', 500, 'commit_shape');
+    throw new AppError('INTERNAL_ERROR', 500, 'commit_action_shape');
   }
 
   if (result.replayed === true) {
-    if (
-      !isPublicSummaryResponse(result.response) &&
-      !isPublicEasyChoicesResponse(result.response)
-    ) {
-      throw new AppError('INTERNAL_ERROR', 500, 'commit_replay_shape');
-    }
-    return { ...result.response, replayed: true };
-  }
-
-  if (isPublicSummaryResponse(result.response)) {
-    return result.response;
-  }
-  if (isPublicEasyChoicesResponse(result.response)) {
-    return result.response;
-  }
-
-  return input.responsePayload;
-}
-
-function isPublicBootstrapResponse(
-  value: unknown
-): value is MediationTurnV2Response {
-  return (
-    isPublicSummaryResponse(value) || isPublicEasyChoicesResponse(value)
-  );
-}
-
-async function resolveLanguage(
-  admin: SupabaseClient,
-  hostUserId: string
-): Promise<string> {
-  const { data } = await admin
-    .from('profiles')
-    .select('preferred_language')
-    .eq('id', hostUserId)
-    .maybeSingle();
-
-  const lang =
-    data && typeof data.preferred_language === 'string'
-      ? data.preferred_language.trim()
-      : '';
-  return lang || 'pl';
-}
-
-async function runSummaryGeneration(input: {
-  admin: SupabaseClient;
-  session: MediationSessionRow;
-  mediation: MediationRow;
-  hostUserId: string;
-  requestId: string;
-  anthropicKey: string;
-  claimToken: string;
-}): Promise<MediationTurnV2Response> {
-  const language = await resolveLanguage(input.admin, input.hostUserId);
-
-  let summaryText: string;
-  try {
-    summaryText = await generateSummaryText({
-      mediation: input.mediation,
-      language,
-      apiKey: input.anthropicKey,
-    });
-  } catch (error) {
-    await failGenerationClaim(input.admin, {
-      sessionId: input.session.session_id,
-      requestId: input.requestId,
-      claimToken: input.claimToken,
-      generationKind: SUMMARY_GENERATION_KIND,
-    });
-    throw error;
-  }
-
-  const nextVersion = input.session.session_version + 1;
-  const responsePayload = buildSummaryResponse({
-    sessionId: input.session.session_id,
-    sessionVersion: nextVersion,
-    summaryText,
-    replayed: false,
-  });
-
-  return finalizeClaimedGeneration(input.admin, {
-    session: input.session,
-    requestId: input.requestId,
-    claimToken: input.claimToken,
-    generationKind: SUMMARY_GENERATION_KIND,
-    expectedScreen: 'SUMMARY',
-    nextScreen: 'SUMMARY',
-    sessionPayload: withSummaryOnPayload(
-      input.session.session_payload,
-      summaryText
-    ),
-    responsePayload,
-  });
-}
-
-async function runEasyChoicesGeneration(input: {
-  admin: SupabaseClient;
-  session: MediationSessionRow;
-  hostUserId: string;
-  requestId: string;
-  anthropicKey: string;
-  claimToken: string;
-}): Promise<MediationTurnV2Response> {
-  const language = await resolveLanguage(input.admin, input.hostUserId);
-  const summaryText = readSummaryText(input.session.session_payload);
-  if (summaryText === null) {
-    await failGenerationClaim(input.admin, {
-      sessionId: input.session.session_id,
-      requestId: input.requestId,
-      claimToken: input.claimToken,
-      generationKind: EASY_CHOICES_GENERATION_KIND,
-    });
-    throw new AppError(
-      'UNSUPPORTED_SESSION_STATE',
-      422,
-      'easy_choices_missing_summary'
-    );
-  }
-
-  let rounds: EasyChoiceRound[];
-  try {
-    rounds = await generateEasyChoicesRounds({
-      language,
-      summaryText,
-      conflictCategory: input.session.conflict_category,
-      apiKey: input.anthropicKey,
-    });
-  } catch (error) {
-    await failGenerationClaim(input.admin, {
-      sessionId: input.session.session_id,
-      requestId: input.requestId,
-      claimToken: input.claimToken,
-      generationKind: EASY_CHOICES_GENERATION_KIND,
-    });
-    throw error;
-  }
-
-  const nextVersion = input.session.session_version + 1;
-  const currentRound = readEasyChoicesCurrentRound(
-    input.session.session_payload
-  );
-  const responsePayload = buildEasyChoicesResponse({
-    sessionId: input.session.session_id,
-    sessionVersion: nextVersion,
-    rounds,
-    currentRound,
-    replayed: false,
-  });
-
-  return finalizeClaimedGeneration(input.admin, {
-    session: input.session,
-    requestId: input.requestId,
-    claimToken: input.claimToken,
-    generationKind: EASY_CHOICES_GENERATION_KIND,
-    expectedScreen: 'EASY_CHOICES',
-    nextScreen: 'EASY_CHOICES',
-    sessionPayload: withEasyChoicesRoundsOnPayload(
-      input.session.session_payload,
-      rounds
-    ),
-    responsePayload,
-  });
-}
-
-async function handleClaimedOutcomes(input: {
-  claim: ClaimOutcome;
-  mediationId: string;
-  requestId: string;
-  onClaimed: (claimToken: string) => Promise<MediationTurnV2Response>;
-}): Promise<{
-  response: Response;
-  mediationId: string;
-  requestId: string;
-}> {
-  if (
-    input.claim.outcome === 'ALREADY_CLAIMED' ||
-    input.claim.outcome === 'IN_PROGRESS'
-  ) {
-    throw new AppError(
-      'GENERATION_ALREADY_RUNNING',
-      409,
-      'claim_already_running'
-    );
-  }
-
-  if (input.claim.outcome === 'ALREADY_COMPLETED') {
-    if (!isPublicBootstrapResponse(input.claim.response)) {
-      throw new AppError('INTERNAL_ERROR', 500, 'claim_completed_shape');
+    if (!isPublicEnvelope(result.response)) {
+      throw new AppError('INTERNAL_ERROR', 500, 'commit_action_replay');
     }
     return {
-      mediationId: input.mediationId,
-      requestId: input.requestId,
-      response: jsonResponse(input.claim.response, 200),
+      envelope: { ...result.response, replayed: true },
+      session: input.session,
     };
   }
 
-  const envelope = await input.onClaimed(input.claim.claimToken);
-  return {
-    mediationId: input.mediationId,
-    requestId: input.requestId,
-    response: jsonResponse(envelope, 200),
-  };
+  const session = asSessionRow(result.session);
+  if (!session) {
+    throw new AppError('INTERNAL_ERROR', 500, 'commit_action_session');
+  }
+  if (isPublicEnvelope(result.response)) {
+    return { envelope: result.response, session };
+  }
+  return { envelope: input.responsePayload, session };
 }
 
-async function handleBootstrap(req: Request): Promise<{
+function needsGeneration(
+  session: MediationSessionRow
+): GenerationKind | null {
+  const status = session.generation_status;
+  if (status !== 'GENERATING_CONTENT' && status !== 'GENERATING_COMPROMISE') {
+    return null;
+  }
+  const kind = session.last_generation_kind as GenerationKind | null;
+  if (!kind) return null;
+  if (hasScreenContent(session.session_payload, kind)) return null;
+  return kind;
+}
+
+async function resumeOrProcessGeneration(input: {
+  admin: SupabaseClient;
+  session: MediationSessionRow;
+  mediation: MediationRow;
+  talker: Talker;
+  requestId: string;
+  anthropicKey: string;
+}): Promise<MediationTurnV2Envelope> {
+  const kind = needsGeneration(input.session);
+  if (!kind) {
+    return processingEnvelope({
+      session: input.session,
+      correlationId: input.requestId,
+    });
+  }
+
+  const result = await runGenerationPipeline({
+    admin: input.admin,
+    session: input.session,
+    mediation: input.mediation,
+    talker: input.talker,
+    requestId: input.requestId,
+    anthropicKey: input.anthropicKey,
+    generationKind: kind,
+  });
+
+  if (result.kind === 'processing') {
+    return processingEnvelope({
+      session: input.session,
+      correlationId: input.requestId,
+    });
+  }
+  return result.envelope;
+}
+
+async function commitTransitionAndMaybeGenerate(input: {
+  admin: SupabaseClient;
+  session: MediationSessionRow;
+  mediation: MediationRow;
+  talker: Talker;
+  clientRequestId: string;
+  anthropicKey: string;
+  transition: ReturnType<typeof applyUserTransition>;
+}): Promise<MediationTurnV2Envelope> {
+  const t = input.transition;
+  const lastKind =
+    t.lastGenerationKind ??
+    (input.session.last_generation_kind as GenerationKind | null) ??
+    'SUMMARY';
+
+  if (!t.kickoffGeneration) {
+    const provisional: MediationSessionRow = {
+      ...input.session,
+      current_screen: t.nextScreen,
+      session_payload: t.sessionPayload,
+      generation_status: t.generationStatus,
+      last_generation_kind: lastKind,
+      progress_total: t.progressTotal,
+      session_version: input.session.session_version + 1,
+    };
+    const responsePayload = buildEnvelope({
+      session: provisional,
+      talker: input.talker,
+      correlationId: input.clientRequestId,
+    });
+    const committed = await commitAction(input.admin, {
+      session: input.session,
+      requestId: input.clientRequestId,
+      expectedScreen: input.session.current_screen,
+      nextScreen: t.nextScreen,
+      sessionPayload: t.sessionPayload,
+      generationStatus: t.generationStatus,
+      lastGenerationKind: lastKind,
+      progressTotal: t.progressTotal,
+      responsePayload,
+    });
+    return committed.envelope;
+  }
+
+  // One client requestId: atomic kickoff + claim (no server UUID).
+  const started = await startMediationGeneration(input.admin, {
+    session: input.session,
+    requestId: input.clientRequestId,
+    expectedScreen: input.session.current_screen,
+    nextScreen: t.nextScreen,
+    sessionPayload: t.sessionPayload,
+    generationStatus: t.generationStatus,
+    generationKind: t.kickoffGeneration,
+    progressTotal: t.progressTotal,
+  });
+
+  if (started.outcome === 'ALREADY_COMPLETED') {
+    if (isPublicEnvelope(started.response)) {
+      return started.response;
+    }
+    throw new AppError('INTERNAL_ERROR', 500, 'start_completed_shape');
+  }
+
+  if (
+    started.outcome === 'ALREADY_CLAIMED' ||
+    started.outcome === 'IN_PROGRESS'
+  ) {
+    return processingEnvelope({
+      session: started.session ?? input.session,
+      correlationId: input.clientRequestId,
+    });
+  }
+
+  // CLAIMED — session_version already +1 from kickoff; finalize expects this version.
+  return runClaimedGeneration({
+    admin: input.admin,
+    session: started.session,
+    mediation: input.mediation,
+    talker: input.talker,
+    requestId: input.clientRequestId,
+    anthropicKey: input.anthropicKey,
+    claimToken: started.claimToken,
+    generationKind: t.kickoffGeneration,
+  });
+}
+
+async function handleTurn(req: Request): Promise<{
   response: Response;
   mediationId?: string;
   requestId?: string;
@@ -581,158 +413,236 @@ async function handleBootstrap(req: Request): Promise<{
     throw new AppError('INVALID_REQUEST', 400, 'json_body');
   }
 
-  const parsed = parseBootstrapRequest(body);
+  const parsed = parseTurnRequest(body);
   if (!parsed.ok) {
     throw new AppError('INVALID_REQUEST', 400, 'request_contract');
   }
 
-  const { mediationId, requestId } = parsed.value;
+  const request = parsed.value;
+  const requestId = request.requestId;
 
-  try {
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const {
-      data: { user },
-      error: userError,
-    } = await userClient.auth.getUser();
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const {
+    data: { user },
+    error: userError,
+  } = await userClient.auth.getUser();
+  if (userError || !user) {
+    throw new AppError('UNAUTHORIZED', 401, 'get_user');
+  }
 
-    if (userError || !user) {
-      throw new AppError('UNAUTHORIZED', 401, 'get_user');
-    }
+  const admin = createClient(supabaseUrl, serviceKey);
 
-    const admin = createClient(supabaseUrl, serviceKey);
-    const mediation = await loadMediation(admin, mediationId);
-    assertMembership(user.id, mediation);
+  // ─── Bootstrap START_OR_RESUME ───────────────────────────────────────────
+  if (request.kind === 'bootstrap') {
+    const mediationId = request.mediationId;
+    try {
+      const mediation = await loadMediation(admin, mediationId);
+      assertMembership(user.id, mediation);
+      const conflictCategory = requireConflictCategory(mediation);
+      const coupleId = requireCoupleId(mediation);
+      const partnerUserId = requirePartnerId(mediation);
+      const hostUserId = mediation.user_id;
 
-    const conflictCategory = requireConflictCategory(mediation);
-    const coupleId = requireCoupleId(mediation);
-    const partnerUserId = requirePartnerId(mediation);
-    const hostUserId = mediation.user_id;
-
-    let session: MediationSessionRow;
-    const existingSessionId = await findSessionIdByMediationId(
-      admin,
-      mediationId
-    );
-    if (existingSessionId) {
-      session = await loadSession(admin, existingSessionId);
-    } else {
-      session = await createSession(admin, {
-        mediationId,
-        coupleId,
-        hostUserId,
-        partnerUserId,
-        conflictCategory,
-      });
-    }
-
-    if (session.current_screen === 'EASY_CHOICES') {
-      const easyCase = classifyEasyChoicesBootstrap(session);
-      if (easyCase.kind === 'unsupported') {
-        throw new AppError(
-          'UNSUPPORTED_SESSION_STATE',
-          422,
-          'easy_choices_bootstrap_state'
-        );
+      let session: MediationSessionRow;
+      const existingSessionId = await findSessionIdByMediationId(
+        admin,
+        mediationId
+      );
+      if (existingSessionId) {
+        session = await loadSession(admin, existingSessionId);
+      } else {
+        session = await createSession(admin, {
+          mediationId,
+          coupleId,
+          hostUserId,
+          partnerUserId,
+          conflictCategory,
+        });
       }
 
-      if (easyCase.kind === 'resume') {
+      const talker = assertSessionMembership(user.id, session);
+
+      if (session.generation_status === 'FAILED') {
         return {
           mediationId,
           requestId,
           response: jsonResponse(
-            buildEasyChoicesResponse({
-              sessionId: session.session_id,
-              sessionVersion: session.session_version,
-              rounds: easyCase.rounds,
-              currentRound: easyCase.currentRound,
-              replayed: false,
+            buildEnvelope({
+              session,
+              talker,
+              correlationId: requestId,
             }),
             200
           ),
         };
       }
 
-      const claim = await claimGeneration(admin, {
-        session,
-        requestId,
-        generationKind: EASY_CHOICES_GENERATION_KIND,
-        expectedScreen: 'EASY_CHOICES',
-      });
+      if (needsGeneration(session)) {
+        const envelope = await resumeOrProcessGeneration({
+          admin,
+          session,
+          mediation,
+          talker,
+          requestId,
+          anthropicKey,
+        });
+        return {
+          mediationId,
+          requestId,
+          response: jsonResponse(envelope, 200),
+        };
+      }
 
-      return handleClaimedOutcomes({
-        claim,
-        mediationId,
-        requestId,
-        onClaimed: (claimToken) =>
-          runEasyChoicesGeneration({
-            admin,
-            session,
-            hostUserId,
-            requestId,
-            anthropicKey,
-            claimToken,
-          }),
-      });
-    }
+      if (session.generation_status.startsWith('GENERATING_')) {
+        return {
+          mediationId,
+          requestId,
+          response: jsonResponse(
+            processingEnvelope({ session, correlationId: requestId }),
+            200
+          ),
+        };
+      }
 
-    if (session.current_screen !== 'SUMMARY') {
-      throw new AppError(
-        'UNSUPPORTED_SESSION_STATE',
-        422,
-        'unsupported_screen'
-      );
-    }
-
-    const bootstrapCase = classifySummaryBootstrap(session);
-
-    if (bootstrapCase.kind === 'unsupported') {
-      throw new AppError(
-        'UNSUPPORTED_SESSION_STATE',
-        422,
-        'summary_bootstrap_state'
-      );
-    }
-
-    if (bootstrapCase.kind === 'resume') {
       return {
         mediationId,
         requestId,
         response: jsonResponse(
-          buildSummaryResponse({
-            sessionId: session.session_id,
-            sessionVersion: session.session_version,
-            summaryText: bootstrapCase.summaryText,
-            replayed: false,
+          buildEnvelope({
+            session,
+            talker,
+            correlationId: requestId,
           }),
+          200
+        ),
+      };
+    } catch (error) {
+      if (error instanceof AppError) {
+        error.mediationId = mediationId;
+        error.requestId = requestId;
+      }
+      throw error;
+    }
+  }
+
+  // ─── Session actions ─────────────────────────────────────────────────────
+  const sessionId = request.sessionId;
+  let mediationId: string | undefined;
+
+  try {
+    let session = await loadSession(admin, sessionId);
+    mediationId = session.mediation_id;
+    const talker = assertSessionMembership(user.id, session);
+    const mediation = await loadMediation(admin, session.mediation_id);
+    assertMembership(user.id, mediation);
+
+    const action = request.action;
+
+    // LOAD_SESSION
+    if (action.type === 'LOAD_SESSION') {
+      if (session.generation_status === 'FAILED') {
+        return {
+          mediationId,
+          requestId,
+          response: jsonResponse(
+            buildEnvelope({ session, talker, correlationId: requestId }),
+            200
+          ),
+        };
+      }
+      if (needsGeneration(session)) {
+        const envelope = await resumeOrProcessGeneration({
+          admin,
+          session,
+          mediation,
+          talker,
+          requestId,
+          anthropicKey,
+        });
+        return {
+          mediationId,
+          requestId,
+          response: jsonResponse(envelope, 200),
+        };
+      }
+      if (session.generation_status.startsWith('GENERATING_')) {
+        return {
+          mediationId,
+          requestId,
+          response: jsonResponse(
+            processingEnvelope({ session, correlationId: requestId }),
+            200
+          ),
+        };
+      }
+      return {
+        mediationId,
+        requestId,
+        response: jsonResponse(
+          buildEnvelope({ session, talker, correlationId: requestId }),
           200
         ),
       };
     }
 
-    const claim = await claimGeneration(admin, {
+    // Concurrent user action during generation → PROCESSING
+    if (session.generation_status.startsWith('GENERATING_')) {
+      if (action.type === 'RETRY') {
+        throw new AppError('INVALID_TRANSITION', 409, 'retry_while_generating');
+      }
+      return {
+        mediationId,
+        requestId,
+        response: jsonResponse(
+          processingEnvelope({ session, correlationId: requestId }),
+          200
+        ),
+      };
+    }
+
+    // RETRY
+    if (action.type === 'RETRY') {
+      const transition = retryTransition({ session });
+      const envelope = await commitTransitionAndMaybeGenerate({
+        admin,
+        session,
+        mediation,
+        talker,
+        clientRequestId: requestId,
+        anthropicKey,
+        transition,
+      });
+      return {
+        mediationId,
+        requestId,
+        response: jsonResponse(envelope, 200),
+      };
+    }
+
+    // Deterministic user transitions
+    const transition = applyUserTransition({
       session,
-      requestId,
-      generationKind: SUMMARY_GENERATION_KIND,
-      expectedScreen: 'SUMMARY',
+      talker,
+      action,
     });
 
-    return handleClaimedOutcomes({
-      claim,
+    const envelope = await commitTransitionAndMaybeGenerate({
+      admin,
+      session,
+      mediation,
+      talker,
+      clientRequestId: requestId,
+      anthropicKey,
+      transition,
+    });
+
+    return {
       mediationId,
       requestId,
-      onClaimed: (claimToken) =>
-        runSummaryGeneration({
-          admin,
-          session,
-          mediation,
-          hostUserId,
-          requestId,
-          anthropicKey,
-          claimToken,
-        }),
-    });
+      response: jsonResponse(envelope, 200),
+    };
   } catch (error) {
     if (error instanceof AppError) {
       error.mediationId = mediationId;
@@ -756,7 +666,7 @@ serve(async (req: Request) => {
   let requestId: string | undefined;
 
   try {
-    const result = await handleBootstrap(req);
+    const result = await handleTurn(req);
     return result.response;
   } catch (error) {
     if (error instanceof AppError) {

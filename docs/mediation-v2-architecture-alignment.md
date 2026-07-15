@@ -9,7 +9,7 @@
 
 ## 1. Executive summary
 
-Audyt obejmuje **150 sklasyfikowanych elementów** w tabelach §3–§7 (w tym pozycje pomocnicze: realtime subscriptions i dynamic imports w §3). Klasyfikacja względem **finalnego kontraktu V2**: tile flow 7 stanów, jeden runtime `mediation-turn-v2`, envelope `screen + content + actions`, max 6× LLM/sesję (1 ekran = 1 call), brak orchestratora legacy.
+Audyt obejmuje **150 sklasyfikowanych elementów** w tabelach §3–§7 (w tym pozycje pomocnicze: realtime subscriptions i dynamic imports w §3). Klasyfikacja względem **finalnego kontraktu V2**: tile flow 7 stanów, jeden runtime `mediation-turn-v2`, envelope `screen + content + actions`, max 7× LLM/sesję (1 ekran = 1 call), brak orchestratora legacy.
 
 **Statystyki architektury** (wyłącznie klasyfikacja elementów):
 
@@ -55,7 +55,7 @@ Zgodnie z kontraktem rev. 3:
               ┌─────────────┴─────────────┐
               ▼                           ▼
    [atomowy commit_mediation_action]   [LLM poza transakcją SQL]
-   session_version++, generation_status   max 6× / sesję
+   session_version++, generation_status   max 7× / sesję
               │                           │
               └─────────────┬─────────────┘
                             ▼
@@ -366,7 +366,7 @@ Endpoint HTTP ma postać `/functions/v1/hyper-task`, mimo że nazwa funkcji w pa
 | etap | scope | output |
 |------|-------|--------|
 | **1. Database alignment** | Nowa migracja: enum SUMMARY…END, `session_payload`, `session_version`, `generation_status`, `commit_mediation_action`; decyzja `couple_id`/`conflict_category`; exclusion store | Migracja SQL reviewed, not 031 patch |
-| **2. Edge Function implementation** | `mediation-turn-v2`: auth, action handler, LLM calls (max 6), PROCESSING, exclusion | Deploy równoległy (skeleton → full) |
+| **2. Edge Function implementation** | `mediation-turn-v2`: auth, action handler, LLM calls (max 7), PROCESSING, exclusion | Deploy równoległy (skeleton → full) |
 | **3. React Native renderer** | Nowy ekran tile-based; `mediationActionClient`; typy envelope; dynamic progress 6/7 | Feature branch, no legacy delete |
 | **4. Parallel cutover** | Feature flag lub route `live-v2`; nowe sesje → V2; stare in-flight → legacy | Okres równoległy (TBD) |
 | **5. Legacy caller removal** | Usunąć `callMediatorRuntime`, `processMediationTurn`, dynamic imports w `live.tsx` | Grep zero refs |

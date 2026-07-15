@@ -14,6 +14,7 @@ const ANTHROPIC_MESSAGES_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
 const SUMMARY_MAX_TOKENS = 1024;
 const EASY_CHOICES_MAX_TOKENS = 2048;
+const SCREEN_MAX_TOKENS = 1024;
 const TEMPERATURE = 0.3;
 const ANALYSIS_EXCERPT_MAX = 400;
 
@@ -375,4 +376,271 @@ export async function generateEasyChoicesRounds(input: {
     maxTokens: EASY_CHOICES_MAX_TOKENS,
   });
   return parseEasyChoicesLlmRounds(rawText);
+}
+
+function requireStringField(
+  parsed: Record<string, unknown>,
+  key: string,
+  stage: string
+): string {
+  const value = parsed[key];
+  if (typeof value !== 'string' || value.trim().length < 1) {
+    throw new AppError('LLM_INVALID_RESPONSE', 422, stage);
+  }
+  return value.trim();
+}
+
+export function parseFirstDealLlm(raw: string): { dealText: string } {
+  const parsed = parseLlmJsonObject(raw);
+  const keys = Object.keys(parsed);
+  if (keys.length !== 1 || keys[0] !== 'dealText') {
+    throw new AppError('LLM_INVALID_RESPONSE', 422, 'parse_first_deal_keys');
+  }
+  return { dealText: requireStringField(parsed, 'dealText', 'parse_first_deal') };
+}
+
+export function parseCompromiseLlm(raw: string): {
+  dealText: string;
+  whyItFitsBoth: string;
+} {
+  const parsed = parseLlmJsonObject(raw);
+  const keys = Object.keys(parsed).sort();
+  if (keys.join(',') !== 'dealText,whyItFitsBoth') {
+    throw new AppError('LLM_INVALID_RESPONSE', 422, 'parse_compromise_keys');
+  }
+  return {
+    dealText: requireStringField(parsed, 'dealText', 'parse_compromise_deal'),
+    whyItFitsBoth: requireStringField(
+      parsed,
+      'whyItFitsBoth',
+      'parse_compromise_why'
+    ),
+  };
+}
+
+export function parseLessonLlm(raw: string): {
+  observation: string;
+  lesson: string;
+} {
+  const parsed = parseLlmJsonObject(raw);
+  const keys = Object.keys(parsed).sort();
+  if (keys.join(',') !== 'lesson,observation') {
+    throw new AppError('LLM_INVALID_RESPONSE', 422, 'parse_lesson_keys');
+  }
+  return {
+    observation: requireStringField(
+      parsed,
+      'observation',
+      'parse_lesson_observation'
+    ),
+    lesson: requireStringField(parsed, 'lesson', 'parse_lesson_text'),
+  };
+}
+
+export function parseDateLlm(raw: string): {
+  dateIdea: string;
+  scenario: string[];
+} {
+  const parsed = parseLlmJsonObject(raw);
+  const keys = Object.keys(parsed).sort();
+  if (keys.join(',') !== 'dateIdea,scenario') {
+    throw new AppError('LLM_INVALID_RESPONSE', 422, 'parse_date_keys');
+  }
+  const dateIdea = requireStringField(parsed, 'dateIdea', 'parse_date_idea');
+  if (!Array.isArray(parsed.scenario) || parsed.scenario.length < 1) {
+    throw new AppError('LLM_INVALID_RESPONSE', 422, 'parse_date_scenario');
+  }
+  const scenario: string[] = [];
+  for (const step of parsed.scenario) {
+    if (typeof step !== 'string' || step.trim().length < 1) {
+      throw new AppError('LLM_INVALID_RESPONSE', 422, 'parse_date_step');
+    }
+    scenario.push(step.trim());
+  }
+  return { dateIdea, scenario };
+}
+
+export function buildFirstDealPrompt(input: {
+  summaryText: string;
+  conflictCategory: string;
+  language: string;
+}): { system: string; user: string } {
+  const language = input.language.trim() || 'pl';
+  const system = [
+    'Jesteś Mościkiem, AI mediatorem dla par.',
+    'Generujesz wyłącznie treść ekranu FIRST_DEAL.',
+    'Nie sterujesz flow. Nie generujesz innych ekranów.',
+    'Zwróć dokładnie jeden obiekt JSON: {"dealText":"..."}.',
+    'Bez markdown, bez code fence, bez dodatkowych kluczy.',
+    `Napisz dealText w języku: ${language}.`,
+  ].join('\n');
+  const user = [
+    'DANE WEJŚCIOWE:',
+    `Kategoria konfliktu: ${input.conflictCategory.trim() || '(brak)'}`,
+    '',
+    '--- SUMMARY ---',
+    input.summaryText.trim() || '(brak)',
+    '',
+    'Wygeneruj jedną konkretną, wykonalną propozycję rozwiązania.',
+    'JSON: {"dealText":"..."}',
+  ].join('\n');
+  return { system, user };
+}
+
+export function buildCompromisePrompt(input: {
+  summaryText: string;
+  firstDealText: string;
+  hostVote: string;
+  partnerVote: string;
+  conflictCategory: string;
+  language: string;
+}): { system: string; user: string } {
+  const language = input.language.trim() || 'pl';
+  const system = [
+    'Jesteś Mościkiem, AI mediatorem dla par.',
+    'Generujesz wyłącznie treść ekranu COMPROMISE.',
+    'Nie sterujesz flow. Nie generujesz innych ekranów.',
+    'Zwróć JSON: {"dealText":"...","whyItFitsBoth":"..."}.',
+    'Bez markdown, bez code fence, bez dodatkowych kluczy.',
+    `Napisz treść w języku: ${language}.`,
+  ].join('\n');
+  const user = [
+    'DANE WEJŚCIOWE:',
+    `Kategoria: ${input.conflictCategory.trim() || '(brak)'}`,
+    `Głos HOST: ${input.hostVote}`,
+    `Głos PARTNER: ${input.partnerVote}`,
+    '',
+    '--- SUMMARY ---',
+    input.summaryText.trim() || '(brak)',
+    '',
+    '--- FIRST_DEAL (odrzucony / niepełna zgoda) ---',
+    input.firstDealText.trim() || '(brak)',
+    '',
+    'JSON: {"dealText":"...","whyItFitsBoth":"..."}',
+  ].join('\n');
+  return { system, user };
+}
+
+export function buildLessonPrompt(input: {
+  summaryText: string;
+  agreementText: string;
+  language: string;
+}): { system: string; user: string } {
+  const language = input.language.trim() || 'pl';
+  const system = [
+    'Jesteś Mościkiem, AI mediatorem dla par.',
+    'Generujesz wyłącznie treść ekranu LESSON.',
+    'Nie sterujesz flow. Nie generujesz DATE ani innych ekranów.',
+    'Zwróć JSON: {"observation":"...","lesson":"..."}.',
+    'Bez markdown, bez code fence, bez dodatkowych kluczy.',
+    `Napisz treść w języku: ${language}.`,
+  ].join('\n');
+  const user = [
+    'DANE WEJŚCIOWE:',
+    '',
+    '--- SUMMARY ---',
+    input.summaryText.trim() || '(brak)',
+    '',
+    '--- AGREEMENT ---',
+    input.agreementText.trim() || '(brak)',
+    '',
+    'JSON: {"observation":"...","lesson":"..."}',
+  ].join('\n');
+  return { system, user };
+}
+
+export function buildDatePrompt(input: {
+  summaryText: string;
+  lessonText: string;
+  language: string;
+}): { system: string; user: string } {
+  const language = input.language.trim() || 'pl';
+  const system = [
+    'Jesteś Mościkiem, AI mediatorem dla par.',
+    'Generujesz wyłącznie treść ekranu DATE.',
+    'Nie sterujesz flow. Nie generujesz LESSON ani innych ekranów.',
+    'Zwróć JSON: {"dateIdea":"...","scenario":["...","...","..."]}.',
+    'scenario: 3–5 krótkich kroków.',
+    'Bez markdown, bez code fence, bez dodatkowych kluczy.',
+    `Napisz treść w języku: ${language}.`,
+  ].join('\n');
+  const user = [
+    'DANE WEJŚCIOWE:',
+    '',
+    '--- SUMMARY ---',
+    input.summaryText.trim() || '(brak)',
+    '',
+    '--- LESSON ---',
+    input.lessonText.trim() || '(brak)',
+    '',
+    'JSON: {"dateIdea":"...","scenario":["..."]}',
+  ].join('\n');
+  return { system, user };
+}
+
+export async function generateFirstDeal(input: {
+  summaryText: string;
+  conflictCategory: string;
+  language: string;
+  apiKey: string;
+}): Promise<{ dealText: string }> {
+  const { system, user } = buildFirstDealPrompt(input);
+  const raw = await callAnthropic({
+    system,
+    user,
+    apiKey: input.apiKey,
+    maxTokens: SCREEN_MAX_TOKENS,
+  });
+  return parseFirstDealLlm(raw);
+}
+
+export async function generateCompromise(input: {
+  summaryText: string;
+  firstDealText: string;
+  hostVote: string;
+  partnerVote: string;
+  conflictCategory: string;
+  language: string;
+  apiKey: string;
+}): Promise<{ dealText: string; whyItFitsBoth: string }> {
+  const { system, user } = buildCompromisePrompt(input);
+  const raw = await callAnthropic({
+    system,
+    user,
+    apiKey: input.apiKey,
+    maxTokens: SCREEN_MAX_TOKENS,
+  });
+  return parseCompromiseLlm(raw);
+}
+
+export async function generateLesson(input: {
+  summaryText: string;
+  agreementText: string;
+  language: string;
+  apiKey: string;
+}): Promise<{ observation: string; lesson: string }> {
+  const { system, user } = buildLessonPrompt(input);
+  const raw = await callAnthropic({
+    system,
+    user,
+    apiKey: input.apiKey,
+    maxTokens: SCREEN_MAX_TOKENS,
+  });
+  return parseLessonLlm(raw);
+}
+
+export async function generateDate(input: {
+  summaryText: string;
+  lessonText: string;
+  language: string;
+  apiKey: string;
+}): Promise<{ dateIdea: string; scenario: string[] }> {
+  const { system, user } = buildDatePrompt(input);
+  const raw = await callAnthropic({
+    system,
+    user,
+    apiKey: input.apiKey,
+    maxTokens: SCREEN_MAX_TOKENS,
+  });
+  return parseDateLlm(raw);
 }
