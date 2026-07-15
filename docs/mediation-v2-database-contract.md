@@ -24,7 +24,7 @@ Mutacje **wyłącznie** przez `service_role` RPC (`SECURITY DEFINER`). Uczestnic
 | 2 | **`session_id`** = PK i **`sessionId`** w API (Product Contract §9, API Contract §2) |
 | 3 | **`couple_id` + `conflict_category`** zapisane w wierszu sesji przy utworzeniu (Product Contract §9.1 — **opcja A**) |
 | 4 | **Brak chatu** — zero tabel/wierszy na dowolny tekst użytkownika |
-| 5 | **Max 4 wywołania LLM / sesję** — licznik w `session_payload.metadata.llmCallCount` |
+| 5 | **Max 6 wywołań LLM / sesję** — `session_payload.metadata.llmCallCount` = liczba **rozpoczętych** Claude calls; +1 wyłącznie przy claim outcome `CLAIMED` (w tym reclaim) |
 | 6 | **LLM poza transakcją SQL** — RPC Commit 1 / Commit 2 (Product Contract §5, §7) |
 | 7 | **Idempotencja** — `(session_id, request_id)` w osobnej tabeli |
 | 8 | **`mediations`** (intake) pozostaje tabelą SHARED; legacy JSONB runtime zostanie usunięte po cutover (Architecture Alignment §6) |
@@ -114,7 +114,6 @@ Obiekt JSONB w kolumnie `mediation_sessions.session_payload`. **Jedyny store tre
   },
   "metadata": {
     "llmCallCount": 0,
-    "lastGenerationKind": null,
     "lastFailedAt": null
   }
 }
@@ -191,11 +190,12 @@ Mapa ekranów wymagających sync obojga uczestników:
 
 | Podpole | Typ | Opis |
 |---------|-----|------|
-| `llmCallCount` | `integer` | Liczba zakończonych wywołań LLM (max 4) |
-| `lastGenerationKind` | `string \| null` | `"SUMMARY_EASY"`, `"FIRST_DEAL"`, `"COMPROMISE"`, `"LESSON_DATE"` |
+| `llmCallCount` | `integer` | Liczba **rozpoczętych** wywołań Claude (max **6**). +1 wyłącznie przy claim `CLAIMED` (w tym reclaim). Nie cofany przy fail sieci/parsera. |
 | `lastFailedAt` | `string (ISO) \| null` | Timestamp ostatniego `generation_status = FAILED` |
 
-**Uwaga:** `screen` **nie** jest duplikowany w payload — autorytatywne jest `macro_state` w wierszu. `progress.current` **nie** jest persystowane — liczone przy projekcji envelope z `macro_state` + `progress_total` (Product Contract §11, API Contract §9).
+**Nie duplikować w payload:** `lastGenerationKind` — autorytatywne jest `mediation_sessions.last_generation_kind` (kolumna).
+
+**Uwaga:** `screen` **nie** jest duplikowany w payload — autorytatywne jest `macro_state` / `current_screen` w wierszu. `progress.current` **nie** jest persystowane — liczone przy projekcji envelope z `macro_state` + `progress_total` (Product Contract §11, API Contract §9).
 
 ---
 
@@ -397,7 +397,7 @@ Wszystkie w schemacie `public`. Legacy `mediation_macro_state` (031) **zostanie 
 | `easyChoices.currentRound` | `0`–`5` |
 | `firstDealVotes.*` | `null` lub enum `mediation_vote` |
 | `agreement` | Zgodność `source` + `acceptance` (§4.3) |
-| `metadata.llmCallCount` | `0`–`4` |
+| `metadata.llmCallCount` | `0`–`6` |
 
 ### 10.3 `used_content_logs`
 
@@ -545,7 +545,7 @@ Interfejsy **bez implementacji SQL**. Wszystkie mutujące: **jedna transakcja** 
 | **Output** | Wiersz |
 | **Transakcja** | Atomowa per faza |
 | **START** | Ustaw `generation_status` → `GENERATING_*` |
-| **COMPLETE** | Merge patch do `session_payload`, `generation_status = IDLE`, opcjonalnie `macro_state`, increment `llmCallCount`, INSERT `used_content_logs` + purge 50 |
+| **COMPLETE** | Merge patch do `session_payload`, `generation_status = IDLE`, opcjonalnie `macro_state`, INSERT `used_content_logs` + purge 50. **Uwaga Runtime V2:** `llmCallCount` inkrementuje `claim_mediation_generation` przy `CLAIMED`, nie COMPLETE. |
 
 **LLM wykonywany przez Edge między START a COMPLETE** — poza transakcją.
 

@@ -39,13 +39,12 @@ Dokładnie **7** ekranów:
 
 Przed pierwszym `LOAD_SESSION` użytkownika:
 
-1. `create_mediation_session` → `macro_state = SUMMARY`, `generation_status = GENERATING_CONTENT`, `session_version = 0`.
-2. Commit 1 (start) → `session_version = 1`.
-3. LLM × 1 (poza SQL): SUMMARY + EASY_CHOICES (5 rund).
-4. Commit 2 (wynik) → zapis `summary`, `easyChoices.rounds`, `generation_status = IDLE`, `session_version = 2`.
-5. Dopiero teraz ekran SUMMARY jest **w pełni gotowy** do wyświetlenia.
+1. `create_mediation_session` → `current_screen = SUMMARY`, `generation_status = GENERATING_CONTENT`, `last_generation_kind = SUMMARY`.
+2. Claim `SUMMARY` → Claude × 1 → finalize → `summary` w payload, `generation_status = IDLE`.
+3. Po przejściu na EASY_CHOICES: claim `EASY_CHOICES` → Claude × 1 → finalize → `easyChoices.rounds`.
+4. Każdy ekran LLM ma osobny claim i osobne wywołanie Claude (1 ekran = 1 call).
 
-Ten bootstrap **nie jest** akcją klienta; klient zaczyna od `LOAD_SESSION`.
+Bootstrap jest wołany przez Edge (`START_OR_RESUME`); klient zaczyna od tego requestu / `LOAD_SESSION`.
 
 ---
 
@@ -513,21 +512,26 @@ Po **Case B** T42 (drugi głos ≠ YES+YES):
 
 ## 19. LLM call budget
 
+Zasada Runtime V2: **1 ekran generowany = 1 Claude call = 1 generation_kind**.
+
+`metadata.llmCallCount` = liczba **rozpoczętych** wywołań. +1 wyłącznie przy claim outcome `CLAIMED` (w tym reclaim). Fail po CLAIMED nie cofa. Replay / ALREADY_* / resume nie zwiększają.
+
 | # | Moment | Wywołania | Ścieżka COMPROMISE | Ścieżka YES+YES |
 |---|--------|-----------|--------------------|-----------------|
-| 1 | SUMMARY + EASY_CHOICES (bootstrap) | **1** | 1 | 1 |
-| 2 | FIRST_DEAL | **1** | 1 | 1 |
-| 3 | COMPROMISE | **0 lub 1** | **1** | **0** |
-| 4 | LESSON + DATE | **1** | 1 (po 2. CONTINUE COMPROMISE) | 1 (po 2. głosie YES+YES) |
-| **Razem** | | **max 4** | 1+1+1+1 = **4** | 1+1+0+1 = **3** |
+| 1 | SUMMARY | **1** | 1 | 1 |
+| 2 | EASY_CHOICES | **1** | 1 | 1 |
+| 3 | FIRST_DEAL | **1** | 1 | 1 |
+| 4 | COMPROMISE | **0 lub 1** | **1** | **0** |
+| 5 | LESSON | **1** | 1 | 1 |
+| 6 | DATE | **1** | 1 | 1 |
+| **Razem** | | **max 6** | 1+1+1+1+1+1 = **6** | 1+1+1+0+1+1 = **5** |
 
 | Reguła | Wartość |
 |--------|---------|
-| Hard maximum | **4** / sesję |
-| Techniczny retry dostawcy | Max 1; **nie** zmienia flow |
-| Retry unikalności (exclusion) | Max 1; wlicza się w budżet 4 |
+| Hard maximum | **6** / sesję |
+| Reclaim po lease expiry | Nowe `CLAIMED` → +1 do budżetu |
 | Retry stylistyczny | **Zabroniony** |
-| RETRY klienta | Ponawia **ten sam** etap generacji; **nie** tworzy nowego ekranu produktowego |
+| RETRY klienta po FAILED | Nowe `CLAIMED` → wlicza się w hard max 6; **nie** tworzy nowego ekranu produktowego |
 
 ---
 

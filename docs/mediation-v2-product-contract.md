@@ -206,7 +206,7 @@ EASY_CHOICES zastępuje legacy nazwę **QUIZ**.
 | Prezentacja | Kafelki (tiles), nie lista radio |
 | Ton odpowiedzi | Konkretne, życiowe, lekko humorystyczne |
 | Odpowiedzi partnerów | Osobno — oboje muszą wybrać przed przejściem do następnej rundy |
-| Generacja LLM | **Preferowane:** SUMMARY + EASY_CHOICES jednym wywołaniem (sekcja 12) |
+| Generacja LLM | **Osobne wywołanie** na ekran (sekcja 12: 1 ekran = 1 Claude call) |
 
 ### Przykładowa struktura generacji (LLM → backend)
 
@@ -669,28 +669,42 @@ Po FIRST_DEAL następuje **bezpośrednio** LESSON z `4 / 6` — **bez skoku** (n
 
 ## 12. Budżet LLM
 
+### Zasada Runtime V2
+
+```text
+1 ekran generowany = 1 wywołanie Claude = 1 generation_kind
+```
+
+Licznik `session_payload.metadata.llmCallCount` = **liczba rozpoczętych** wywołań Claude.
+Inkrementacja wyłącznie przy outcome `CLAIMED` (w tym reclaim po wygaśnięciu lease).
+Brak inkrementacji dla: `ALREADY_CLAIMED`, `IN_PROGRESS`, `ALREADY_COMPLETED`, resume, replay.
+Błąd sieci / parsera po `CLAIMED` **nie cofa** licznika — call został rozpoczęty.
+
 ### Plan wywołań
 
 | # | Moment | Wywołania | Uwagi |
 |---|--------|-----------|-------|
-| 1 | SUMMARY + EASY_CHOICES | **1** (preferowane) | Jedno wywołanie na start flow interaktywnego |
-| 2 | FIRST_DEAL | **1** | Jeden deal |
-| 3 | COMPROMISE | **0 lub 1** | Tylko warunkowo — gdy `GENERATE_COMPROMISE` |
-| 4 | LESSON + DATE | **1** (preferowane) | Jedno wywołanie przed LESSON |
+| 1 | SUMMARY | **1** | Osobny claim |
+| 2 | EASY_CHOICES | **1** | Osobny claim |
+| 3 | FIRST_DEAL | **1** | Osobny claim |
+| 4 | COMPROMISE | **0 lub 1** | Tylko gdy wynik ≠ YES+YES |
+| 5 | LESSON | **1** | Osobny claim |
+| 6 | DATE | **1** | Osobny claim |
 
 ### Target
 
 | Scenariusz | Liczba wywołań LLM |
 |------------|-------------------|
-| Bez COMPROMISE (YES+YES) | **3** |
-| Z COMPROMISE | **4** |
+| Bez COMPROMISE (YES+YES) | **5** |
+| Z COMPROMISE | **6** |
 
 ### Hard maximum
 
-- **4 wywołania** na pełną sesję.
+- **6 wywołań** na pełną sesję (ścieżka COMPROMISE).
+- Ścieżka YES+YES zużywa **5**.
 - **Brak retry stylistycznego.**
-- Dopuszczalny **maksymalnie jeden techniczny retry** przy błędzie dostawcy (timeout, 5xx).
-- Dopuszczalny **maksymalnie jeden retry unikalności** przy oczywistym duplikacie exclusion history (§15) — **nie** wlicza się jako osobna „runda" produktowa; nadal obowiązuje limit 4 wywołań łącznie.
+- Reclaim po wygaśnięciu lease = nowe `CLAIMED` = kolejne rozpoczęcie Claude (zużywa budżet ponownie).
+- Techniczny RETRY klienta po `FAILED` = nowe `CLAIMED` i wlicza się w hard max 6.
 
 Więcej wywołań wymaga uzasadnienia w PR i aktualizacji tej sekcji.
 
@@ -806,7 +820,7 @@ Backend (`mediation-turn-v2` — jedyna Edge Function runtime mediacji) odpowiad
 | Limity | `session_version`, paywall |
 | Idempotencja | `requestId` + `session_version` + deduplikacja commitów |
 | Historia | Exclusion history per couple_id/category/type (max 50/kubełek) |
-| LLM | Wywołanie modelu (max 4/sesję), przekazanie exclusion context |
+| LLM | Wywołanie modelu (max 6/sesję), przekazanie exclusion context |
 | Walidacja | Struktura JSON odpowiedzi LLM (schema, nie styl) |
 | Persystencja | Atomowe RPC, np. `commit_mediation_action` — **nie** legacy `commit_mediation_turn` |
 
@@ -828,10 +842,12 @@ LLM odpowiada za:
 | Obszar | Przykład |
 |--------|----------|
 | Ton Mościka | Ciepły, konkretny, lekko humorystyczny |
-| SUMMARY + EASY_CHOICES | Preferowane jednym wywołaniem |
-| FIRST_DEAL | Jeden deal |
-| COMPROMISE | Jedno finalne rozwiązanie (różne głosy lub upór — ten sam stan) |
-| LESSON + DATE | Preferowane jednym wywołaniem |
+| SUMMARY | Osobne wywołanie Claude |
+| EASY_CHOICES | Osobne wywołanie Claude |
+| FIRST_DEAL | Jeden deal — osobne wywołanie |
+| COMPROMISE | Jedno finalne rozwiązanie — osobne wywołanie |
+| LESSON | Osobne wywołanie Claude |
+| DATE | Osobne wywołanie Claude |
 | Kontekst | Język, para, kategoria konfliktu, odpowiedzi z sesji, głosy z FIRST_DEAL |
 | Unikanie powtórek | Respektowanie sekcji ALREADY USED |
 
@@ -871,7 +887,7 @@ mediation-turn-v2 (Edge Function)
         ↓
   [atomowy commit_mediation_action]  ← bez LLM
         ↓
-  [optional: LLM call poza transakcją + JSON schema validate]  (max 4/session)
+  [optional: LLM call poza transakcją + JSON schema validate]  (max 6/session)
         ↓
   [atomowy commit_mediation_action]  ← zapis treści, agreement, screen
         ↓
@@ -984,7 +1000,7 @@ Projekt uznajemy za **zakończony**, gdy spełnione są **wszystkie** poniższe:
 | 11 | Repo i produkcja zawierają **ten sam zestaw** Edge Functions |
 | 12 | Testy i typecheck przechodzą |
 | 13 | Cleanup wykonany i zweryfikowany (audit repo vs Supabase) |
-| 14 | Budżet LLM: max 4 wywołania/sesję, bez retry stylistycznego |
+| 14 | Budżet LLM: max 6 wywołań/sesję (YES+YES = 5), 1 ekran = 1 call, bez retry stylistycznego |
 
 ---
 
