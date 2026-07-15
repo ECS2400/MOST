@@ -3,6 +3,7 @@ import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import type { ConflictCategory } from '@/constants/conflictCategories';
 import type { MediationState } from '@/types/mediator/mediationState';
 import type { SessionMemory } from '@/types/mediator/sessionMemory';
 import type { RuntimeSession } from '@/types/mediator/runtimeSession';
@@ -170,6 +171,7 @@ export type Tables = {
   mediations: {
     id: string;
     user_id: string;
+    conflict_category: ConflictCategory | null;
     what_happened: string | null;
     what_angered: string | null;
     how_felt: string | null;

@@ -12,11 +12,15 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import {
+  CONFLICT_CATEGORIES,
+  type ConflictCategory,
+} from '@/constants/conflictCategories';
 import { useAuth } from '@/hooks/useAuth';
 import { useCouple } from '@/hooks/useCouple';
 import { useLanguage } from '@/hooks/useLanguage';
 import { getLiveMediationExtras } from '@/constants/i18n/liveMediation';
-import { Colors, Spacing, Typography } from '@/constants/theme';
+import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import {
@@ -52,6 +56,9 @@ export default function NewMediationScreen() {
   const [usePasteInstead, setUsePasteInstead] = useState(false);
   const [pastedText, setPastedText] = useState('');
 
+  const [conflictCategory, setConflictCategory] = useState<ConflictCategory | null>(
+    null
+  );
   const [whatHappened, setWhatHappened] = useState('');
   const [whatAngered, setWhatAngered] = useState('');
   const [howFelt, setHowFelt] = useState('');
@@ -77,12 +84,14 @@ export default function NewMediationScreen() {
   const hasDescription = combinedDescription.trim().length > 0;
   const hasPasteText = pastedText.trim().length > 0;
   const effectivePastedText = pastedText.trim() || null;
+  const hasConflictCategory = conflictCategory !== null;
 
   const canSubmit =
-    hasDescription ||
-    (usePasteInstead && hasPasteText) ||
-    (screenshotUris.length > 0 && interpretStep === 'structured') ||
-    (screenshotUris.length === 0 && hasPasteText);
+    hasConflictCategory &&
+    (hasDescription ||
+      (usePasteInstead && hasPasteText) ||
+      (screenshotUris.length > 0 && interpretStep === 'structured') ||
+      (screenshotUris.length === 0 && hasPasteText));
 
   function handleStructured(form: StructuredFormResult) {
     applyStructuredForm(form, {
@@ -96,7 +105,14 @@ export default function NewMediationScreen() {
   }
 
   async function handleSubmit() {
-    if (!user || !canSubmit || loading) return;
+    if (!user || loading) return;
+
+    if (!conflictCategory) {
+      setError(lm.new.categoryRequiredError);
+      return;
+    }
+
+    if (!canSubmit) return;
 
     setError('');
     setLoading(true);
@@ -116,6 +132,7 @@ export default function NewMediationScreen() {
         userId: user.id,
         coupleId: couple.id,
         language: language || 'pl',
+        conflictCategory,
         whatHappened,
         whatAngered,
         howFelt,
@@ -140,7 +157,11 @@ export default function NewMediationScreen() {
         return;
       }
       if (e instanceof MediationSubmitError) {
-        setError(lm.new.submitError);
+        setError(
+          e.code === 'CONFLICT_CATEGORY_REQUIRED'
+            ? lm.new.categoryRequiredError
+            : lm.new.submitError
+        );
         return;
       }
       setError(e instanceof Error ? e.message : lm.new.submitError);
@@ -178,6 +199,39 @@ export default function NewMediationScreen() {
         </View>
 
         <Text style={styles.intro}>{lm.new.intro}</Text>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{lm.new.categorySectionTitle}</Text>
+          <Text style={styles.sectionSub}>{lm.new.categorySectionSub}</Text>
+          <View style={styles.categoryGrid}>
+            {CONFLICT_CATEGORIES.map((slug) => {
+              const selected = conflictCategory === slug;
+              return (
+                <Pressable
+                  key={slug}
+                  onPress={() => {
+                    setConflictCategory(slug);
+                    if (error === lm.new.categoryRequiredError) {
+                      setError('');
+                    }
+                  }}
+                  style={[styles.categoryChip, selected && styles.categoryChipActive]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                >
+                  <Text
+                    style={[
+                      styles.categoryChipText,
+                      selected && styles.categoryChipTextActive,
+                    ]}
+                  >
+                    {lm.new.conflictCategories[slug]}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
 
         <View style={styles.section}>
           {!usePasteInstead ? (
@@ -323,6 +377,32 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.sm,
     color: Colors.textMuted,
     marginBottom: Spacing.xs,
+  },
+  categoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  categoryChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+  },
+  categoryChipActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primary + '25',
+  },
+  categoryChipText: {
+    fontFamily: Typography.fontFamily.medium,
+    fontSize: Typography.size.sm,
+    color: Colors.textMuted,
+  },
+  categoryChipTextActive: {
+    color: Colors.primaryLight,
+    fontFamily: Typography.fontFamily.semiBold,
   },
   toggleRow: {
     flexDirection: 'row',

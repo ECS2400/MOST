@@ -50,6 +50,21 @@ export interface LiveMediationBundle {
     pasteToggleSub: string;
     pasteLabel: string;
     pastePlaceholder: string;
+    categorySectionTitle: string;
+    categorySectionSub: string;
+    categoryRequiredError: string;
+    conflictCategories: {
+      money: string;
+      chores: string;
+      communication: string;
+      trust: string;
+      jealousy: string;
+      intimacy: string;
+      family: string;
+      parenting: string;
+      time: string;
+      other: string;
+    };
     whatHappened: string;
     whatHappenedPlaceholder: string;
     whatAngered: string;

@@ -1,6 +1,9 @@
+import type { ConflictCategory } from '@/constants/conflictCategories';
+
 export interface CreateMediationInput {
   userId: string;
   coupleId?: string | null;
+  conflictCategory: ConflictCategory;
   whatHappened: string;
   whatAngered: string;
   howFelt: string;

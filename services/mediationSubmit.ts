@@ -1,3 +1,7 @@
+import {
+  isConflictCategory,
+  type ConflictCategory,
+} from '@/constants/conflictCategories';
 import type { Language } from '@/constants/i18n';
 import {
   analyzeMediationScreenshotUrls,
@@ -26,6 +30,7 @@ export interface SubmitNewMediationInput {
   userId: string;
   coupleId: string;
   language: Language;
+  conflictCategory: ConflictCategory;
   whatHappened: string;
   whatAngered: string;
   howFelt: string;
@@ -70,6 +75,7 @@ function toCreateInput(input: SubmitNewMediationInput): CreateMediationInput {
   return {
     userId: input.userId,
     coupleId: input.coupleId,
+    conflictCategory: input.conflictCategory,
     whatHappened: input.whatHappened,
     whatAngered: input.whatAngered,
     howFelt: input.howFelt,
@@ -83,13 +89,24 @@ function toCreateInput(input: SubmitNewMediationInput): CreateMediationInput {
 export async function submitNewMediation(
   input: SubmitNewMediationInput
 ): Promise<SubmitNewMediationResult> {
+  if (!isConflictCategory(input.conflictCategory)) {
+    throw new MediationSubmitError(
+      'create_record',
+      'Missing or invalid conflict category',
+      { code: 'CONFLICT_CATEGORY_REQUIRED' }
+    );
+  }
+
   const createInput = toCreateInput(input);
   const effectivePastedText = input.pastedText?.trim() || null;
 
   let mediationId: string;
 
   try {
-    logMediationSubmitDev('create_record', { coupleId: input.coupleId });
+    logMediationSubmitDev('create_record', {
+      coupleId: input.coupleId,
+      conflictCategory: input.conflictCategory,
+    });
     const mediation = await createMediationRecord(createInput);
     mediationId = mediation.id;
   } catch (error) {

@@ -1,3 +1,4 @@
+import { isConflictCategory } from '@/constants/conflictCategories';
 import { prepareSupabaseRequest, supabase } from '@/services/supabase';
 import {
   MediationPersistenceError,
@@ -65,6 +66,13 @@ export function resolveCombinedDescription(input: CreateMediationInput): string 
 export async function createMediationRecord(
   input: CreateMediationInput
 ): Promise<CreateMediationResult> {
+  if (!isConflictCategory(input.conflictCategory)) {
+    throw new MediationPersistenceError(
+      'create_record',
+      'Brak lub nieprawidłowa kategoria konfliktu'
+    );
+  }
+
   await prepareSupabaseRequest();
 
   const combinedDescription = resolveCombinedDescription(input);
@@ -75,6 +83,7 @@ export async function createMediationRecord(
       user_id: input.userId,
       partner_id: null,
       couple_id: input.coupleId ?? null,
+      conflict_category: input.conflictCategory,
       what_happened: input.whatHappened.trim() || null,
       what_angered: input.whatAngered.trim() || null,
       how_felt: input.howFelt.trim() || null,
