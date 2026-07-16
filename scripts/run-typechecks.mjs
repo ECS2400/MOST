@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 /**
- * Runs isolated TypeScript checks for Expo app, Node/mediator, and Supabase Edge.
+ * Runs isolated TypeScript checks for Expo app and Supabase Edge.
  */
 
 import { spawnSync } from 'node:child_process';
 
 const checks = [
   { name: 'app', config: 'tsconfig.app.json' },
-  { name: 'node', config: 'tsconfig.node.json' },
   { name: 'edge', config: 'tsconfig.edge.json' },
 ];
 

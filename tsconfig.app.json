@@ -27,7 +27,6 @@
     "supabase/**",
     "scripts/**",
     "tests/**",
-    "services/mediatorEngine/**",
     "**/__tests__/**",
     "**/*_test.ts"
   ]

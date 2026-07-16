@@ -4,8 +4,8 @@ import {
   createLoadSessionCoordinator,
   isWaitingForPartner,
   shouldReloadMediationSession,
-} from '@/services/mediationSessionSync';
-import type { MediationTurnV2Envelope } from '@/services/mediationTurnV2.types';
+} from '../mediationSessionSync.ts';
+import type { MediationTurnV2Envelope } from '../mediationTurnV2.types.ts';
 
 function envelope(
   overrides: Partial<MediationTurnV2Envelope> & {

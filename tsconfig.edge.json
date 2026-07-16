@@ -1,6 +1,5 @@
 /**
  * Supabase Edge Functions (Deno-style URL imports).
- * Prebundled mediator-runtime/_generated is excluded; deploy uses npm run build:mediator:edge.
  */
 {
   "extends": "./tsconfig.base.json",
@@ -21,7 +20,6 @@
   ],
   "exclude": [
     "node_modules",
-    "supabase/functions/mediator-runtime/_generated/**",
     "supabase/functions/.env"
   ]
 }

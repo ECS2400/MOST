@@ -8,7 +8,7 @@ import {
   type RealtimeChannelLike,
   type RealtimeClientLike,
   type RealtimeSubscribeStatus,
-} from '@/services/realtimeChannel';
+} from '../realtimeChannel.ts';
 
 type MockChannel = RealtimeChannelLike & {
   name: string;

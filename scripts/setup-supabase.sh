@@ -27,4 +27,3 @@ npx supabase link --project-ref "$PROJECT_REF" --yes
 
 echo ""
 echo "Done. Project linked to https://${PROJECT_REF}.supabase.co"
-echo "Deploy mediator-runtime: npm run build:mediator:edge && npx supabase functions deploy mediator-runtime --project-ref $PROJECT_REF"

@@ -1,6 +1,17 @@
-import type { RuntimeSessionStage } from '@/types/mediator/runtimeSession';
+/** Legacy runtime stage keys kept for i18n bundle shape (no live UI consumer). */
+export type LiveMediationRuntimeStage =
+  | 'intake'
+  | 'story_collection'
+  | 'understanding'
+  | 'needs_and_impact'
+  | 'repair'
+  | 'agreement_building'
+  | 'extension'
+  | 'proposal'
+  | 'closing'
+  | 'safety_hold';
 
-export type LiveMediationRuntimeStageLabels = Record<RuntimeSessionStage, string>;
+export type LiveMediationRuntimeStageLabels = Record<LiveMediationRuntimeStage, string>;
 
 export interface LiveMediationServiceStrings {
   toughQuestionPool: string[];

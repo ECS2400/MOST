@@ -4,9 +4,6 @@ import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import type { ConflictCategory } from '@/constants/conflictCategories';
-import type { MediationState } from '@/types/mediator/mediationState';
-import type { SessionMemory } from '@/types/mediator/sessionMemory';
-import type { RuntimeSession } from '@/types/mediator/runtimeSession';
 
 export const SUPABASE_URL = 'https://ilqdxdjnabmbmmstvczh.supabase.co';
 export const SUPABASE_ANON_KEY =
@@ -86,7 +83,6 @@ export const EDGE = {
   analyzePerspectives: `${SUPABASE_URL}/functions/v1/analyze-perspectives`,
   realtimeCoach: `${SUPABASE_URL}/functions/v1/realtimecoach`,
   checkLimits: `${SUPABASE_URL}/functions/v1/check-limits`,
-  mediatorRuntime: `${SUPABASE_URL}/functions/v1/mediator-runtime`,
   mediationTurnV2: `${SUPABASE_URL}/functions/v1/mediation-turn-v2`,
   soloCoach: `${SUPABASE_URL}/functions/v1/solo-coach`,
   disputeClosure: `${SUPABASE_URL}/functions/v1/dispute-closure`,
@@ -192,14 +188,14 @@ export type Tables = {
     current_question_index: number;
     partner_typing: boolean;
     live_summary: any | null;
-    mediation_state: MediationState | null;
-    session_memory: SessionMemory | null;
+    mediation_state: Record<string, unknown> | null;
+    session_memory: Record<string, unknown> | null;
     mediator_engine_version: string | null;
     mediator_runtime_metadata: Record<string, unknown> | null;
     mediator_last_goal: string | null;
     mediator_last_strategy: string | null;
     mediator_last_safety_level: string | null;
-    mediator_runtime_session: RuntimeSession | null;
+    mediator_runtime_session: Record<string, unknown> | null;
     status:
       | 'pending'
       | 'analyzing'

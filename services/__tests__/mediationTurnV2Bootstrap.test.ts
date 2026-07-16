@@ -3,8 +3,8 @@ import { describe, it } from 'node:test';
 import {
   isMutatingTurnActionType,
   planPostBootstrapClientAction,
-} from '@/services/mediationTurnV2Bootstrap';
-import type { MediationTurnV2Envelope } from '@/services/mediationTurnV2.types';
+} from '../mediationTurnV2Bootstrap.ts';
+import type { MediationTurnV2Envelope } from '../mediationTurnV2.types.ts';
 
 const sampleEnvelope: MediationTurnV2Envelope = {
   ok: true,

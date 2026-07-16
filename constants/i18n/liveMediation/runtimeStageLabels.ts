@@ -1,7 +1,7 @@
-import type { RuntimeSessionStage } from '@/types/mediator/runtimeSession';
+import type { LiveMediationRuntimeStage } from './types';
 
 /** Shared runtime stage labels for live mediation header (Phase UI-B.3c.2). */
-export const RUNTIME_STAGE_LABELS_EN: Record<RuntimeSessionStage, string> = {
+export const RUNTIME_STAGE_LABELS_EN: Record<LiveMediationRuntimeStage, string> = {
   intake: 'Opening',
   story_collection: 'Sharing stories',
   understanding: 'Understanding',
@@ -14,7 +14,7 @@ export const RUNTIME_STAGE_LABELS_EN: Record<RuntimeSessionStage, string> = {
   safety_hold: 'Safety pause',
 };
 
-export const RUNTIME_STAGE_LABELS_PL: Record<RuntimeSessionStage, string> = {
+export const RUNTIME_STAGE_LABELS_PL: Record<LiveMediationRuntimeStage, string> = {
   intake: 'Rozpoczęcie',
   story_collection: 'Zbieranie historii',
   understanding: 'Zrozumienie',
@@ -27,7 +27,7 @@ export const RUNTIME_STAGE_LABELS_PL: Record<RuntimeSessionStage, string> = {
   safety_hold: 'Pauza bezpieczeństwa',
 };
 
-export const RUNTIME_STAGE_LABELS_DE: Record<RuntimeSessionStage, string> = {
+export const RUNTIME_STAGE_LABELS_DE: Record<LiveMediationRuntimeStage, string> = {
   intake: 'Eröffnung',
   story_collection: 'Geschichten sammeln',
   understanding: 'Verständnis',
@@ -40,7 +40,7 @@ export const RUNTIME_STAGE_LABELS_DE: Record<RuntimeSessionStage, string> = {
   safety_hold: 'Sicherheitspause',
 };
 
-export const RUNTIME_STAGE_LABELS_FR: Record<RuntimeSessionStage, string> = {
+export const RUNTIME_STAGE_LABELS_FR: Record<LiveMediationRuntimeStage, string> = {
   intake: 'Ouverture',
   story_collection: 'Partage des récits',
   understanding: 'Compréhension',
@@ -53,7 +53,7 @@ export const RUNTIME_STAGE_LABELS_FR: Record<RuntimeSessionStage, string> = {
   safety_hold: 'Pause sécurité',
 };
 
-export const RUNTIME_STAGE_LABELS_ES: Record<RuntimeSessionStage, string> = {
+export const RUNTIME_STAGE_LABELS_ES: Record<LiveMediationRuntimeStage, string> = {
   intake: 'Apertura',
   story_collection: 'Recogida de historias',
   understanding: 'Comprensión',
@@ -66,7 +66,7 @@ export const RUNTIME_STAGE_LABELS_ES: Record<RuntimeSessionStage, string> = {
   safety_hold: 'Pausa de seguridad',
 };
 
-export const RUNTIME_STAGE_LABELS_IT: Record<RuntimeSessionStage, string> = {
+export const RUNTIME_STAGE_LABELS_IT: Record<LiveMediationRuntimeStage, string> = {
   intake: 'Apertura',
   story_collection: 'Raccolta storie',
   understanding: 'Comprensione',
