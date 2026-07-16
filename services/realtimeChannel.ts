@@ -12,6 +12,8 @@ export type PostgresChangeBinding = {
   callback: (payload: { new: Record<string, unknown>; old: Record<string, unknown> }) => void;
 };
 
+export type RealtimeSubscribeStatus = 'SUBSCRIBED' | 'CHANNEL_ERROR' | 'TIMED_OUT' | 'CLOSED';
+
 export type RealtimeChannelLike = {
   topic: string;
   on: (...args: unknown[]) => RealtimeChannelLike;
@@ -31,6 +33,11 @@ export type PostgresChannelBuildTrace = {
   channelName: string;
   onCallsBeforeSubscribe: number;
   subscribed: boolean;
+};
+
+export type SubscribePostgresChangesOptions = {
+  onStatus?: (status: RealtimeSubscribeStatus) => void;
+  onSubscribeCalled?: () => void;
 };
 
 function asRealtimeClient(client: PostgresRealtimeClient): RealtimeClientLike {
@@ -88,11 +95,39 @@ export function buildPostgresChannel(
 export function subscribePostgresChanges(
   client: PostgresRealtimeClient,
   channelName: string,
-  bindings: PostgresChangeBinding[]
+  bindings: PostgresChangeBinding[],
+  options?: SubscribePostgresChangesOptions
 ): () => void {
   const realtimeClient = asRealtimeClient(client);
-  const channel = buildPostgresChannel(realtimeClient, channelName, bindings);
+
+  let cancelled = false;
+  let ownedChannel: RealtimeChannelLike | null = null;
+
+  async function setup(): Promise<void> {
+    const staleChannel = findChannelByName(realtimeClient, channelName);
+    if (staleChannel) {
+      await realtimeClient.removeChannel(staleChannel);
+    }
+    if (cancelled) return;
+
+    let channel = realtimeClient.channel(channelName);
+    for (const binding of bindings) {
+      channel = channel.on('postgres_changes', binding.config, binding.callback);
+    }
+    if (cancelled) return;
+
+    options?.onSubscribeCalled?.();
+    ownedChannel = channel.subscribe((status: RealtimeSubscribeStatus) => {
+      options?.onStatus?.(status);
+    });
+  }
+
+  void setup();
+
   return () => {
-    void realtimeClient.removeChannel(channel);
+    cancelled = true;
+    if (ownedChannel) {
+      void realtimeClient.removeChannel(ownedChannel);
+    }
   };
 }

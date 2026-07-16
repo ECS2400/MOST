@@ -52,6 +52,7 @@ export default function MediationSessionV2Screen() {
   const [actionBusy, setActionBusy] = useState(false);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [authReadyTick, setAuthReadyTick] = useState(0);
 
   const inFlightRequestId = useRef<string | null>(null);
   const bootRequestId = useRef<string | null>(null);
@@ -63,6 +64,14 @@ export default function MediationSessionV2Screen() {
   const loadCoordinatorRef = useRef<ReturnType<typeof createLoadSessionCoordinator> | null>(
     null
   );
+
+  const trace = useCallback((event: string, data?: Record<string, unknown>) => {
+    if (data) {
+      console.log('[mediation-session-v2:realtime]', event, data);
+      return;
+    }
+    console.log('[mediation-session-v2:realtime]', event);
+  }, []);
 
   const applyEnvelope = useCallback((next: MediationTurnV2Envelope) => {
     if (!mountedRef.current) return;
@@ -153,15 +162,33 @@ export default function MediationSessionV2Screen() {
 
   useEffect(() => {
     mountedRef.current = true;
+    trace('component mounted');
     loadCoordinatorRef.current = createLoadSessionCoordinator(performLoadSession, {
       loadInFlight,
       reloadPending,
     });
+
+    void supabase.auth.getSession().then(({ data }) => {
+      const userId = data.session?.user?.id ?? null;
+      trace('auth user id', { userId });
+      if (data.session?.access_token) {
+        setAuthReadyTick((prev) => prev + 1);
+      }
+    });
+
+    const authSubscription = supabase.auth.onAuthStateChange((_event, session) => {
+      trace('auth user id', { userId: session?.user?.id ?? null });
+      if (session?.access_token) {
+        setAuthReadyTick((prev) => prev + 1);
+      }
+    });
+
     return () => {
       mountedRef.current = false;
       loadCoordinatorRef.current = null;
+      authSubscription.data.subscription.unsubscribe();
     };
-  }, [performLoadSession]);
+  }, [performLoadSession, trace]);
 
   useEffect(() => {
     bootstrap();
@@ -170,13 +197,21 @@ export default function MediationSessionV2Screen() {
   // Soft sync: partner actions / generation finalize → LOAD_SESSION only.
   useEffect(() => {
     const sessionId = envelope?.sessionId;
+    trace('envelope sessionId', { sessionId: sessionId ?? null, mediationId });
+    trace('realtime effect entered');
     if (!sessionId) return;
 
     sessionIdRef.current = sessionId;
+    const channelName = `mediation-session-v2:sync:${sessionId}`;
+    trace('channel name', {
+      channelName,
+      routeMediationId: mediationId ?? null,
+      filter: `session_id=eq.${sessionId}`,
+    });
 
-    return subscribePostgresChanges(
+    const cleanup = subscribePostgresChanges(
       supabase,
-      `mediation-session-v2:sync:${sessionId}`,
+      channelName,
       [
         {
           config: {
@@ -190,12 +225,28 @@ export default function MediationSessionV2Screen() {
             if (!shouldReloadMediationSession(row, lastSessionVersion.current)) {
               return;
             }
+            trace('UPDATE event → LOAD_SESSION', {
+              sessionId,
+              sessionVersion: row.session_version ?? null,
+            });
             loadCoordinatorRef.current?.requestLoad();
           },
         },
-      ]
+      ],
+      {
+        onSubscribeCalled: () => {
+          trace('subscribe called', { channelName });
+        },
+        onStatus: (status) => {
+          trace('subscription status', { channelName, status });
+        },
+      }
     );
-  }, [envelope?.sessionId]);
+    return () => {
+      trace('cleanup called', { channelName });
+      cleanup();
+    };
+  }, [authReadyTick, envelope?.sessionId, mediationId, trace]);
 
   const runAction = useCallback(
     async (action: EnvelopeActionV2) => {
