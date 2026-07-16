@@ -189,8 +189,14 @@ export function buildEnvelope(input: {
       },
     ];
   } else if (screen === 'SUMMARY') {
-    content = { summary: readSummaryText(payload) ?? '' };
+    const hostConfirmed = isConfirmed(payload, 'SUMMARY', 'HOST');
+    const partnerConfirmed = isConfirmed(payload, 'SUMMARY', 'PARTNER');
     const done = isConfirmed(payload, 'SUMMARY', input.talker);
+    content = {
+      summary: readSummaryText(payload) ?? '',
+      hostConfirmed,
+      partnerConfirmed,
+    };
     actions = [
       {
         id: 'continue',

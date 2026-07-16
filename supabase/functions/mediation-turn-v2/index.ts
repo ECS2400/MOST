@@ -21,8 +21,13 @@ import {
   runGenerationPipeline,
   startMediationGeneration,
 } from './generation.ts';
+import { planBootstrapResume } from './bootstrapResume.ts';
 import { hasScreenContent } from './payload.ts';
 import { parseTurnRequest } from './request.ts';
+import {
+  buildSessionIdentityFromMediation,
+  classifyFindSessionLookup,
+} from './sessionIdentity.ts';
 import {
   SUMMARY_MODEL_VERSION,
   SUMMARY_PROMPT_VERSION,
@@ -141,6 +146,10 @@ function requireCoupleId(mediation: MediationRow): string {
   return mediation.couple_id;
 }
 
+/**
+ * Lookup session_id by mediation_id (service_role).
+ * SELECT errors must not be treated as "session missing".
+ */
 async function findSessionIdByMediationId(
   admin: SupabaseClient,
   mediationId: string
@@ -150,9 +159,15 @@ async function findSessionIdByMediationId(
     .select('session_id')
     .eq('mediation_id', mediationId)
     .maybeSingle();
-  if (error) throw new AppError('INTERNAL_ERROR', 500, 'find_session');
-  if (!data || typeof data.session_id !== 'string') return null;
-  return data.session_id;
+  const classified = classifyFindSessionLookup({ error, data });
+  if (classified.kind === 'query_failed') {
+    throw new AppError('INTERNAL_ERROR', 500, 'find_session_query_failed');
+  }
+  if (classified.kind === 'bad_shape') {
+    throw new AppError('INTERNAL_ERROR', 500, 'find_session_shape');
+  }
+  if (classified.kind === 'missing') return null;
+  return classified.sessionId;
 }
 
 async function loadSession(
@@ -180,6 +195,8 @@ async function createSession(
     conflictCategory: string;
   }
 ): Promise<MediationSessionRow> {
+  // RPC handles ON CONFLICT (mediation_id): return existing when identity matches,
+  // or SESSION_IDENTITY_CONFLICT when it does not. No Edge reload fallback.
   const { data, error } = await admin.rpc('create_mediation_session', {
     p_mediation_id: input.mediationId,
     p_couple_id: input.coupleId,
@@ -440,31 +457,39 @@ async function handleTurn(req: Request): Promise<{
     try {
       const mediation = await loadMediation(admin, mediationId);
       assertMembership(user.id, mediation);
-      const conflictCategory = requireConflictCategory(mediation);
-      const coupleId = requireCoupleId(mediation);
-      const partnerUserId = requirePartnerId(mediation);
-      const hostUserId = mediation.user_id;
+
+      // Identity is always from mediation row — not from auth role / requester.
+      const identity = buildSessionIdentityFromMediation(mediation);
+      if ('error' in identity) {
+        if (identity.error === 'COUPLE_MISSING') {
+          throw new AppError('INVALID_REQUEST', 400, 'couple_id');
+        }
+        if (identity.error === 'PARTNER_NOT_READY') {
+          throw new AppError('PARTNER_NOT_READY', 409, 'partner');
+        }
+        throw new AppError(
+          'CONFLICT_CATEGORY_MISSING',
+          422,
+          'conflict_category'
+        );
+      }
 
       let session: MediationSessionRow;
       const existingSessionId = await findSessionIdByMediationId(
         admin,
-        mediationId
+        identity.mediationId
       );
       if (existingSessionId) {
         session = await loadSession(admin, existingSessionId);
       } else {
-        session = await createSession(admin, {
-          mediationId,
-          coupleId,
-          hostUserId,
-          partnerUserId,
-          conflictCategory,
-        });
+        session = await createSession(admin, identity);
       }
 
       const talker = assertSessionMembership(user.id, session);
+      const plan = planBootstrapResume(session);
 
-      if (session.generation_status === 'FAILED') {
+      // Existing IDLE session with content → pure read (no claim/commit/Claude).
+      if (plan.kind === 'read_envelope' || plan.kind === 'failed') {
         return {
           mediationId,
           requestId,
@@ -479,7 +504,7 @@ async function handleTurn(req: Request): Promise<{
         };
       }
 
-      if (needsGeneration(session)) {
+      if (plan.kind === 'resume_generation') {
         const envelope = await resumeOrProcessGeneration({
           admin,
           session,
@@ -495,26 +520,12 @@ async function handleTurn(req: Request): Promise<{
         };
       }
 
-      if (session.generation_status.startsWith('GENERATING_')) {
-        return {
-          mediationId,
-          requestId,
-          response: jsonResponse(
-            processingEnvelope({ session, correlationId: requestId }),
-            200
-          ),
-        };
-      }
-
+      // plan.kind === 'processing'
       return {
         mediationId,
         requestId,
         response: jsonResponse(
-          buildEnvelope({
-            session,
-            talker,
-            correlationId: requestId,
-          }),
+          processingEnvelope({ session, correlationId: requestId }),
           200
         ),
       };
@@ -540,9 +551,10 @@ async function handleTurn(req: Request): Promise<{
 
     const action = request.action;
 
-    // LOAD_SESSION
+    // LOAD_SESSION — read/resume only (same plan as START_OR_RESUME)
     if (action.type === 'LOAD_SESSION') {
-      if (session.generation_status === 'FAILED') {
+      const plan = planBootstrapResume(session);
+      if (plan.kind === 'read_envelope' || plan.kind === 'failed') {
         return {
           mediationId,
           requestId,
@@ -552,7 +564,7 @@ async function handleTurn(req: Request): Promise<{
           ),
         };
       }
-      if (needsGeneration(session)) {
+      if (plan.kind === 'resume_generation') {
         const envelope = await resumeOrProcessGeneration({
           admin,
           session,
@@ -567,21 +579,11 @@ async function handleTurn(req: Request): Promise<{
           response: jsonResponse(envelope, 200),
         };
       }
-      if (session.generation_status.startsWith('GENERATING_')) {
-        return {
-          mediationId,
-          requestId,
-          response: jsonResponse(
-            processingEnvelope({ session, correlationId: requestId }),
-            200
-          ),
-        };
-      }
       return {
         mediationId,
         requestId,
         response: jsonResponse(
-          buildEnvelope({ session, talker, correlationId: requestId }),
+          processingEnvelope({ session, correlationId: requestId }),
           200
         ),
       };

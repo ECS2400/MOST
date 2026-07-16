@@ -24,10 +24,19 @@ export function MediationV2SummaryScreen({
   onAction,
 }: Props) {
   const summary = readString(content.summary);
+  const hostConfirmed = content.hostConfirmed === true;
+  const partnerConfirmed = content.partnerConfirmed === true;
+  const canAct = actions.some((a) => a.type === 'CONTINUE' && a.disabled !== true);
 
   return (
     <View style={styles.wrap}>
       <Text style={styles.body}>{summary || '—'}</Text>
+      {hostConfirmed && canAct ? (
+        <Text style={styles.wait}>Host już potwierdził — Twój ruch.</Text>
+      ) : null}
+      {partnerConfirmed && canAct ? (
+        <Text style={styles.wait}>Partner już potwierdził — Twój ruch.</Text>
+      ) : null}
       {waitingForPartner ? (
         <Text style={styles.wait}>Oczekiwanie na partnera…</Text>
       ) : null}

@@ -15,7 +15,7 @@ export function readEasyChoiceRounds(
 ): EasyChoiceRound[] | null {
   if (!sessionPayload) return null;
   const rounds = readEasyChoicesRounds(sessionPayload);
-  if (!rounds || rounds.length < 1) return null;
+  if (!rounds || rounds.length !== 5) return null;
   return rounds.map((r) => ({
     title: r.question,
     choices: r.options.map((o) => o.label),
@@ -46,12 +46,12 @@ export function classifyEasyChoicesBootstrap(
   if (
     status === 'GENERATING_CONTENT' &&
     kind === 'EASY_CHOICES' &&
-    (rounds === null || rounds.length < 5)
+    rounds === null
   ) {
     return { kind: 'generate' };
   }
 
-  if (status === 'IDLE' && rounds !== null && rounds.length >= 5) {
+  if (status === 'IDLE' && rounds !== null && rounds.length === 5) {
     return {
       kind: 'resume',
       rounds,

@@ -1,3 +1,4 @@
+import { subscribePostgresChanges } from '@/services/realtimeChannel';
 import { supabase } from '@/services/supabase';
 import { buildCombinedDescription } from '@/services/mediationCreate';
 import {
@@ -197,23 +198,17 @@ export function subscribePartnerMediationInvites(
   userId: string,
   onChange: () => void
 ): () => void {
-  const channel = supabase
-    .channel(`partner-mediations:${userId}`)
-    .on(
-      'postgres_changes',
-      {
+  return subscribePostgresChanges(supabase, `partner-mediations:banner:${userId}`, [
+    {
+      config: {
         event: '*',
         schema: 'public',
         table: 'mediations',
         filter: `partner_id=eq.${userId}`,
       },
-      () => onChange()
-    )
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(channel);
-  };
+      callback: () => onChange(),
+    },
+  ]);
 }
 
 export function partnerInviteRoute(invite: PartnerMediationInvite): {

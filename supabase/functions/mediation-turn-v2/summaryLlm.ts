@@ -8,7 +8,7 @@ export const SUMMARY_PROMPT_VERSION = 'summary-v2-1';
  * Anthropic model id — must match the `model` field sent to the API
  * and the value stored as mediation_sessions.model_version.
  */
-export const SUMMARY_MODEL_VERSION = 'claude-sonnet-4-20250514';
+export const SUMMARY_MODEL_VERSION = 'claude-haiku-4-5-20251001';
 
 const ANTHROPIC_MESSAGES_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
@@ -148,7 +148,9 @@ export function buildEasyChoicesPrompt(input: {
     'Nie dodajesz metadanych, statusów ani nextScreen.',
     'Sam tworzysz pytania (title) i odpowiedzi (choices).',
     'Zwróć dokładnie jeden obiekt JSON z polem "rounds" (array).',
+    'Pole "rounds" musi zawierać dokładnie 5 elementów — ani mniej, ani więcej.',
     'Każdy element rounds: { "title": string, "choices": string[] }.',
+    'Każde "choices" ma 3 lub 4 krótkie odpowiedzi.',
     'Bez markdown, bez code fence, bez dodatkowych kluczy na root.',
     `Napisz title i choices w języku: ${language}.`,
   ].join('\n');
@@ -161,7 +163,14 @@ export function buildEasyChoicesPrompt(input: {
     '--- SUMMARY (już wygenerowane) ---',
     summary || '(brak summary)',
     '',
-    'Wygeneruj JSON: {"rounds":[{"title":"...","choices":["...","...","...","..."]}]}',
+    'Wygeneruj JSON z dokładnie 5 rundami:',
+    '{"rounds":[',
+    '{"title":"...","choices":["...","...","...","..."]},',
+    '{"title":"...","choices":["...","...","...","..."]},',
+    '{"title":"...","choices":["...","...","...","..."]},',
+    '{"title":"...","choices":["...","...","...","..."]},',
+    '{"title":"...","choices":["...","...","...","..."]}',
+    ']}',
   ].join('\n');
 
   return { system, user };
@@ -218,7 +227,7 @@ export function parseEasyChoicesLlmRounds(raw: string): EasyChoiceRound[] {
   }
 
   const rounds = parsed.rounds;
-  if (!Array.isArray(rounds) || rounds.length < 1) {
+  if (!Array.isArray(rounds) || rounds.length !== 5) {
     throw new AppError('LLM_INVALID_RESPONSE', 422, 'parse_easy_choices_rounds');
   }
 

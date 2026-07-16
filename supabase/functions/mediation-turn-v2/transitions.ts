@@ -116,7 +116,7 @@ export function applyUserTransition(input: {
     }
     const round = readCurrentRound(payload);
     const rounds = readEasyChoicesRounds(payload);
-    if (!rounds || rounds.length < 5) {
+    if (!rounds || rounds.length !== 5) {
       throw new AppError('UNSUPPORTED_SESSION_STATE', 422, 'easy_choices_empty');
     }
     const current = rounds[round - 1];

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCouple } from '@/hooks/useCouple';
 import { useLanguage } from '@/hooks/useLanguage';
+import { subscribePostgresChanges } from '@/services/realtimeChannel';
 import { supabase } from '@/services/supabase';
 import {
   RelationshipData,
@@ -18,6 +19,7 @@ export function useRelationship() {
   const { t } = useLanguage();
   const [data, setData] = useState<RelationshipData>({ startDate: null, anniversaries: [] });
   const [loading, setLoading] = useState(false);
+  const mountedRef = useRef(true);
 
   const refresh = useCallback(async () => {
     if (!user?.id) return;
@@ -31,6 +33,13 @@ export function useRelationship() {
   }, [user?.id, couple?.id]);
 
   useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     refresh();
   }, [refresh]);
 
@@ -38,32 +47,31 @@ export function useRelationship() {
   useEffect(() => {
     if (!couple?.id) return;
 
-    const channel = supabase
-      .channel(`relationship-dates:${couple.id}`)
-      .on(
-        'postgres_changes',
+    return subscribePostgresChanges(
+      supabase,
+      `relationship-dates:hook:${couple.id}`,
+      [
         {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'couples',
-          filter: `id=eq.${couple.id}`,
+          config: {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'couples',
+            filter: `id=eq.${couple.id}`,
+          },
+          callback: (payload) => {
+            if (!mountedRef.current) return;
+            const row = payload.new as {
+              relationship_start_date?: string | null;
+              anniversaries?: RelationshipAnniversary[] | null;
+            };
+            setData({
+              startDate: row.relationship_start_date || null,
+              anniversaries: Array.isArray(row.anniversaries) ? row.anniversaries : [],
+            });
+          },
         },
-        (payload) => {
-          const row = payload.new as {
-            relationship_start_date?: string | null;
-            anniversaries?: RelationshipAnniversary[] | null;
-          };
-          setData({
-            startDate: row.relationship_start_date || null,
-            anniversaries: Array.isArray(row.anniversaries) ? row.anniversaries : [],
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      ]
+    );
   }, [couple?.id]);
 
   const save = useCallback(

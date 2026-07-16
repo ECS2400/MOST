@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { subscribePostgresChanges } from '@/services/realtimeChannel';
 import { supabase } from '@/services/supabase';
 import { isPartnerNeedId, type PartnerNeedId } from '@/constants/partnerNeeds';
 
@@ -135,21 +136,15 @@ export function subscribePartnerNeeds(
   coupleId: string,
   onChange: () => void
 ): () => void {
-  const channel = supabase
-    .channel(`partner-needs-${coupleId}`)
-    .on(
-      'postgres_changes',
-      {
+  return subscribePostgresChanges(supabase, `partner-needs:dashboard:${coupleId}`, [
+    {
+      config: {
         event: '*',
         schema: 'public',
         table: 'partner_need_signals',
         filter: `couple_id=eq.${coupleId}`,
       },
-      () => onChange()
-    )
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(channel);
-  };
+      callback: () => onChange(),
+    },
+  ]);
 }

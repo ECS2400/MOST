@@ -32,19 +32,24 @@ const RPC_CODE_MAP: Array<{
   { match: 'HOST_PROFILE_NOT_FOUND', publicCode: 'FORBIDDEN', httpStatus: 403 },
   { match: 'PARTNER_PROFILE_NOT_FOUND', publicCode: 'PARTNER_NOT_READY', httpStatus: 409 },
   { match: 'COUPLE_MEMBERSHIP_MISMATCH', publicCode: 'FORBIDDEN', httpStatus: 403 },
-  { match: 'SESSION_IDENTITY_CONFLICT', publicCode: 'INVALID_TRANSITION', httpStatus: 409 },
+  // Identity ≠ screen transition — keep a distinct public code.
+  {
+    match: 'SESSION_IDENTITY_CONFLICT',
+    publicCode: 'SESSION_IDENTITY_CONFLICT',
+    httpStatus: 409,
+  },
   { match: 'SESSION_NOT_FOUND', publicCode: 'INTERNAL_ERROR', httpStatus: 500 },
   { match: 'SESSION_VERSION_CONFLICT', publicCode: 'SESSION_VERSION_CONFLICT', httpStatus: 409 },
   { match: 'INVALID_TRANSITION', publicCode: 'INVALID_TRANSITION', httpStatus: 409 },
   { match: 'DUPLICATE_ACTION', publicCode: 'DUPLICATE_ACTION', httpStatus: 409 },
-  { match: 'REQUEST_ID_ALREADY_USED', publicCode: 'INVALID_TRANSITION', httpStatus: 409 },
+  // Idempotency collision is not a screen transition.
+  { match: 'REQUEST_ID_ALREADY_USED', publicCode: 'INTERNAL_ERROR', httpStatus: 409 },
   { match: 'INVALID_CONFLICT_CATEGORY', publicCode: 'CONFLICT_CATEGORY_MISSING', httpStatus: 422 },
   { match: 'HOST_PARTNER_MUST_DIFFER', publicCode: 'PARTNER_NOT_READY', httpStatus: 409 },
   { match: 'INVALID_GENERATION_STATUS', publicCode: 'INVALID_TRANSITION', httpStatus: 409 },
   { match: 'INVALID_GENERATION_KIND', publicCode: 'INVALID_TRANSITION', httpStatus: 409 },
   { match: 'SUMMARY_ALREADY_PRESENT', publicCode: 'UNSUPPORTED_SESSION_STATE', httpStatus: 422 },
   { match: 'EASY_CHOICES_ALREADY_PRESENT', publicCode: 'UNSUPPORTED_SESSION_STATE', httpStatus: 422 },
-  { match: 'REQUEST_ID_ALREADY_USED', publicCode: 'INVALID_TRANSITION', httpStatus: 409 },
   { match: 'LLM_CALL_BUDGET_EXCEEDED', publicCode: 'LLM_CALL_BUDGET_EXCEEDED', httpStatus: 409 },
 ];
 

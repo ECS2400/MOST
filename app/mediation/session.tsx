@@ -20,6 +20,13 @@ import {
   sendMediationTurnV2Action,
   startOrResumeMediationTurnV2,
 } from '@/services/mediationTurnV2';
+import { planPostBootstrapClientAction } from '@/services/mediationTurnV2Bootstrap';
+import {
+  createLoadSessionCoordinator,
+  isWaitingForPartner,
+  shouldReloadMediationSession,
+} from '@/services/mediationSessionSync';
+import { subscribePostgresChanges } from '@/services/realtimeChannel';
 import type {
   EnvelopeActionV2,
   MediationTurnV2Envelope,
@@ -33,22 +40,6 @@ import { MediationV2DateScreen } from '@/components/mediation/v2/MediationV2Date
 import { MediationV2EndScreen } from '@/components/mediation/v2/MediationV2EndScreen';
 import { MediationV2ProcessingView } from '@/components/mediation/v2/MediationV2ProcessingView';
 import { MediationV2ErrorView } from '@/components/mediation/v2/MediationV2ErrorView';
-
-function isWaitingForPartner(envelope: MediationTurnV2Envelope): boolean {
-  if (envelope.processing) return false;
-  if (envelope.content.status === 'failed') return false;
-
-  const partnerStatus = envelope.content.partnerStatus;
-  if (partnerStatus === 'waiting') {
-    const answered = envelope.actions.every((a) => a.disabled === true);
-    return answered;
-  }
-
-  const primary = envelope.actions.find(
-    (a) => a.type === 'CONTINUE' || a.type === 'FINISH' || a.type === 'VOTE'
-  );
-  return primary?.disabled === true;
-}
 
 export default function MediationSessionV2Screen() {
   const router = useRouter();
@@ -66,15 +57,24 @@ export default function MediationSessionV2Screen() {
   const bootRequestId = useRef<string | null>(null);
   const lastSessionVersion = useRef<number | null>(null);
   const loadInFlight = useRef(false);
+  const reloadPending = useRef(false);
+  const mountedRef = useRef(true);
+  const sessionIdRef = useRef<string | null>(null);
+  const loadCoordinatorRef = useRef<ReturnType<typeof createLoadSessionCoordinator> | null>(
+    null
+  );
 
   const applyEnvelope = useCallback((next: MediationTurnV2Envelope) => {
+    if (!mountedRef.current) return;
     setEnvelope(next);
     lastSessionVersion.current = next.sessionVersion;
+    sessionIdRef.current = next.sessionId;
     setErrorCode(null);
     setErrorMessage(null);
   }, []);
 
   const handlePublicError = useCallback((error: unknown) => {
+    if (!mountedRef.current) return;
     if (error instanceof MediationTurnV2Error) {
       setErrorCode(error.code);
       setErrorMessage(error.message);
@@ -103,6 +103,14 @@ export default function MediationSessionV2Screen() {
     try {
       const next = await startOrResumeMediationTurnV2({ mediationId, requestId });
       applyEnvelope(next);
+      // Explicit guard: bootstrap must never chain CONTINUE/VOTE/etc.
+      if (planPostBootstrapClientAction(next) !== 'none') {
+        throw new MediationTurnV2Error(
+          'INTERNAL_ERROR',
+          500,
+          'Unexpected bootstrap auto-action'
+        );
+      }
     } catch (error) {
       handlePublicError(error);
     } finally {
@@ -111,13 +119,14 @@ export default function MediationSessionV2Screen() {
     }
   }, [applyEnvelope, handlePublicError, mediationId]);
 
-  const reloadSession = useCallback(async () => {
-    if (!envelope?.sessionId || loadInFlight.current || actionBusy) return;
-    loadInFlight.current = true;
+  const performLoadSession = useCallback(async () => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId) return;
+
     const requestId = createMediationTurnRequestId();
     try {
       const next = await loadMediationTurnV2Session({
-        sessionId: envelope.sessionId,
+        sessionId,
         requestId,
       });
       applyEnvelope(next);
@@ -126,6 +135,7 @@ export default function MediationSessionV2Screen() {
         error instanceof MediationTurnV2Error &&
         error.code === 'GENERATION_ALREADY_RUNNING'
       ) {
+        if (!mountedRef.current) return;
         setEnvelope((prev) =>
           prev
             ? { ...prev, processing: true, message: prev.message ?? 'PROCESSING' }
@@ -134,10 +144,24 @@ export default function MediationSessionV2Screen() {
         return;
       }
       handlePublicError(error);
-    } finally {
-      loadInFlight.current = false;
     }
-  }, [actionBusy, applyEnvelope, envelope?.sessionId, handlePublicError]);
+  }, [applyEnvelope, handlePublicError]);
+
+  const reloadSession = useCallback(async () => {
+    loadCoordinatorRef.current?.requestLoad();
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    loadCoordinatorRef.current = createLoadSessionCoordinator(performLoadSession, {
+      loadInFlight,
+      reloadPending,
+    });
+    return () => {
+      mountedRef.current = false;
+      loadCoordinatorRef.current = null;
+    };
+  }, [performLoadSession]);
 
   useEffect(() => {
     bootstrap();
@@ -145,34 +169,33 @@ export default function MediationSessionV2Screen() {
 
   // Soft sync: partner actions / generation finalize → LOAD_SESSION only.
   useEffect(() => {
-    if (!envelope?.sessionId) return;
+    const sessionId = envelope?.sessionId;
+    if (!sessionId) return;
 
-    const channel = supabase
-      .channel(`mediation-session-v2:${envelope.sessionId}`)
-      .on(
-        'postgres_changes',
+    sessionIdRef.current = sessionId;
+
+    return subscribePostgresChanges(
+      supabase,
+      `mediation-session-v2:sync:${sessionId}`,
+      [
         {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'mediation_sessions',
-          filter: `session_id=eq.${envelope.sessionId}`,
+          config: {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'mediation_sessions',
+            filter: `session_id=eq.${sessionId}`,
+          },
+          callback: (payload) => {
+            const row = payload.new as { session_version?: number };
+            if (!shouldReloadMediationSession(row, lastSessionVersion.current)) {
+              return;
+            }
+            loadCoordinatorRef.current?.requestLoad();
+          },
         },
-        (payload) => {
-          const row = payload.new as { session_version?: number };
-          const version =
-            typeof row.session_version === 'number' ? row.session_version : null;
-          if (version != null && lastSessionVersion.current != null && version <= lastSessionVersion.current) {
-            return;
-          }
-          void reloadSession();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [envelope?.sessionId, reloadSession]);
+      ]
+    );
+  }, [envelope?.sessionId]);
 
   const runAction = useCallback(
     async (action: EnvelopeActionV2) => {

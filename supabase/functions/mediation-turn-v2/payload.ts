@@ -1,3 +1,4 @@
+import { AppError } from './errors.ts';
 import type { EasyChoiceRound, Talker, VoteValue } from './types.ts';
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -46,9 +47,12 @@ export function withEasyChoicesRoundsOnPayload(
   payload: Record<string, unknown>,
   rounds: EasyChoiceRound[]
 ): Record<string, unknown> {
+  if (rounds.length !== 5) {
+    throw new AppError('LLM_INVALID_RESPONSE', 422, 'easy_choices_rounds_count');
+  }
   const next = clonePayload(payload);
   const existing = asRecord(next.easyChoices) ?? {};
-  const mapped = rounds.slice(0, 5).map((round, i) => {
+  const mapped = rounds.map((round, i) => {
     const ids = optionIds(round.choices.length);
     return {
       roundIndex: i + 1,
@@ -63,6 +67,7 @@ export function withEasyChoicesRoundsOnPayload(
     ...existing,
     rounds: mapped,
     answers: asRecord(existing.answers) ?? { HOST: {}, PARTNER: {} },
+    // 1-based play index. Default payload may store 0 as empty-template sentinel.
     currentRound:
       typeof existing.currentRound === 'number' && existing.currentRound >= 1
         ? existing.currentRound
@@ -125,7 +130,7 @@ export function readEasyChoicesRounds(
     }
     return null;
   }
-  return out.length >= 5 ? out.slice(0, 5) : out.length > 0 ? out : null;
+  return out.length === 5 ? out : null;
 }
 
 export function readCurrentRound(payload: Record<string, unknown>): number {
@@ -359,7 +364,7 @@ export function hasScreenContent(
   if (kind === 'SUMMARY') return readSummaryText(payload) !== null;
   if (kind === 'EASY_CHOICES') {
     const rounds = readEasyChoicesRounds(payload);
-    return rounds !== null && rounds.length >= 5;
+    return rounds !== null && rounds.length === 5;
   }
   if (kind === 'FIRST_DEAL') {
     const f = asRecord(payload.firstDeal);
