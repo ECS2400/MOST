@@ -17,7 +17,6 @@
     "constants/**/*.ts",
     "utils/**/*.ts",
     "types/**/*.ts",
-    "legacyMigration/**/*.ts",
     "services/**/*.ts",
     "services/**/*.tsx",
     ".expo/types/**/*.ts",

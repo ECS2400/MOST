@@ -1,4 +1,4 @@
-import { invalidateLiveMessagesCache } from '@/services/liveMediation';
+import { invalidateLiveMessagesCache } from '@/services/mediationLegacyCompat';
 import { supabase } from '@/services/supabase';
 
 export async function deleteMediationPermanently(

@@ -8,7 +8,6 @@ import { spawnSync } from 'node:child_process';
 const checks = [
   { name: 'app', config: 'tsconfig.app.json' },
   { name: 'node', config: 'tsconfig.node.json' },
-  { name: 'mediator-client', config: 'tsconfig.mediator-client.json' },
   { name: 'edge', config: 'tsconfig.edge.json' },
 ];
 

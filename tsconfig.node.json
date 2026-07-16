@@ -1,5 +1,5 @@
 /**
- * Node: mediator engine, runtime client tests, liveMediation service, scripts.
+ * Node: mediator engine and scripts.
  * Does not include Expo app screens or Supabase Edge Functions.
  */
 {
@@ -17,20 +17,14 @@
     "esModuleInterop": true,
     "types": [],
     "paths": {
-      "@/*": ["./*"],
-      "@/services/supabase": ["./services/mediatorRuntimeClient/typecheck/supabase.stub.ts"]
+      "@/*": ["./*"]
     }
   },
   "include": [
     "services/mediatorEngine/**/*.ts",
-    "services/mediatorRuntimeClient/**/*.ts",
-    "services/liveMediation.types.ts",
     "types/mediator/**/*.ts",
     "types/node-runtime.d.ts",
     "types/runtime-globals.d.ts",
-    "legacyMigration/**/*.ts",
-    "tests/runtimeComparison/**/*.ts",
-    "hooks/useRuntimeSession.ts",
     "services/*_test.ts",
     "scripts/**/*.ts"
   ],

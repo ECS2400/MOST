@@ -2,7 +2,7 @@ import { Linking } from 'react-native';
 import type { Language } from '@/constants/i18n';
 import { getLiveMediationExtras } from '@/constants/i18n/liveMediation';
 import { supabase } from '@/services/supabase';
-import { LiveMessage } from '@/services/liveMediation';
+import type { LiveMessage } from '@/services/mediationLegacyCompat';
 
 export type AgreementResponsible = 'me' | 'partner' | 'both';
 

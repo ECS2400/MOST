@@ -16,7 +16,7 @@ import {
   SoloChatSession,
 } from '@/services/soloCoach';
 import { finalizeSoloMediation } from '@/services/soloMediationRecord';
-import { endLiveMediation } from '@/services/liveMediation';
+import { endLiveMediation } from '@/services/mediationLegacyCompat';
 
 export interface DateIdea {
   id?: string;
